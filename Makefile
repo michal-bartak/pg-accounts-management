@@ -6,6 +6,7 @@ GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 GOOS := $(shell go env GOOS)
 GOARCH := $(shell go env GOARCH)
+WAILS := $(shell go env GOPATH)/bin/wails
 
 LDFLAGS := -s -w \
 	-X $(VERSION_PKG).Version=$(VERSION) \
@@ -29,7 +30,8 @@ test-vet: test
 
 # Production app bundle (macOS: build/bin/DbAccounts.app). Requires Wails CLI.
 build: sync-wails-version test-vet
-	wails build -ldflags "$(LDFLAGS)"
+	@test -x "$(WAILS)" || (echo "Wails CLI not found at $(WAILS). Run: go install github.com/wailsapp/wails/v2/cmd/wails@latest" && exit 1)
+	$(WAILS) build -ldflags "$(LDFLAGS)"
 	@echo "Built DbAccounts $(VERSION) ($(GIT_COMMIT)) -> build/bin/"
 
 # Archive for distribution under dist/ (adjust platform when cross-compiling).
