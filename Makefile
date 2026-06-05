@@ -8,6 +8,13 @@ GOOS := $(shell go env GOOS)
 GOARCH := $(shell go env GOARCH)
 WAILS := $(shell go env GOPATH)/bin/wails
 
+# Ubuntu 24.04+ ships webkit2gtk 4.1 only; Wails defaults to 4.0 without this tag.
+ifeq ($(GOOS),linux)
+ifneq ($(shell pkg-config --exists webkit2gtk-4.1 2>/dev/null && echo yes),)
+WAILS_BUILD_FLAGS := -tags webkit2_41
+endif
+endif
+
 LDFLAGS := -s -w \
 	-X $(VERSION_PKG).Version=$(VERSION) \
 	-X $(VERSION_PKG).Commit=$(GIT_COMMIT) \
@@ -49,12 +56,12 @@ test-vet: test
 
 # Production app bundle (macOS: build/bin/DbAccounts.app). Requires Wails CLI.
 build: sync-wails-version test-vet $(WAILS)
-	$(WAILS) build -ldflags "$(LDFLAGS)"
+	$(WAILS) build $(WAILS_BUILD_FLAGS) -ldflags "$(LDFLAGS)"
 	@echo "Built DbAccounts $(VERSION) ($(GIT_COMMIT)) -> build/bin/"
 
 # CI build (no tests; test job gates release pipeline).
 build-ci: sync-wails-version $(WAILS)
-	$(WAILS) build -ldflags "$(LDFLAGS)"
+	$(WAILS) build $(WAILS_BUILD_FLAGS) -ldflags "$(LDFLAGS)"
 	@echo "Built DbAccounts $(VERSION) ($(GIT_COMMIT)) -> build/bin/"
 
 # Archive for distribution under dist/ (adjust platform when cross-compiling).

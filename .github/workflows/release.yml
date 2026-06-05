@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (must exist; must match VERSION file, e.g. v0.1.0)"
+        description: "Release tag (v0.1.0 or 0.1.0; must exist on GitHub and match VERSION)"
         required: true
       draft:
         description: "Create as draft release"
@@ -15,28 +15,42 @@ permissions:
   contents: write
 
 jobs:
-  validate:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.normalize.outputs.tag }}
     steps:
+      - name: Normalize tag input
+        id: normalize
+        run: |
+          raw="${{ inputs.tag }}"
+          if [[ "$raw" == v* ]]; then
+            tag="$raw"
+          else
+            tag="v$raw"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Using release tag: $tag"
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ steps.normalize.outputs.tag }}
       - name: Verify tag matches VERSION file
         run: |
           expected="v$(tr -d ' \n\r' < VERSION)"
-          if [ "${{ inputs.tag }}" != "$expected" ]; then
-            echo "Tag ${{ inputs.tag }} does not match VERSION file ($expected)"
+          tag="${{ steps.normalize.outputs.tag }}"
+          if [ "$tag" != "$expected" ]; then
+            echo "Tag $tag does not match VERSION file ($expected)"
             exit 1
           fi
           echo "Tag matches VERSION: $expected"
 
   test:
-    needs: validate
+    needs: prepare
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ needs.prepare.outputs.tag }}
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -44,7 +58,9 @@ jobs:
       - run: go vet ./...
 
   build:
-    needs: test
+    needs:
+      - prepare
+      - test
     strategy:
       fail-fast: false
       matrix:
@@ -62,7 +78,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ needs.prepare.outputs.tag }}
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -70,7 +86,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+          sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
       - name: Install Make (Windows)
         if: runner.os == 'Windows'
         run: choco install make -y
@@ -94,7 +110,9 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: build
+    needs:
+      - prepare
+      - build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -104,7 +122,7 @@ jobs:
           path: dist
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.tag }}
+          tag_name: ${{ needs.prepare.outputs.tag }}
           draft: ${{ inputs.draft }}
           generate_release_notes: true
           files: dist/*

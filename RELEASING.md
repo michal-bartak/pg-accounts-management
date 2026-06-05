@@ -43,7 +43,7 @@ Published from [pg-accounts-management](https://github.com/michal-bartak/pg-acco
    git push github v0.2.0
    ```
 3. GitHub → **Actions** → **release** → **Run workflow**.
-4. Enter the tag (e.g. `v0.2.0`). Optionally check **draft**.
+4. Enter the tag (`v0.1.0` or `0.1.0` — the workflow adds `v` if omitted). Optionally check **draft**.
 5. When the workflow completes, download assets from **Releases**.
 
 GitLab (`origin`) pushes are independent; the release workflow runs only on GitHub.
@@ -57,6 +57,8 @@ GitLab (`origin`) pushes are independent; the release workflow runs only on GitH
 | macOS arm64 | `DbAccounts-v{VERSION}-darwin-arm64.tar.gz` (contains `.app`) |
 
 Linux tarball users need runtime libraries installed (`libgtk-3-0`, `libwebkit2gtk-4.1-0` on Debian/Ubuntu).
+
+On Ubuntu 24.04+ (WebKit 4.1 only), `make build` auto-detects `webkit2gtk-4.1` and passes `-tags webkit2_41` to Wails. Install dev packages: `libgtk-3-dev libwebkit2gtk-4.1-dev`.
 
 ## Local build and package
 
