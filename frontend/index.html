@@ -10,8 +10,6 @@
   <header class="app-header">
     <h1>DbAccounts</h1>
     <p class="subtitle">PostgreSQL role maintenance across clusters</p>
-    <p class="config-path" id="config-path"></p>
-    <p class="app-version" id="app-version"></p>
   </header>
 
   <nav class="tabs" role="tablist">
@@ -116,14 +114,56 @@
     </section>
 
     <section id="panel-settings" class="panel">
-      <h2>Database functions</h2>
-      <p class="hint">Per operation: choose <strong>Execution</strong> (function / SQL statement / PL/pgSQL block). Use <code>${loginname}</code> (remove_role: <code>${rolename}</code> alias). Function mode: no <code>SELECT</code>, no raw <code>$1</code>. Statement/block: role names are embedded in SQL (PostgreSQL cannot bind identifiers as <code>$1</code>).</p>
+      <div class="settings-meta">
+        <span class="settings-meta-label">Config file</span>
+        <code id="config-path" class="config-path"></code>
+      </div>
+
+      <div class="settings-row">
+        <label>Appearance
+          <select id="ui-theme">
+            <option value="system">System</option>
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="settings-section-head">
+        <h2>DB command templates</h2>
+        <button type="button" id="btn-template-help">Template syntax help</button>
+      </div>
       <div id="db-functions-editor"></div>
+
       <h2>Batch</h2>
-      <label>Max concurrency <input type="number" id="batch-concurrency" min="1" max="50" value="5" /></label>
-      <button type="button" id="btn-save-settings" class="primary">Save settings</button>
+      <div class="settings-footer">
+        <label>Max concurrency <input type="number" id="batch-concurrency" min="1" max="50" value="5" /></label>
+        <button type="button" id="btn-save-settings" class="primary">Save settings</button>
+      </div>
     </section>
   </main>
+
+  <dialog id="template-help-dialog">
+    <div id="template-help-form">
+      <h2>DB command template syntax</h2>
+      <p class="hint">Configure per operation under <strong>DB command templates</strong>. See <code>sql/README.md</code> in the repository for full details.</p>
+
+      <h3 id="help-execution-modes">Execution modes</h3>
+      <ul>
+        <li><strong>Function call</strong> — Write the call only (no SELECT). Placeholders become <code>$1</code>, <code>$2</code>, … For remove_role, <code>${rolename}</code> is an alias for <code>${loginname}</code>.</li>
+        <li><strong>SQL statement</strong> — Single statement, no SELECT. Role names are embedded as identifiers (not quoted). Examples: <code>DROP ROLE ${loginname}</code>; <code>GRANT ${parent_roles} TO ${loginname}</code>.</li>
+        <li><strong>PL/pgSQL block</strong> — Inner statements only; the app wraps <code>DO $dbaccounts$ BEGIN … END</code>. Semicolons allowed inside.</li>
+      </ul>
+
+      <h3>Placeholders</h3>
+      <p>Use <code>${field}</code> in templates. Common fields: <code>${loginname}</code>, <code>${fullname}</code>, <code>${email}</code>, <code>${parent_role}</code>, <code>${parent_roles}</code>, <code>${new_password}</code>, <code>${rolename}</code> (remove_role alias).</p>
+      <p>Function mode: do not use raw <code>$1</code> or <code>SELECT</code> in the template. Statement/block mode: role names are identifiers, not bind parameters.</p>
+
+      <menu>
+        <button type="button" id="template-help-close" class="primary">Close</button>
+      </menu>
+    </div>
+  </dialog>
 
   <dialog id="confirm-dialog">
     <div id="confirm-form">

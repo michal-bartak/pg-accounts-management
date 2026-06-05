@@ -13,6 +13,8 @@ const FN_KEYS = {
 let state = null;
 let currentOp = 'create_role';
 let lastResults = [];
+/** @type {MediaQueryList | null} */
+let systemThemeMedia = null;
 
 function backend() {
   return window.go?.main?.App;
@@ -90,18 +92,33 @@ function showToast(msg, type = '') {
   setTimeout(() => el.classList.add('hidden'), 4500);
 }
 
-async function loadAppVersion() {
-  const app = backend();
-  const el = document.getElementById('app-version');
-  if (!app || !el) return;
+function applyTheme(themePref) {
+  const pref = themePref || 'system';
+  let resolved = pref;
+  if (pref === 'system') {
+    if (!systemThemeMedia) {
+      systemThemeMedia = window.matchMedia('(prefers-color-scheme: dark)');
+      systemThemeMedia.addEventListener('change', () => {
+        const current = document.getElementById('ui-theme')?.value || state?.ui?.theme || 'system';
+        if (current === 'system') applyTheme('system');
+      });
+    }
+    resolved = systemThemeMedia.matches ? 'dark' : 'light';
+  }
+  document.documentElement.setAttribute('data-theme', resolved);
+
+  const rt = window.runtime;
+  if (!rt) return;
   try {
-    const v = await app.GetAppVersion();
-    let text = `v${v.version || '?'}`;
-    if (v.commit && v.commit !== 'dev') text += ` · ${v.commit}`;
-    if (v.buildDate) text += ` · ${v.buildDate}`;
-    el.textContent = text;
+    if (pref === 'system' && rt.WindowSetSystemDefaultTheme) {
+      rt.WindowSetSystemDefaultTheme();
+    } else if (resolved === 'light' && rt.WindowSetLightTheme) {
+      rt.WindowSetLightTheme();
+    } else if (rt.WindowSetDarkTheme) {
+      rt.WindowSetDarkTheme();
+    }
   } catch {
-    el.textContent = '';
+    /* native theme optional */
   }
 }
 
@@ -112,9 +129,13 @@ async function loadConfig() {
     return;
   }
   try {
-    await loadAppVersion();
     state = await app.GetConfig();
     document.getElementById('config-path').textContent = await app.GetConfigPath();
+    const themeEl = document.getElementById('ui-theme');
+    if (themeEl) {
+      themeEl.value = state?.ui?.theme || 'system';
+    }
+    applyTheme(state?.ui?.theme || 'system');
     renderAll();
   } catch (e) {
     showToast(String(e), 'error');
@@ -183,22 +204,6 @@ function renderClusterCheckboxes() {
   }
 }
 
-const EXECUTION_HINTS = {
-  function:
-    'Write the call only (no SELECT). Use ${loginname} etc.; values become $1, $2. For remove_role, ${rolename} is an alias for ${loginname}.',
-  statement:
-    'Single SQL statement, no SELECT. Role names are embedded as identifiers (not quoted). Examples: DROP ROLE ${loginname}; GRANT ${parent_roles} TO ${loginname} (comma-separated parents).',
-  block:
-    'Write only inner PL/pgSQL statements; the app wraps DO $dbaccounts$ BEGIN … END. Semicolons allowed inside.',
-};
-
-function updateExecutionHint(block) {
-  const sel = block.querySelector('[data-field="execution"]');
-  const hint = block.querySelector('.fn-execution-hint');
-  if (!sel || !hint) return;
-  hint.textContent = EXECUTION_HINTS[sel.value] || EXECUTION_HINTS.function;
-}
-
 function renderDBFunctionsEditor() {
   const root = document.getElementById('db-functions-editor');
   root.innerHTML = '';
@@ -236,13 +241,10 @@ function renderDBFunctionsEditor() {
       <label>Execution
         <select data-field="execution">${execSelect}</select>
       </label>
-      <p class="hint fn-execution-hint" data-hint-for="${key}"></p>
       <label>Call template
-        <textarea data-field="call" rows="3" class="call-template">${escapeHtml(call)}</textarea>
+        <textarea data-field="call" rows="4" class="call-template" placeholder="e.g. your_schema.fn(\${loginname}, …)">${escapeHtml(call)}</textarea>
       </label>`;
     root.appendChild(block);
-    updateExecutionHint(block);
-    block.querySelector('[data-field="execution"]')?.addEventListener('change', () => updateExecutionHint(block));
   }
 
   document.getElementById('batch-concurrency').value = String(state?.batch?.maxConcurrency || 5);
@@ -571,6 +573,9 @@ async function saveSettings() {
     await app.SaveBatchSettings({
       maxConcurrency: parseInt(document.getElementById('batch-concurrency').value, 10) || 5,
     });
+    await app.SaveUISettings({
+      theme: document.getElementById('ui-theme')?.value || 'system',
+    });
     await loadConfig();
     showToast('Settings saved', 'success');
   } catch (e) {
@@ -681,7 +686,20 @@ document.getElementById('btn-test-selected').addEventListener('click', testSelec
 document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
 document.getElementById('confirm-production').addEventListener('change', updateTargetPreview);
 
+document.getElementById('ui-theme')?.addEventListener('change', (ev) => {
+  applyTheme(ev.target.value);
+});
+
+document.getElementById('btn-template-help')?.addEventListener('click', () => {
+  document.getElementById('template-help-dialog')?.showModal();
+});
+
+document.getElementById('template-help-close')?.addEventListener('click', () => {
+  document.getElementById('template-help-dialog')?.close();
+});
+
 window.addEventListener('DOMContentLoaded', () => {
+  document.documentElement.setAttribute('data-theme', 'dark');
   configureInputCapitalization();
   loadConfig();
 });

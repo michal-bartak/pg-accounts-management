@@ -24,6 +24,8 @@ export function SaveBatchSettings(arg1:model.BatchSettings):Promise<void>;
 
 export function SaveDBFunctions(arg1:model.DBFunctions):Promise<void>;
 
+export function SaveUISettings(arg1:model.UISettings):Promise<void>;
+
 export function TestConnection(arg1:model.TestConnectionRequest):Promise<void>;
 
 export function UpdateCluster(arg1:string,arg2:model.ClusterInput):Promise<model.Cluster>;

@@ -144,6 +144,18 @@ export namespace model {
 	        this.durationMs = source["durationMs"];
 	    }
 	}
+	export class UISettings {
+	    theme: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UISettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.theme = source["theme"];
+	    }
+	}
 	export class DBFunction {
 	    call: string;
 	    execution?: string;
@@ -206,6 +218,7 @@ export namespace model {
 	    clusters: Cluster[];
 	    dbFunctions: DBFunctions;
 	    batch: BatchSettings;
+	    ui: UISettings;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -218,6 +231,7 @@ export namespace model {
 	        this.clusters = this.convertValues(source["clusters"], Cluster);
 	        this.dbFunctions = this.convertValues(source["dbFunctions"], DBFunctions);
 	        this.batch = this.convertValues(source["batch"], BatchSettings);
+	        this.ui = this.convertValues(source["ui"], UISettings);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

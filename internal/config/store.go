@@ -39,6 +39,7 @@ func DefaultConfig() model.Config {
 			},
 		},
 		Batch: model.BatchSettings{MaxConcurrency: 5},
+		UI:    model.UISettings{Theme: model.ThemeSystem},
 	}
 }
 
@@ -99,6 +100,7 @@ func (s *Store) Load() error {
 	if cfg.Batch.MaxConcurrency <= 0 {
 		cfg.Batch.MaxConcurrency = 5
 	}
+	cfg.UI.Theme = model.NormalizeTheme(cfg.UI.Theme)
 	migrateDBFunctions(&cfg.DBFunctions)
 	s.cfg = cfg
 	return nil
@@ -133,6 +135,11 @@ func (s *Store) UpdateBatch(batch model.BatchSettings) error {
 		batch.MaxConcurrency = 5
 	}
 	s.cfg.Batch = batch
+	return s.Save()
+}
+
+func (s *Store) UpdateUI(ui model.UISettings) error {
+	s.cfg.UI = model.UISettings{Theme: model.NormalizeTheme(ui.Theme)}
 	return s.Save()
 }
 

@@ -66,6 +66,10 @@ func (a *App) SaveBatchSettings(batch model.BatchSettings) error {
 	return a.store.UpdateBatch(batch)
 }
 
+func (a *App) SaveUISettings(ui model.UISettings) error {
+	return a.store.UpdateUI(ui)
+}
+
 func (a *App) AddCluster(in model.ClusterInput) (model.Cluster, error) {
 	return a.store.AddCluster(in)
 }

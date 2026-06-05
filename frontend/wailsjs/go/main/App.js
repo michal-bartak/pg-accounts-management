@@ -46,6 +46,10 @@ export function SaveDBFunctions(arg1) {
   return window['go']['main']['App']['SaveDBFunctions'](arg1);
 }
 
+export function SaveUISettings(arg1) {
+  return window['go']['main']['App']['SaveUISettings'](arg1);
+}
+
 export function TestConnection(arg1) {
   return window['go']['main']['App']['TestConnection'](arg1);
 }

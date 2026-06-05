@@ -56,12 +56,35 @@ type BatchSettings struct {
 	MaxConcurrency int `yaml:"max_concurrency" json:"maxConcurrency"`
 }
 
+const (
+	ThemeLight  = "light"
+	ThemeDark   = "dark"
+	ThemeSystem = "system"
+)
+
+type UISettings struct {
+	Theme string `yaml:"theme" json:"theme"` // light | dark | system
+}
+
+// NormalizeTheme returns a valid theme preference; unknown values become system.
+func NormalizeTheme(theme string) string {
+	switch strings.ToLower(strings.TrimSpace(theme)) {
+	case ThemeLight:
+		return ThemeLight
+	case ThemeDark:
+		return ThemeDark
+	default:
+		return ThemeSystem
+	}
+}
+
 type Config struct {
 	Version     int           `yaml:"version" json:"version"`
 	Categories  []Category    `yaml:"categories" json:"categories"`
 	Clusters    []Cluster     `yaml:"clusters" json:"clusters"`
 	DBFunctions DBFunctions   `yaml:"db_functions" json:"dbFunctions"`
 	Batch       BatchSettings `yaml:"batch" json:"batch"`
+	UI          UISettings    `yaml:"ui" json:"ui"`
 }
 
 type ClusterInput struct {

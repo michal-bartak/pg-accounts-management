@@ -43,3 +43,7 @@ db_functions:
     call: "your_schema.change_role_password(${loginname}, ${new_password})"
 batch:
   max_concurrency: 5
+
+# ui.theme: light | dark | system (follow OS appearance)
+ui:
+  theme: system
