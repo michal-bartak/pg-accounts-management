@@ -1,0 +1,45 @@
+# DbAccounts example config — copy structure only; app creates its own file on first launch.
+#
+# db_functions.<operation>.call — template body
+# db_functions.<operation>.execution — function | statement | block (default: function)
+# See sql/README.md
+#
+# Create role: ARRAY['fixed_group', ...] || ${parent_role}
+#   - empty parent role in UI → SQL "... || NULL"
+#   - set parent role → "... || $n::text[]"
+
+version: 1
+categories:
+  - id: production
+    label: Production
+  - id: uat
+    label: UAT
+clusters: []
+db_functions:
+  create_role:
+    call: "admin_access.create_role(${loginname}, NULL, ${fullname}, ${email}, ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_role})"
+  remove_role:
+    execution: function
+    call: "your_schema.remove_app_role(${loginname})"
+  # remove_role:
+  #   execution: statement
+  #   call: "DROP ROLE ${loginname}"
+  # remove_role:
+  #   execution: block
+  #   call: "DROP ROLE ${loginname};"
+  grant_parents:
+    execution: function
+    call: "your_schema.grant_role_parents(${loginname}, ${parent_roles})"
+  # grant_parents:
+  #   execution: statement
+  #   call: "GRANT ${parent_roles} TO ${loginname}"
+  revoke_parents:
+    execution: statement
+    call: "REVOKE ${parent_roles} FROM ${loginname}"
+  # revoke_parents:
+  #   execution: function
+  #   call: "your_schema.revoke_role_parents(${loginname}, ${parent_roles})"
+  change_password:
+    call: "your_schema.change_role_password(${loginname}, ${new_password})"
+batch:
+  max_concurrency: 5

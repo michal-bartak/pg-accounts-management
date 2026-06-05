@@ -1,0 +1,10 @@
+build/bin/
+dist/
+*.tar.gz
+*.exe
+*.dll
+*.so
+*.dylib
+.DS_Store
+.idea/
+.vscode/

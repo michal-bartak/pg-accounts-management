@@ -1,93 +1,128 @@
-# DB Accounts Utility
+# DbAccounts
 
+Cross-platform desktop app for maintaining PostgreSQL roles across many clusters. Built with **Go**, **Wails v2** (WebView), and **pgx**.
 
+## Features
 
-## Getting started
+- Manage PostgreSQL clusters (alias, host, port, database, category)
+- Categories: **Production** and **UAT** (extensible in config)
+- Run role operations in batch against selected categories and/or clusters:
+  - Create role (login, full name, email, parent role)
+  - Remove role
+  - Grant parent role(s)
+  - Change password
+- Operations invoke **your** PostgreSQL functions via **call templates** (`${loginname}`, `ARRAY['fixed'] || ${parent_role}`, etc.)
+- Credentials are **not** stored in config — use `PGUSER` / `PGPASSWORD`, per-cluster connect user, `.pgpass`, or the run dialog
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Config file location
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+| OS | Path |
+|----|------|
+| macOS | `~/Library/Application Support/DbAccounts/config.yaml` |
+| Linux | `~/.config/dbaccounts/config.yaml` |
+| Windows | `%AppData%\DbAccounts\config.yaml` |
 
-## Add your files
+Copy [`config.example.yaml`](config.example.yaml) as a reference. The app creates a default config on first launch.
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## Prerequisites
+
+- Go 1.22+
+- [Wails v2](https://wails.io/docs/gettingstarted/installation)
+- Platform WebView dependencies (Xcode CLT on macOS, WebView2 on Windows, `webkit2gtk` on Linux)
+
+## Version
+
+Application version is defined in [`VERSION`](VERSION) (currently `0.1.0`). Git release tags use the `v` prefix: `v0.1.0`.
+
+See [`RELEASING.md`](RELEASING.md) for bump, tag, and packaging steps.
+
+## Build
+
+```bash
+go install github.com/wailsapp/wails/v2/cmd/wails@latest
+cd /path/to/DbAccounts
+go mod tidy
+make package    # release build + dist/DbAccounts-v*-.tar.gz
+```
+
+Development:
+
+```bash
+wails dev
+```
+
+Other Makefile targets: `make test`, `make version`, `make build`, `make sync-wails-version`.
+
+## Authentication
+
+1. **User**: cluster `connect_user`, else `PGUSER`, else the Operations sidebar user field.
+2. **Password**: Operations password field, else `PGPASSWORD`, else `~/.pgpass`, else **no password** (same as `psql` without `-W` — works with trust auth or empty password).
+
+See [PostgreSQL .pgpass](https://www.postgresql.org/docs/current/libpq-pgpass.html).
+
+## Database call templates
+
+Each operation has a **call template** and **execution mode** in **Settings** or `db_functions.<operation>` in config (`execution`: `function` | `statement` | `block`).
+
+Use **statement** (or **block**) when the template is raw SQL such as DDL/GRANT — PostgreSQL cannot bind role names as `$1`, and the app must embed them as identifiers:
+
+- Remove role: `DROP ROLE ${loginname}`
+- Grant parents: `GRANT ${parent_roles} TO ${loginname}`
+- Revoke parents: `REVOKE ${parent_roles} FROM ${loginname}` (comma-separated parent roles as unquoted identifiers)
+
+Example (create role):
+
+```text
+admin_access.create_role(${loginname}, NULL, ${fullname}, ${email}, ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_role})
+```
+
+- `${loginname}`, `${fullname}`, `${email}` — from the form, bound as `$1`, `$2`, …
+- `NULL` — SQL literal (unused argument).
+- `ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_role}` — fixed groups in config; optional parent role from form (`|| NULL` when empty).
+
+Full syntax, whitelist, YAML examples, and common mistakes: [`sql/README.md`](sql/README.md).
+
+## Safety
+
+- Production clusters use a distinct badge colour.
+- Runs touching **production** require the confirmation checkbox and an extra confirm dialog.
+- **Remove role** asks for confirmation before execution.
+
+## Tests
+
+```bash
+make test          # or: go test ./... -count=1
+```
+
+CI runs the same on every push/PR (`.github/workflows/test.yml`). Run tests before committing — they catch import cycles and compile errors that only show up in `_test.go` packages.
+
+Covers call-template SQL generation for all four operations, command validation/args, config migration, and batch target resolution (DB calls fail without a live server).
+
+## Manual test checklist
+
+- [ ] First launch creates config file at the OS path above
+- [ ] Add/edit/delete clusters; assign production vs UAT
+- [ ] Import from environment (`PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`)
+- [ ] Save call templates + execution mode in Settings (create role: `function` + `ARRAY['...'] || ${parent_role}`; optional `statement` for DROP ROLE / GRANT)
+- [ ] Test connection on one cluster (`.pgpass` and prompted password)
+- [ ] Preview target count when toggling categories/clusters
+- [ ] Run each operation against a single UAT cluster
+- [ ] Run against multiple clusters; verify per-row results and timing
+- [ ] Production run blocked without checkbox; succeeds with checkbox + confirm
+- [ ] One failing cluster does not prevent others from completing
+
+## Project layout
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.sts.foo/postgres/db-accounts-utility.git
-git branch -M master
-git push -uf origin master
+main.go, app.go          Wails entry and bindings
+internal/config/         YAML persistence
+internal/calltemplate/   Template parse/build (function / statement / block)
+internal/pg/             Connections, .pgpass, ExecuteOperation
+internal/batch/          Concurrent batch runner
+internal/commands/       Operation validation
+frontend/                Web UI
 ```
-
-## Integrate with your tools
-
-* [Set up project integrations](https://gitlab.sts.foo/postgres/db-accounts-utility/-/settings/integrations)
-
-## Collaborate with your team
-
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Use and modify as needed for your organization.

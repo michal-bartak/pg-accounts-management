@@ -1,0 +1,154 @@
+---
+description: DbAccounts project context — architecture, conventions, and decisions for PostgreSQL role maintenance GUI
+alwaysApply: true
+---
+
+# DbAccounts — project knowledge
+
+Cross-platform **PostgreSQL role maintenance** desktop app: manage clusters, batch-run role operations via **user-defined PostgreSQL functions** (not direct DDL in app).
+
+## Product decisions (do not regress)
+
+| Topic | Decision |
+|-------|----------|
+| UI shell | **Wails v2** + embedded WebView; frontend is vanilla HTML/CSS/JS in `frontend/` |
+| DB driver | **pgx/v5**; direct **TCP** to `host:port` (no SSH tunnels in v1) |
+| Secrets | **Never** store passwords in YAML; optional `connect_user` only. Auth: cluster `connect_user` → run-dialog user → `PGUSER`; password: non-empty dialog → `PGPASSWORD` → `~/.pgpass` → **empty** (trust / no password, like psql) |
+| Role logic | App calls **call templates** with `${placeholder}` → `SELECT fn($1,...)` — real DDL/privileges live in **DB functions** on each cluster |
+| Categories | Default `production` and `uat`; extensible in config YAML |
+| DB function specs | User will provide real names/signatures; defaults in `config.example.yaml` are placeholders (`your_schema.*`) |
+
+## Stack (current)
+
+- Go module: `github.com/michalbartak/dbaccounts`
+- Wails **v2.12.0** (CLI may auto-bump `go.mod` on `wails dev`)
+- pgx v5, yaml.v3, google/uuid
+- Bindings: `frontend/wailsjs/` — **auto-generated** by Wails; do not hand-edit; regenerate via `wails dev` / `wails build`
+
+## Config file
+
+| OS | Path |
+|----|------|
+| macOS | `~/Library/Application Support/DbAccounts/config.yaml` |
+| Linux | `~/.config/dbaccounts/config.yaml` |
+| Windows | `%AppData%\DbAccounts\config.yaml` |
+
+Example template: [`config.example.yaml`](config.example.yaml). Implemented in `internal/config/` (`paths.go`, `store.go`).
+
+**YAML keys:** `version`, `categories`, `clusters`, `db_functions.<op>.call`, `db_functions.<op>.execution`, `batch.max_concurrency` (default 5). Legacy `name`/`params` migrated on load.
+
+## Wails API (`app.go` → `window.go.main.App`)
+
+- `GetConfig`, `GetConfigPath`, `ReloadConfig`
+- `AddCluster`, `UpdateCluster`, `DeleteCluster`
+- `ImportFromEnvironment` — reads `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`
+- `SaveDBFunctions`, `SaveBatchSettings`
+- `TestConnection`, `PreviewTargets`, `RunOperation`
+
+## Call templates (`internal/calltemplate/`)
+
+Config: `db_functions.<operation>.call` + optional `.execution` (`function` \| `statement` \| `block`). Docs: [`sql/README.md`](sql/README.md).
+
+| `operation` | Allowed `${...}` | Notes |
+|-------------|------------------|-------|
+| `create_role` | loginname, fullname, email, parent_role | `ARRAY \|\|` requires `execution: function` |
+| `remove_role` | loginname, rolename (alias) | `statement`: e.g. `DROP ROLE ${loginname}`; `block`: inner PL/pgSQL only |
+| `grant_parents` | loginname, parent_roles | `statement`: `GRANT ${parent_roles} TO ${loginname}` — identifiers, not quoted |
+| `revoke_parents` | loginname, parent_roles | Default `statement`: `REVOKE ${parent_roles} FROM ${loginname}` |
+| `change_password` | loginname, new_password | |
+
+**Execution:** `function` → `SELECT` + `$n` binds (`Query`). `statement` / `block` → embed values (`Exec`): role fields as identifiers (`loginname`, `parent_roles` list on grant_parents); passwords/names as quoted literals. Do not use raw `$1` in templates.
+
+**Create role default:**
+
+`admin_access.create_role(${loginname}, NULL, ${fullname}, ${email}, ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_role})`
+
+**Template processing:**
+
+- **Function mode:** `${field}` → `$n` text bind from form (`internal/commands` arg map).
+- **Statement/block:** `loginname`, `parent_roles`, `parent_role`, `rolename` → unquoted identifiers; `parent_roles` split on commas (grant/revoke); `new_password`, `fullname`, `email` → SQL string literals.
+- `ARRAY['a','b'] || ${field}` → fixed array literal + `|| NULL` if field empty, else `|| $n::text[]` with `[]string{value}` (processed before other placeholders).
+- `ARRAY[${field}, 'a', 'b']` → normalized to `ARRAY['a','b'] || ${field}` via `normalizeTemplate`.
+- Reject `${Array...}`, `SELECT`, `;`. Legacy `${array_concat:...}` still parsed; migrate broken configs in `internal/config/dbfunctions.go`.
+
+`internal/pg/function.go` → `calltemplate.Build` + `Query` (function) or `Exec` (statement/block).
+
+## UI (`frontend/`)
+
+Tabs: **Clusters**, **Operations**, **Settings**. Prod/UAT badges in CSS. Results table per cluster after run. Do not add heavy frontend framework unless requested.
+
+## Versioning & packaging
+
+- App semver: [`VERSION`](VERSION) — git tags `v$(cat VERSION)` (see [`RELEASING.md`](RELEASING.md)).
+- `make sync-wails-version` updates `wails.json` `productVersion`.
+- `make package` — `wails build` with `-ldflags` (version/commit/date) + `dist/` archive.
+- UI: `GetAppVersion()`; config YAML `version:` is **schema** version only.
+
+## Build & run (macOS)
+
+```bash
+export PATH="/opt/homebrew/bin:$HOME/go/bin:$PATH"
+cd /Users/michalbartak/GitRepo/DbAccounts
+go mod tidy
+wails dev          # dev window + http://localhost:34115
+make package       # → build/bin/DbAccounts.app + dist/*.tar.gz
+```
+
+Go was installed via `brew install go` on this machine. Self-signed dev build warning on darwin is expected.
+
+## Layout
+
+```
+main.go, app.go           Wails entry + bindings
+internal/config/          YAML persistence
+internal/model/           Shared types + RunRequest
+internal/calltemplate/    Call template parse/validate/SQL build (stdlib only)
+internal/pg/              DSN, auth, Connect, CallFunction
+internal/batch/           Concurrent executor
+internal/commands/        Op validation + arg maps
+internal/envimport/       PG* env import
+frontend/                 UI (app.js uses backend())
+sql/README.md             Docs for user's PostgreSQL functions
+```
+
+## Out of scope (v1)
+
+SSH tunnels, encrypted config vault, audit log file, reading remote `pg_hba.conf`.
+
+## Safety (implemented)
+
+- Production badge + checkbox `confirmProduction` + extra confirm dialog
+- Remove role: in-app `<dialog id="confirm-dialog">` (not `window.confirm()` — broken in Wails WebView)
+- Password inputs masked; not written to config
+
+## Pending / follow-ups
+
+1. User may need different function signatures on server — adjust `call` templates and literals only in config (not app code) when possible.
+2. Do **not** edit `.cursor/plans/*.plan.md` unless user explicitly asks.
+
+## Package dependencies (avoid import cycles)
+
+| Package | May import | Must not import |
+|---------|------------|-----------------|
+| `internal/model` | (stdlib only) | other `internal/*` |
+| `internal/calltemplate` | stdlib | `config`, `pg`, `commands`, `batch` |
+| `internal/config` | `model`, `calltemplate` | `pg` |
+| `internal/pg` | `model`, `calltemplate`, pgx | `config` |
+| `internal/commands` | `model`, `config` | — |
+
+- Config validates templates via `calltemplate.ValidateCallTemplate`, not `pg`.
+- **`internal/pg` tests must not import `internal/config`** (creates cycle: config → calltemplate ← pg test → config).
+- Cross-package SQL tests: `commands` + `calltemplate`, or `calltemplate` alone.
+
+## Tests & CI
+
+- Run **`make test`** (or `go test ./...`) before committing.
+- GitHub Actions: `.github/workflows/test.yml` on push/PR.
+- When adding an operation: extend `AllowedPlaceholders`, `commands.BuildArgs`, defaults in `config/store.go`, tests in `calltemplate`, `commands`, `config`.
+
+## Conventions when changing code
+
+- Minimal diffs; match existing package layout and naming.
+- JSON struct tags on model types for Wails (camelCase).
+- After changing Go bindings, run `wails dev` or `wails build` to refresh `frontend/wailsjs/`.
+- Comments only for non-obvious business rules.

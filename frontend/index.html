@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DbAccounts</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>DbAccounts</h1>
+    <p class="subtitle">PostgreSQL role maintenance across clusters</p>
+    <p class="config-path" id="config-path"></p>
+    <p class="app-version" id="app-version"></p>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="operations" role="tab">Operations</button>
+    <button class="tab" data-tab="clusters" role="tab">Clusters</button>
+    <button class="tab" data-tab="settings" role="tab">Settings</button>
+  </nav>
+
+  <main>
+    <section id="panel-operations" class="panel active">
+      <div class="ops-layout">
+        <aside class="ops-sidebar">
+          <h2>Target selection</h2>
+          <div id="category-checkboxes" class="checkbox-group"></div>
+          <h3>Or pick clusters</h3>
+          <div id="cluster-checkboxes" class="checkbox-group cluster-list"></div>
+          <p class="hint" id="target-preview"></p>
+
+          <h2>Connection</h2>
+          <label>User <input type="text" id="auth-user" placeholder="PGUSER or cluster default" autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
+          <label>Password <input type="password" id="auth-password" placeholder="optional — trust auth / empty like psql" /></label>
+          <label class="inline"><input type="checkbox" id="confirm-production" /> I confirm production execution</label>
+        </aside>
+
+        <div class="ops-main">
+          <div class="op-tabs">
+            <button type="button" class="op-tab active" data-op="create_role">Create role</button>
+            <button type="button" class="op-tab" data-op="remove_role">Remove role</button>
+            <button type="button" class="op-tab" data-op="grant_parents">Grant parents</button>
+            <button type="button" class="op-tab" data-op="revoke_parents">Revoke parents</button>
+            <button type="button" class="op-tab" data-op="change_password">Change password</button>
+          </div>
+
+          <form id="form-create_role" class="op-form active" novalidate autocapitalize="none">
+            <label>Login name <input name="loginName" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
+            <label>Full name <input name="fullName" autocapitalize="words" autocomplete="name" /></label>
+            <label>Email <input name="email" type="email" autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
+            <label>Parent role <input name="parentRole" autocapitalize="none" autocomplete="off" spellcheck="false" title="Optional with ${array_concat:parent_role,...}; empty uses fixed groups only" /></label>
+          </form>
+          <form id="form-remove_role" class="op-form" novalidate autocapitalize="none">
+            <label>Login name <input name="loginName" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
+          </form>
+          <form id="form-grant_parents" class="op-form" novalidate autocapitalize="none">
+            <label>Login name <input name="loginName" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
+            <label>Parent role(s) <input name="parentRoles" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="comma-separated or single role" /></label>
+          </form>
+          <form id="form-revoke_parents" class="op-form" novalidate autocapitalize="none">
+            <label>Login name <input name="loginName" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
+            <label>Parent role(s) <input name="parentRoles" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="comma-separated or single role" /></label>
+          </form>
+          <form id="form-change_password" class="op-form" novalidate autocapitalize="none">
+            <label>Login name <input name="loginName" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
+            <label>New password <input name="newPassword" type="password" required autocapitalize="none" autocomplete="off" /></label>
+          </form>
+
+          <div class="run-bar">
+            <button type="button" id="btn-run" class="primary">Run on selected targets</button>
+            <button type="button" id="btn-test-selected">Test connections</button>
+          </div>
+
+          <h2>Results</h2>
+          <div class="table-wrap">
+            <table id="results-table">
+              <thead>
+                <tr>
+                  <th>Cluster</th>
+                  <th>Host</th>
+                  <th>Category</th>
+                  <th>Status</th>
+                  <th>Duration</th>
+                  <th>Message</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-clusters" class="panel">
+      <div class="toolbar">
+        <button type="button" id="btn-add-cluster" class="primary">Add cluster</button>
+        <button type="button" id="btn-import-env">Import from PG* env</button>
+      </div>
+      <div class="table-wrap">
+        <table id="clusters-table">
+          <thead>
+            <tr>
+              <th>Alias</th>
+              <th>Host</th>
+              <th>Port</th>
+              <th>Database</th>
+              <th>Category</th>
+              <th>SSL</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="panel-settings" class="panel">
+      <h2>Database functions</h2>
+      <p class="hint">Per operation: choose <strong>Execution</strong> (function / SQL statement / PL/pgSQL block). Use <code>${loginname}</code> (remove_role: <code>${rolename}</code> alias). Function mode: no <code>SELECT</code>, no raw <code>$1</code>. Statement/block: role names are embedded in SQL (PostgreSQL cannot bind identifiers as <code>$1</code>).</p>
+      <div id="db-functions-editor"></div>
+      <h2>Batch</h2>
+      <label>Max concurrency <input type="number" id="batch-concurrency" min="1" max="50" value="5" /></label>
+      <button type="button" id="btn-save-settings" class="primary">Save settings</button>
+    </section>
+  </main>
+
+  <dialog id="confirm-dialog">
+    <div id="confirm-form">
+      <h2 id="confirm-dialog-title">Confirm</h2>
+      <p id="confirm-dialog-message"></p>
+      <menu>
+        <button type="button" class="primary" id="confirm-dialog-ok">Continue</button>
+        <button type="button" id="confirm-dialog-cancel">Cancel</button>
+      </menu>
+    </div>
+  </dialog>
+
+  <dialog id="cluster-dialog">
+    <form method="dialog" id="cluster-form" autocapitalize="none">
+      <h2 id="cluster-dialog-title">Add cluster</h2>
+      <input type="hidden" name="id" />
+      <label>Alias <input name="alias" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
+      <label>Host <input name="host" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
+      <label>Port <input name="port" type="number" value="5432" /></label>
+      <label>Database <input name="database" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
+      <label>Category <select name="category" required></select></label>
+      <label>SSL mode
+        <select name="sslMode">
+          <option value="prefer">prefer</option>
+          <option value="disable">disable</option>
+          <option value="require">require</option>
+          <option value="verify-ca">verify-ca</option>
+          <option value="verify-full">verify-full</option>
+        </select>
+      </label>
+      <label>Connect user (optional) <input name="connectUser" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="Uses PGUSER if empty" /></label>
+      <menu>
+        <button type="button" id="btn-test-cluster">Test connection</button>
+        <button type="submit" value="save" class="primary">Save</button>
+        <button type="button" value="cancel">Cancel</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
