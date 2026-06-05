@@ -1,4 +1,4 @@
-.PHONY: version sync-wails-version test test-vet build build-ci package package-ci clean dist
+.PHONY: version sync-wails-version ensure-wails test test-vet build build-ci package package-ci clean dist
 
 VERSION := $(shell tr -d ' \n\r' < VERSION)
 VERSION_PKG := github.com/michalbartak/dbaccounts/internal/version
@@ -6,7 +6,12 @@ GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 GOOS := $(shell go env GOOS)
 GOARCH := $(shell go env GOARCH)
-WAILS := $(shell go env GOPATH)/bin/wails
+GOPATH_DIR := $(subst \,/,$(shell go env GOPATH))
+ifeq ($(GOOS),windows)
+WAILS := $(GOPATH_DIR)/bin/wails.exe
+else
+WAILS := $(GOPATH_DIR)/bin/wails
+endif
 
 # Ubuntu 24.04+ ships webkit2gtk 4.1 only; Wails defaults to 4.0 without this tag.
 ifeq ($(GOOS),linux)
@@ -45,8 +50,8 @@ sync-wails-version:
 	@python3 -c "import json, pathlib; v=pathlib.Path('VERSION').read_text().strip(); p=pathlib.Path('wails.json'); w=json.loads(p.read_text()); w.setdefault('info', {})['productVersion']=v; p.write_text(json.dumps(w, indent=2)+'\n')"
 	@echo "wails.json productVersion -> $(VERSION)"
 
-$(WAILS):
-	go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
+ensure-wails:
+	@if [ ! -f "$(WAILS)" ]; then go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0; fi
 
 test:
 	go test ./... -count=1
@@ -55,13 +60,13 @@ test-vet: test
 	go vet ./...
 
 # Production app bundle (macOS: build/bin/DbAccounts.app). Requires Wails CLI.
-build: sync-wails-version test-vet $(WAILS)
-	$(WAILS) build $(WAILS_BUILD_FLAGS) -ldflags "$(LDFLAGS)"
+build: sync-wails-version test-vet ensure-wails
+	"$(WAILS)" build $(WAILS_BUILD_FLAGS) -ldflags "$(LDFLAGS)"
 	@echo "Built DbAccounts $(VERSION) ($(GIT_COMMIT)) -> build/bin/"
 
 # CI build (no tests; test job gates release pipeline).
-build-ci: sync-wails-version $(WAILS)
-	$(WAILS) build $(WAILS_BUILD_FLAGS) -ldflags "$(LDFLAGS)"
+build-ci: sync-wails-version ensure-wails
+	"$(WAILS)" build $(WAILS_BUILD_FLAGS) -ldflags "$(LDFLAGS)"
 	@echo "Built DbAccounts $(VERSION) ($(GIT_COMMIT)) -> build/bin/"
 
 # Archive for distribution under dist/ (adjust platform when cross-compiling).
