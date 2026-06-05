@@ -125,4 +125,10 @@ jobs:
           tag_name: ${{ needs.prepare.outputs.tag }}
           draft: ${{ inputs.draft }}
           generate_release_notes: true
+          body: |
+            ### Installing
+
+            - **macOS:** First launch requires **Right-click → Open** (unsigned build). See [README](https://github.com/michal-bartak/pg-accounts-management#installing-releases).
+            - **Windows:** SmartScreen may warn; choose **More info → Run anyway**.
+            - **Linux:** Install runtime libs `libgtk-3-0` and `libwebkit2gtk-4.1-0` if needed.
           files: dist/*

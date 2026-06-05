@@ -60,6 +60,25 @@ Linux tarball users need runtime libraries installed (`libgtk-3-0`, `libwebkit2g
 
 On Ubuntu 24.04+ (WebKit 4.1 only), `make build` auto-detects `webkit2gtk-4.1` and passes `-tags webkit2_41` to Wails. Install dev packages: `libgtk-3-dev libwebkit2gtk-4.1-dev`.
 
+### Unsigned builds (macOS and Windows)
+
+GitHub Actions produces **ad-hoc / unsigned** binaries. There is no Apple Developer ID notarization or Windows Authenticode signing unless you add that separately (requires paid certificates and CI secrets).
+
+Copy-paste instructions for testers (also worth pasting into the GitHub Release description):
+
+**macOS**
+
+1. Extract `DbAccounts.app` from the release `.tar.gz`.
+2. Right-click the app → **Open** → confirm **Open** (do not double-click the first time).
+3. Or: **System Settings → Privacy & Security → Open Anyway** after a blocked launch.
+4. Or in Terminal: `xattr -dr com.apple.quarantine /path/to/DbAccounts.app`
+
+**Windows**
+
+- If SmartScreen appears: **More info** → **Run anyway**.
+
+To remove Gatekeeper warnings entirely, you would need Apple Developer Program membership (~$99/year), a Developer ID certificate, and notarization in the macOS CI job. See [Wails macOS signing discussion](https://github.com/wailsapp/wails/issues/3868) if you pursue that later.
+
 ## Local build and package
 
 ```bash

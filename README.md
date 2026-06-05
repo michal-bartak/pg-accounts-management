@@ -53,6 +53,23 @@ wails dev
 
 Other Makefile targets: `make test`, `make version`, `make build`, `make sync-wails-version`.
 
+## Installing releases
+
+Pre-built binaries are on [GitHub Releases](https://github.com/michal-bartak/pg-accounts-management/releases). CI builds are **not** signed with an Apple or Microsoft developer certificate, so the first launch may show a security warning.
+
+**macOS** — extract `DbAccounts.app` from the `.tar.gz`, then **right-click** the app → **Open** → confirm **Open**. Alternatively: **System Settings → Privacy & Security → Open Anyway**, or in Terminal:
+
+```bash
+xattr -dr com.apple.quarantine /path/to/DbAccounts.app
+open /path/to/DbAccounts.app
+```
+
+**Windows** — if SmartScreen blocks the `.exe`, click **More info** → **Run anyway**.
+
+**Linux** — extract the tarball and run `./DbAccounts`; install `libgtk-3-0` and `libwebkit2gtk-4.1-0` if the app fails to start.
+
+See [`RELEASING.md`](RELEASING.md) for maintainers.
+
 ## Authentication
 
 1. **User**: cluster `connect_user`, else `PGUSER`, else the Operations sidebar user field.
