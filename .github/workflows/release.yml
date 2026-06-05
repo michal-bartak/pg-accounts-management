@@ -1,0 +1,110 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (must exist; must match VERSION file, e.g. v0.1.0)"
+        required: true
+      draft:
+        description: "Create as draft release"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - name: Verify tag matches VERSION file
+        run: |
+          expected="v$(tr -d ' \n\r' < VERSION)"
+          if [ "${{ inputs.tag }}" != "$expected" ]; then
+            echo "Tag ${{ inputs.tag }} does not match VERSION file ($expected)"
+            exit 1
+          fi
+          echo "Tag matches VERSION: $expected"
+
+  test:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test ./... -count=1
+      - run: go vet ./...
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install Linux WebView dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+      - name: Install Make (Windows)
+        if: runner.os == 'Windows'
+        run: choco install make -y
+      - name: Build and package
+        shell: bash
+        run: make package-ci
+      - name: Zip Windows executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          $exe = "dist/DbAccounts-v${version}-windows-amd64.exe"
+          $zip = "dist/DbAccounts-v${version}-windows-amd64.zip"
+          if (-not (Test-Path $exe)) { throw "Missing $exe" }
+          Compress-Archive -Path $exe -DestinationPath $zip -Force
+          Remove-Item $exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          draft: ${{ inputs.draft }}
+          generate_release_notes: true
+          files: dist/*
