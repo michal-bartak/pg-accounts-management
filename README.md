@@ -7,8 +7,8 @@ Cross-platform desktop app for maintaining PostgreSQL roles across many clusters
 - Manage PostgreSQL clusters (alias, host, port, database, category)
 - Categories: **Production** and **UAT** (extensible in config)
 - **Create role** in batch against selected categories and/or clusters (login, full name, email, parent role)
-- **Alter user** — find a role from a search popup (matched on role name and comment across the **selected** clusters/groups), then edit its whole identity in **one form**:
-  - Privileges (parent-role memberships) and role **attributes** (superuser, create role, create DB, inherit, login, replication, bypass RLS) listed per row and labelled by scope (`→ all`, `ALL PRODUCTION`, individual cluster aliases)
+- **Alter role** — find a role from a search popup (matched on role name and comment across the **selected** clusters/groups), then edit its whole identity in **one form**:
+  - Privileges (parent-role memberships) and role **attributes** (superuser, create role, create DB, inherit, login, replication, bypass RLS) listed per row and labelled by scope (a filled group label like `PRODUCTION` when a whole group matches, else individual cluster aliases)
   - Add a privilege / enable an attribute on any mix of **groups and clusters** via a scope picker
   - View and consolidate **comments** (grouped by identical content) in a popup
   - Change password and remove role
@@ -102,12 +102,13 @@ admin_access.create_role(${loginname}, NULL, ${fullname}, ${email}, ARRAY['gr_pe
 
 Full syntax, whitelist, YAML examples, and common mistakes: [`sql/README.md`](sql/README.md).
 
-## Alter user
+## Alter role
 
-The **Alter user** tab avoids mistyped role names by searching first.
+The **Alter role** button (right side of the top tab bar, shown while Operations is
+active) avoids mistyped role names by searching first.
 
 1. Pick the clusters/groups to compare in **Target selection** (left sidebar), then
-   click **Find user…** and enter a term (≥ 2 characters). Only the **selected**
+   click **Alter role** and enter a term (≥ 2 characters) in the search popup. Only the **selected**
    clusters are scanned (concurrently); the term is matched case-insensitively
    against the role name **and** the role's `COMMENT ON ROLE` (read from
    `pg_shdescription`). Unreachable clusters are reported but do not abort the
@@ -172,18 +173,19 @@ Covers call-template SQL generation for all operations (including `set_comment` 
 - [ ] Test connection on one cluster (`.pgpass` and prompted password)
 - [ ] Preview target count when toggling categories/clusters
 - [ ] Create role against a single UAT cluster
-- [ ] Alter user: search/compare is limited to the selected clusters/groups (Target selection); empty selection is blocked
-- [ ] Alter user: Find user popup; search by name and by comment finds the role, grouped by login; picking closes the popup
-- [ ] Alter user: full name shown when comment is JSON with `full_name`
-- [ ] Alter user: one consolidated form; privilege scope labels (`→ all`, `ALL PRODUCTION`, individual aliases)
-- [ ] Alter user: ✎ Edit opens a per-cluster editor that grants AND revokes on specific clusters/groups; whole-group match shows a filled group label, partial shows transparent cluster labels
-- [ ] Alter user: Add privilege… adds a new membership; × removes everywhere; ↺ discards pending
-- [ ] Alter user: comments popup groups by content (JSON compared by value — formatting differences collapse), labels coloured by environment, edit + save writes to that group's clusters
-- [ ] Alter user: scope labels consistent (Present on / privileges / comments), coloured by environment, ordered by group
-- [ ] Alter user: attributes (superuser/createrole/createdb/inherit/login/replication/bypassrls) shown per row with scope; ＋ enables, × disables via set_attribute
-- [ ] Alter user: privileges/attributes listed one per row (name left, scope labels right); search results use the same scope labels
-- [ ] Alter user: change password via Save (field + checkbox stacked under PASSWORD); Remove role via the red button; Status panel hidden until a run produces output
-- [ ] Alter user: one unreachable cluster is reported but search still returns others
+- [ ] Alter role: search/compare is limited to the selected clusters/groups (Target selection); empty selection is blocked
+- [ ] Alter role: Create role / Alter role buttons sit in the tab bar, visible only when Operations is active; Alter role opens the search popup
+- [ ] Alter role: search by name and by comment finds the role, grouped by login; picking closes the popup
+- [ ] Alter role: full name shown when comment is JSON with `full_name`
+- [ ] Alter role: one consolidated form; scope labels judged per group (filled group label vs transparent per-cluster labels)
+- [ ] Alter role: ✎ Edit opens a per-cluster editor that grants AND revokes on specific clusters/groups; whole-group match shows a filled group label, partial shows transparent cluster labels
+- [ ] Alter role: Add privilege… adds a new membership; × removes everywhere; ↺ discards pending
+- [ ] Alter role: comments popup groups by content (JSON compared by value — formatting differences collapse), labels coloured by environment, edit + save writes to that group's clusters
+- [ ] Alter role: scope labels consistent (Present on / privileges / comments), coloured by environment, ordered by group
+- [ ] Alter role: attributes (superuser/createrole/createdb/inherit/login/replication/bypassrls) shown per row with scope; ＋ enables, × disables via set_attribute
+- [ ] Alter role: privileges/attributes listed one per row (name left, scope labels right); search results use the same scope labels
+- [ ] Alter role: change password via Save (field + checkbox stacked under PASSWORD); Remove role via the red button; Status panel hidden until a run produces output
+- [ ] Alter role: one unreachable cluster is reported but search still returns others
 - [ ] Production run/save blocked without checkbox; succeeds with checkbox + confirm
 - [ ] One failing cluster does not prevent others from completing
 

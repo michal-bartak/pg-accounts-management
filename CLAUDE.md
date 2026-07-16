@@ -34,7 +34,7 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
    → `ResolveClusters` → `commands.BuildArgs` → per-cluster `pg.Connect` +
    `pg.CallFunction` → `calltemplate.Build`. Concurrency bounded by
    `batch.max_concurrency` (default 5), 30s per-cluster timeout, production gate.
-2. **Read (introspection), catalog queries — added for "Alter user".**
+2. **Read (introspection), catalog queries — added for "Alter role".**
    [internal/pg/introspect.go](internal/pg/introspect.go): `SearchRoles` (matches
    `rolname` or `COMMENT ON ROLE` via `pg_shdescription`), `RoleDetail` (existence,
    comment, attribute flags, parent memberships from `pg_auth_members`),
@@ -48,7 +48,7 @@ Config/clusters: `GetConfig`, `GetConfigPath`, `ReloadConfig`, `AddCluster`,
 `UpdateCluster`, `DeleteCluster`, `ImportFromEnvironment`, `SaveDBFunctions`,
 `SaveBatchSettings`, `SaveUISettings`, `GetAppVersion`.
 Run/test: `TestConnection`, `PreviewTargets`, `RunOperation`.
-Introspection (Alter user): `SearchRoles(RoleSearchRequest)`,
+Introspection (Alter role): `SearchRoles(RoleSearchRequest)`,
 `LoadRoleDetails(RoleDetailsRequest)`.
 
 ## Operations (call templates, `internal/calltemplate/`)
@@ -84,14 +84,16 @@ migrate/validate lists; the Settings editor entries in `frontend/app.js`
 
 ## Frontend (`frontend/`)
 
-Top tabs **Operations / Clusters / Settings**. Operations has op-tabs **Create role**
-and **Alter user** (the latter replaced the individual remove/grant/revoke/password
-tabs). The shared left sidebar (**Target selection** + connection + confirm-production)
-selects the clusters/groups everything acts on.
+Top tabs **Operations / Clusters / Settings**, with **Create role** / **Alter role**
+op-tabs right-aligned in the same bar (shown only while Operations is active; toggled in
+the `.tab` click handler). Alter role replaced the individual remove/grant/revoke/
+password tabs. The shared left sidebar (**Target selection** + connection +
+confirm-production) selects the clusters/groups everything acts on.
 
-**Alter user flow** (all in [frontend/app.js](frontend/app.js), styles in
+**Alter role flow** (all in [frontend/app.js](frontend/app.js), styles in
 [frontend/styles.css](frontend/styles.css)):
-- **Find user…** opens a search dialog; results grouped by login; picking one loads a
+- Clicking the **Alter role** op-tab opens the search dialog (`openSearchDialog`; there
+  is no separate "Find user" button); results grouped by login; picking one loads a
   single consolidated form. Search + detail load are **restricted to the selected
   clusters** (`alterTargets`/`alterScopeClusters` captured at search time).
 - **Privileges** (parent roles) and **Attributes** (superuser/createrole/createdb/

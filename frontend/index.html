@@ -16,6 +16,10 @@
     <button class="tab active" data-tab="operations" role="tab">Operations</button>
     <button class="tab" data-tab="clusters" role="tab">Clusters</button>
     <button class="tab" data-tab="settings" role="tab">Settings</button>
+    <div class="op-tabs" id="op-tabs">
+      <button type="button" class="op-tab active" data-op="create_role">Create role</button>
+      <button type="button" class="op-tab" data-op="alter_user">Alter role</button>
+    </div>
   </nav>
 
   <main>
@@ -35,11 +39,6 @@
         </aside>
 
         <div class="ops-main">
-          <div class="op-tabs">
-            <button type="button" class="op-tab active" data-op="create_role">Create role</button>
-            <button type="button" class="op-tab" data-op="alter_user">Alter user</button>
-          </div>
-
           <form id="form-create_role" class="op-form active" novalidate autocapitalize="none">
             <label>Login name <input name="loginName" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
             <label>Full name <input name="fullName" autocapitalize="words" autocomplete="name" /></label>
@@ -48,10 +47,7 @@
           </form>
 
           <div id="form-alter_user" class="op-form">
-            <div class="alter-toolbar">
-              <button type="button" id="btn-open-search" class="primary">Find user…</button>
-              <span id="alter-current-hint" class="hint">Search for a role to view and alter it.</span>
-            </div>
+            <p class="hint" id="alter-current-hint">Use the <strong>Alter role</strong> button above to find a role.</p>
             <div id="alter-detail" class="alter-detail hidden"></div>
           </div>
 
@@ -159,7 +155,7 @@
 
   <dialog id="search-dialog">
     <div class="search-dialog-body">
-      <h2>Find user</h2>
+      <h2>Find role</h2>
       <div class="alter-search">
         <input type="search" id="alter-search-term" placeholder="Search by role name or comment…" autocapitalize="none" autocomplete="off" spellcheck="false" />
         <button type="button" id="btn-alter-search" class="primary">Search</button>

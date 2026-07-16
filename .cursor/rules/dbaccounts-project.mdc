@@ -44,7 +44,7 @@ Example template: [`config.example.yaml`](config.example.yaml). Implemented in `
 - `ImportFromEnvironment` — reads `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`
 - `SaveDBFunctions`, `SaveBatchSettings`, `SaveUISettings`
 - `TestConnection`, `PreviewTargets`, `RunOperation`
-- **Introspection (reads, for Alter user):** `SearchRoles`, `LoadRoleDetails` — scan the
+- **Introspection (reads, for Alter role):** `SearchRoles`, `LoadRoleDetails` — scan the
   **selected** clusters concurrently (`internal/pg/introspect.go` + `batch.Runner`),
   collecting per-cluster errors instead of failing.
 
@@ -80,11 +80,13 @@ Config: `db_functions.<operation>.call` + optional `.execution` (`function` \| `
 
 ## UI (`frontend/`)
 
-Tabs: **Operations**, **Clusters**, **Settings**. Operations op-tabs: **Create role** +
-**Alter user**. Prod/UAT badges in CSS. Per-cluster outcomes render in the **Status**
-panel (hidden until non-empty). Do not add a heavy frontend framework unless requested.
+Tabs: **Operations**, **Clusters**, **Settings**, with **Create role** + **Alter role**
+op-tabs right-aligned in the same bar (visible only while Operations is active). Prod/UAT
+badges in CSS. Per-cluster outcomes render in the **Status** panel (hidden until
+non-empty). Do not add a heavy frontend framework unless requested.
 
-**Alter user** (search-then-edit): **Find user…** dialog searches the *selected*
+**Alter role** (search-then-edit): clicking the **Alter role** op-tab opens a search
+dialog (no separate "Find user" button) that searches the *selected*
 clusters (name + `COMMENT ON ROLE`), grouped by login; picking one opens a single
 consolidated form. Privileges (`pg_auth_members`) and attributes (superuser, createrole,
 createdb, inherit, login, replication, bypassrls) list one-per-row with **scope labels**

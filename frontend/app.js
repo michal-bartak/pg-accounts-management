@@ -16,7 +16,7 @@ let state = null;
 let currentOp = 'create_role';
 let lastResults = [];
 
-// --- Alter user tab state ---
+// --- Alter role tab state ---
 /** @type {Array<{loginName:string, fullName:string, clusters:Array<any>}>} */
 let alterGroups = [];
 /** @type {string|null} */
@@ -623,7 +623,7 @@ function escapeAttr(s) {
 }
 
 // ------------------------------------------------------------------
-// Alter user tab
+// Alter role tab
 // ------------------------------------------------------------------
 
 let alterPassword = '';
@@ -1371,6 +1371,8 @@ document.querySelectorAll('.tab').forEach((tab) => {
     document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById(`panel-${tab.dataset.tab}`).classList.add('active');
+    // Create role / Alter role live in the tabs bar but belong to Operations only.
+    document.getElementById('op-tabs')?.classList.toggle('hidden', tab.dataset.tab !== 'operations');
   });
 });
 
@@ -1383,7 +1385,12 @@ document.querySelectorAll('.op-tab').forEach((tab) => {
     document.getElementById(`form-${currentOp}`).classList.add('active');
     // The create-role run bar only applies to the Create role tab.
     document.getElementById('create-run-bar')?.classList.toggle('hidden', currentOp !== 'create_role');
-    if (currentOp === 'create_role') updateTargetPreview();
+    if (currentOp === 'create_role') {
+      updateTargetPreview();
+    } else if (currentOp === 'alter_user') {
+      // Alter role doubles as "find user": open the search popup.
+      openSearchDialog();
+    }
   });
 });
 
@@ -1458,7 +1465,7 @@ document.getElementById('btn-test-selected').addEventListener('click', testSelec
 document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
 document.getElementById('confirm-production').addEventListener('change', updateTargetPreview);
 
-// Alter user tab wiring
+// Alter role tab wiring
 function openSearchDialog() {
   const dlg = document.getElementById('search-dialog');
   const scope = document.getElementById('alter-search-scope');
@@ -1471,7 +1478,6 @@ function openSearchDialog() {
   dlg.showModal();
   document.getElementById('alter-search-term')?.focus();
 }
-document.getElementById('btn-open-search')?.addEventListener('click', openSearchDialog);
 document.getElementById('search-dialog-close')?.addEventListener('click', () => {
   document.getElementById('search-dialog').close();
 });
