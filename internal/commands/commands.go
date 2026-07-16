@@ -13,7 +13,20 @@ const (
 	OpGrantParents   = "grant_parents"
 	OpRevokeParents  = "revoke_parents"
 	OpChangePassword = "change_password"
+	OpSetComment     = "set_comment"
+	OpSetAttribute   = "set_attribute"
 )
+
+// allowedAttributeKeywords are the ALTER ROLE attribute keywords the app may emit.
+var allowedAttributeKeywords = map[string]bool{
+	"SUPERUSER": true, "NOSUPERUSER": true,
+	"CREATEROLE": true, "NOCREATEROLE": true,
+	"CREATEDB": true, "NOCREATEDB": true,
+	"INHERIT": true, "NOINHERIT": true,
+	"LOGIN": true, "NOLOGIN": true,
+	"REPLICATION": true, "NOREPLICATION": true,
+	"BYPASSRLS": true, "NOBYPASSRLS": true,
+}
 
 func BuildArgs(cfg model.Config, req model.RunRequest) (model.DBFunction, map[string]string, error) {
 	switch req.Operation {
@@ -61,6 +74,22 @@ func BuildArgs(cfg model.Config, req model.RunRequest) (model.DBFunction, map[st
 			"loginname":    req.ChangePassword.LoginName,
 			"new_password": req.ChangePassword.NewPassword,
 		}, nil
+	case OpSetComment:
+		if req.SetComment == nil {
+			return model.DBFunction{}, nil, fmt.Errorf("set comment parameters missing")
+		}
+		return cfg.DBFunctions.SetComment, map[string]string{
+			"loginname": req.SetComment.LoginName,
+			"comment":   req.SetComment.Comment,
+		}, nil
+	case OpSetAttribute:
+		if req.SetAttribute == nil {
+			return model.DBFunction{}, nil, fmt.Errorf("set attribute parameters missing")
+		}
+		return cfg.DBFunctions.SetAttribute, map[string]string{
+			"loginname": req.SetAttribute.LoginName,
+			"attribute": req.SetAttribute.Attribute,
+		}, nil
 	default:
 		return model.DBFunction{}, nil, fmt.Errorf("unknown operation: %s", req.Operation)
 	}
@@ -94,6 +123,17 @@ func ValidateRequest(cfg model.Config, req model.RunRequest) error {
 	case OpChangePassword:
 		if req.ChangePassword == nil || strings.TrimSpace(req.ChangePassword.LoginName) == "" {
 			return fmt.Errorf("login name is required")
+		}
+	case OpSetComment:
+		if req.SetComment == nil || strings.TrimSpace(req.SetComment.LoginName) == "" {
+			return fmt.Errorf("login name is required")
+		}
+	case OpSetAttribute:
+		if req.SetAttribute == nil || strings.TrimSpace(req.SetAttribute.LoginName) == "" {
+			return fmt.Errorf("login name is required")
+		}
+		if !allowedAttributeKeywords[strings.ToUpper(strings.TrimSpace(req.SetAttribute.Attribute))] {
+			return fmt.Errorf("unsupported role attribute: %q", req.SetAttribute.Attribute)
 		}
 	default:
 		return fmt.Errorf("unknown operation: %s", req.Operation)

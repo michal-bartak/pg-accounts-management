@@ -14,6 +14,8 @@ export function GetConfigPath():Promise<string>;
 
 export function ImportFromEnvironment():Promise<model.EnvImport>;
 
+export function LoadRoleDetails(arg1:model.RoleDetailsRequest):Promise<Array<model.ClusterRoleDetail>>;
+
 export function PreviewTargets(arg1:model.RunRequest):Promise<Array<model.Cluster>>;
 
 export function ReloadConfig():Promise<model.Config>;
@@ -25,6 +27,8 @@ export function SaveBatchSettings(arg1:model.BatchSettings):Promise<void>;
 export function SaveDBFunctions(arg1:model.DBFunctions):Promise<void>;
 
 export function SaveUISettings(arg1:model.UISettings):Promise<void>;
+
+export function SearchRoles(arg1:model.RoleSearchRequest):Promise<Array<model.RoleMatch>>;
 
 export function TestConnection(arg1:model.TestConnectionRequest):Promise<void>;
 

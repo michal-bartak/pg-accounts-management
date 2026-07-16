@@ -26,6 +26,10 @@ export function ImportFromEnvironment() {
   return window['go']['main']['App']['ImportFromEnvironment']();
 }
 
+export function LoadRoleDetails(arg1) {
+  return window['go']['main']['App']['LoadRoleDetails'](arg1);
+}
+
 export function PreviewTargets(arg1) {
   return window['go']['main']['App']['PreviewTargets'](arg1);
 }
@@ -48,6 +52,10 @@ export function SaveDBFunctions(arg1) {
 
 export function SaveUISettings(arg1) {
   return window['go']['main']['App']['SaveUISettings'](arg1);
+}
+
+export function SearchRoles(arg1) {
+  return window['go']['main']['App']['SearchRoles'](arg1);
 }
 
 export function TestConnection(arg1) {

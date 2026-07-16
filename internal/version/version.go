@@ -5,7 +5,7 @@ import "strings"
 
 // Defaults match VERSION at repo root; release builds set these via Makefile / wails build -ldflags.
 var (
-	Version   = "0.1.0"
+	Version   = "0.3.0"
 	Commit    = "dev"
 	BuildDate = ""
 )

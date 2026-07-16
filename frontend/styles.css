@@ -544,3 +544,298 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 .toast.error { border-color: var(--danger); }
 .toast.success { border-color: var(--ok); }
 .toast.hidden { display: none; }
+
+.hidden { display: none !important; }
+
+/* ---------------- Alter user tab ---------------- */
+#form-alter_user.op-form.active {
+  display: block;
+  max-width: none;
+}
+
+.alter-search { display: flex; gap: 0.5rem; align-items: center; }
+.alter-search input[type="search"] {
+  flex: 1;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.alter-errors {
+  margin: 0.5rem 0;
+  font-size: 0.82rem;
+  color: var(--danger);
+}
+.alter-error-row { margin-top: 0.2rem; }
+.alter-cluster-host { color: var(--muted); font-size: 0.82rem; }
+
+.alter-results { margin-top: 0.75rem; display: grid; gap: 0.4rem; }
+.alter-result-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.alter-result-row:hover { border-color: var(--primary); }
+.alter-login { font-weight: 600; }
+.alter-fullname { color: var(--muted); font-size: 0.86rem; }
+.alter-cluster-badges { margin-left: auto; display: flex; gap: 0.3rem; flex-wrap: wrap; }
+
+.alter-detail { margin-top: 1rem; }
+.alter-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.alter-detail-head h3 { margin: 0; font-weight: 500; }
+
+.alter-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.3rem 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  background: rgba(110, 181, 255, 0.16);
+  color: var(--text);
+  border: 1px solid transparent;
+}
+.chip-added { background: rgba(127, 217, 154, 0.18); border-color: var(--ok); }
+.chip-removed {
+  background: transparent;
+  border-color: var(--danger);
+  color: var(--danger);
+  text-decoration: line-through;
+}
+.chip-x, .chip-restore {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 0 0.15rem;
+  opacity: 0.7;
+}
+.chip-x:hover, .chip-restore:hover { opacity: 1; }
+.chip-restore { text-decoration: none; }
+
+.alter-add-priv { display: flex; gap: 0.4rem; margin-top: 0.7rem; }
+#alter-add-input {
+  flex: 1;
+  max-width: 260px;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.alter-save-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.1rem;
+  flex-wrap: wrap;
+}
+/* Remove role sits opposite Save changes. */
+#btn-alter-remove { margin-left: auto; }
+.alter-password-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+.alter-password-label input {
+  padding: 0.45rem 0.55rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  min-width: 260px;
+}
+
+/* Consolidated single-user form */
+.alter-present {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+.alter-meta-label,
+.alter-privs-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+.alter-identity {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+}
+.alter-identity-row { margin: 0.15rem 0; }
+.alter-identity-row em { color: var(--muted); }
+.alter-identity-row code { color: var(--muted); word-break: break-word; }
+
+.alter-section {
+  border-top: 1px solid var(--border);
+  padding-top: 0.9rem;
+  margin-top: 1rem;
+}
+.alter-section .alter-privs-label { display: block; margin-bottom: 0.5rem; }
+.alter-section .alter-chips { margin-bottom: 0.2rem; }
+
+.alter-account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+}
+.alter-account label.inline { display: flex; align-items: center; gap: 0.35rem; padding-bottom: 0.5rem; }
+.alter-account label.danger { color: var(--danger); }
+
+.chip-scope {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: none;
+  color: var(--muted);
+  background: rgba(154, 163, 181, 0.18);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+}
+/* Scope labels are coloured by cluster environment (category). */
+.chip-scope.scope-production { color: var(--prod); background: rgba(232, 168, 56, 0.16); }
+.chip-scope.scope-uat { color: var(--uat); background: rgba(110, 181, 255, 0.16); }
+.chip-scope.scope-other { color: var(--muted); background: rgba(154, 163, 181, 0.18); }
+/* Whole group matched: filled + uppercase. One cluster of a group: transparent. */
+.chip-scope.scope-kind-group { text-transform: uppercase; }
+.chip-scope.scope-kind-cluster { background: transparent; border: 1px solid currentColor; }
+/* Pending grant (green) wins over the environment colour. */
+.chip-scope.chip-scope-add { color: var(--ok); background: rgba(127, 217, 154, 0.22); border-color: var(--ok); }
+.chip-scope.chip-scope-strike { text-decoration: line-through; color: var(--danger); background: transparent; border-color: var(--danger); }
+.chip-extending { border-color: var(--ok); }
+
+.chip-extend {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0 0.15rem;
+  opacity: 0.7;
+}
+.chip-extend:hover { opacity: 1; }
+
+/* Privilege/attribute rows: name | labels | actions */
+.scope-rows { display: grid; gap: 0.35rem; }
+.scope-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.scope-row-name { font-weight: 600; font-size: 0.9rem; min-width: 9rem; }
+.scope-row-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  align-items: center;
+  margin-left: auto;
+  justify-content: flex-end;
+}
+.scope-row-actions { display: flex; gap: 0.1rem; flex-shrink: 0; }
+.scope-row.is-removed .scope-row-name { text-decoration: line-through; color: var(--danger); }
+.scope-row.is-added .scope-row-name { color: var(--ok); }
+.scope-row.is-extending { border-color: var(--ok); }
+.chip-scope-strike { text-decoration: line-through; opacity: 0.7; }
+.row-note { font-size: 0.72rem; color: var(--danger); }
+
+/* Password section: field + checkbox side by side */
+.alter-password { display: flex; flex-direction: row; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.alter-password input[type="password"] {
+  padding: 0.45rem 0.55rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  min-width: 260px;
+}
+.alter-password label.inline { display: flex; align-items: center; gap: 0.35rem; }
+
+/* Alter toolbar + dialogs */
+.alter-toolbar { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+.alter-toolbar .hint { margin: 0; }
+.alter-identity-actions { margin-top: 0.5rem; }
+
+.search-dialog-body,
+.comments-dialog-body { padding: 1.25rem; display: block; }
+.search-dialog-body h2,
+.comments-dialog-body h2 { margin: 0 0 0.75rem; }
+.search-dialog-body .alter-results { margin-top: 0.75rem; max-height: 50vh; overflow-y: auto; }
+.search-dialog-body menu,
+.comments-dialog-body menu {
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* Scope dialog */
+#scope-form { padding: 1.25rem; display: grid; gap: 0.6rem; }
+#scope-form h2 { margin: 0; }
+#scope-role-label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.88rem; }
+#scope-role-label input {
+  padding: 0.45rem 0.55rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+.scope-targets { display: grid; gap: 0.6rem; max-height: 46vh; overflow-y: auto; }
+.scope-group { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 0.7rem; }
+.scope-group-head { font-weight: 600; display: flex; align-items: center; gap: 0.4rem; }
+.scope-clusters { display: grid; gap: 0.2rem; margin: 0.4rem 0 0 1.2rem; }
+.scope-cluster { display: flex; align-items: center; gap: 0.4rem; font-size: 0.88rem; }
+.scope-cluster.scope-already { color: var(--muted); }
+.scope-cluster .hint { margin: 0; }
+#scope-form menu { margin: 0.5rem 0 0; padding: 0; display: flex; justify-content: flex-end; gap: 0.5rem; }
+
+/* Comments dialog */
+#comments-list { display: grid; gap: 0.9rem; max-height: 55vh; overflow-y: auto; }
+.comment-version { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem 0.75rem; }
+.comment-scope { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.4rem; }
+.comment-edit {
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  resize: vertical;
+}
+.comment-actions { margin-top: 0.4rem; display: flex; justify-content: flex-end; }

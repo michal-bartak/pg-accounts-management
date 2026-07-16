@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/michalbartak/dbaccounts/internal/commands"
 	"github.com/michalbartak/dbaccounts/internal/config"
 	"github.com/michalbartak/dbaccounts/internal/model"
@@ -86,6 +87,136 @@ func (r *Runner) Run(req model.RunRequest) ([]model.ClusterResult, error) {
 	}
 	wg.Wait()
 	return results, nil
+}
+
+// maxScanWorkers returns the configured concurrency (default 5).
+func (r *Runner) maxScanWorkers() int {
+	n := r.store.Get().Batch.MaxConcurrency
+	if n <= 0 {
+		return 5
+	}
+	return n
+}
+
+// scanClusters runs work on the given clusters concurrently.
+func (r *Runner) scanClusters(clusters []model.Cluster, auth model.AuthContext, work func(ctx context.Context, cluster model.Cluster, conn *pgx.Conn) error, onError func(cluster model.Cluster, msg string)) {
+	sem := make(chan struct{}, r.maxScanWorkers())
+	var wg sync.WaitGroup
+	for _, cluster := range clusters {
+		wg.Add(1)
+		go func(cl model.Cluster) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			conn, err := pg.Connect(ctx, cl, auth)
+			if err != nil {
+				onError(cl, err.Error())
+				return
+			}
+			defer conn.Close(ctx)
+
+			if err := work(ctx, cl, conn); err != nil {
+				onError(cl, err.Error())
+			}
+		}(cluster)
+	}
+	wg.Wait()
+}
+
+// SearchRoles scans the selected clusters for roles matching term (name or comment).
+func (r *Runner) SearchRoles(term string, categoryIDs, clusterIDs []string, auth model.AuthContext) ([]model.RoleMatch, error) {
+	clusters, err := r.ResolveClusters(model.RunRequest{CategoryIDs: categoryIDs, ClusterIDs: clusterIDs})
+	if err != nil {
+		return nil, err
+	}
+
+	var mu sync.Mutex
+	var out []model.RoleMatch
+
+	r.scanClusters(clusters, auth,
+		func(ctx context.Context, cl model.Cluster, conn *pgx.Conn) error {
+			rows, err := pg.SearchRoles(ctx, conn, term)
+			if err != nil {
+				return err
+			}
+			mu.Lock()
+			for _, row := range rows {
+				out = append(out, model.RoleMatch{
+					ClusterID: cl.ID,
+					Alias:     cl.Alias,
+					Host:      cl.Host,
+					Category:  cl.Category,
+					LoginName: row.Name,
+					Comment:   row.Comment,
+					FullName:  pg.ParseFullName(row.Comment),
+				})
+			}
+			mu.Unlock()
+			return nil
+		},
+		func(cl model.Cluster, msg string) {
+			mu.Lock()
+			out = append(out, model.RoleMatch{
+				ClusterID: cl.ID,
+				Alias:     cl.Alias,
+				Host:      cl.Host,
+				Category:  cl.Category,
+				Error:     msg,
+			})
+			mu.Unlock()
+		},
+	)
+	return out, nil
+}
+
+// LoadRoleDetails scans the selected clusters for one login's per-cluster state.
+func (r *Runner) LoadRoleDetails(loginName string, categoryIDs, clusterIDs []string, auth model.AuthContext) ([]model.ClusterRoleDetail, error) {
+	clusters, err := r.ResolveClusters(model.RunRequest{CategoryIDs: categoryIDs, ClusterIDs: clusterIDs})
+	if err != nil {
+		return nil, err
+	}
+
+	var mu sync.Mutex
+	var out []model.ClusterRoleDetail
+
+	r.scanClusters(clusters, auth,
+		func(ctx context.Context, cl model.Cluster, conn *pgx.Conn) error {
+			exists, comment, parents, attrs, err := pg.RoleDetail(ctx, conn, loginName)
+			if err != nil {
+				return err
+			}
+			mu.Lock()
+			out = append(out, model.ClusterRoleDetail{
+				ClusterID:  cl.ID,
+				Alias:      cl.Alias,
+				Host:       cl.Host,
+				Category:   cl.Category,
+				Exists:     exists,
+				Comment:    comment,
+				FullName:   pg.ParseFullName(comment),
+				Parents:    parents,
+				Attributes: attrs,
+			})
+			mu.Unlock()
+			return nil
+		},
+		func(cl model.Cluster, msg string) {
+			mu.Lock()
+			out = append(out, model.ClusterRoleDetail{
+				ClusterID: cl.ID,
+				Alias:     cl.Alias,
+				Host:      cl.Host,
+				Category:  cl.Category,
+				Error:     msg,
+			})
+			mu.Unlock()
+		},
+	)
+	return out, nil
 }
 
 func (r *Runner) runOne(cluster model.Cluster, operation string, fn model.DBFunction, args map[string]string, auth model.AuthContext) model.ClusterResult {

@@ -148,6 +148,21 @@ func placeholderKindForField(operation, field string) (fieldKind, error) {
 		case "new_password":
 			return fieldLiteral, nil
 		}
+	case "set_comment":
+		switch field {
+		case "loginname":
+			return fieldIdentifier, nil
+		case "comment":
+			return fieldLiteral, nil
+		}
+	case "set_attribute":
+		switch field {
+		case "loginname":
+			return fieldIdentifier, nil
+		case "attribute":
+			// Keyword (SUPERUSER / NOLOGIN / …): embedded unquoted, whitelisted upstream.
+			return fieldIdentifier, nil
+		}
 	case "create_role":
 		switch field {
 		case "loginname", "parent_role":

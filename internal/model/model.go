@@ -50,6 +50,8 @@ type DBFunctions struct {
 	GrantParents   DBFunction `yaml:"grant_parents" json:"grantParents"`
 	RevokeParents  DBFunction `yaml:"revoke_parents" json:"revokeParents"`
 	ChangePassword DBFunction `yaml:"change_password" json:"changePassword"`
+	SetComment     DBFunction `yaml:"set_comment" json:"setComment"`
+	SetAttribute   DBFunction `yaml:"set_attribute" json:"setAttribute"`
 }
 
 type BatchSettings struct {
@@ -128,27 +130,40 @@ type ChangePasswordParams struct {
 	NewPassword string `json:"newPassword"`
 }
 
+type SetCommentParams struct {
+	LoginName string `json:"loginName"`
+	Comment   string `json:"comment"`
+}
+
+// SetAttributeParams sets one ALTER ROLE attribute keyword (e.g. SUPERUSER / NOSUPERUSER).
+type SetAttributeParams struct {
+	LoginName string `json:"loginName"`
+	Attribute string `json:"attribute"`
+}
+
 type RunRequest struct {
-	Operation       string   `json:"operation"`
-	CategoryIDs     []string `json:"categoryIds"`
-	ClusterIDs      []string `json:"clusterIds"`
-	Auth            AuthContext `json:"auth"`
-	CreateRole      *CreateRoleParams     `json:"createRole,omitempty"`
-	RemoveRole      *RemoveRoleParams     `json:"removeRole,omitempty"`
-	GrantParents    *GrantParentsParams   `json:"grantParents,omitempty"`
-	RevokeParents   *RevokeParentsParams  `json:"revokeParents,omitempty"`
-	ChangePassword  *ChangePasswordParams `json:"changePassword,omitempty"`
-	ConfirmProduction bool `json:"confirmProduction"`
+	Operation         string                `json:"operation"`
+	CategoryIDs       []string              `json:"categoryIds"`
+	ClusterIDs        []string              `json:"clusterIds"`
+	Auth              AuthContext           `json:"auth"`
+	CreateRole        *CreateRoleParams     `json:"createRole,omitempty"`
+	RemoveRole        *RemoveRoleParams     `json:"removeRole,omitempty"`
+	GrantParents      *GrantParentsParams   `json:"grantParents,omitempty"`
+	RevokeParents     *RevokeParentsParams  `json:"revokeParents,omitempty"`
+	ChangePassword    *ChangePasswordParams `json:"changePassword,omitempty"`
+	SetComment        *SetCommentParams     `json:"setComment,omitempty"`
+	SetAttribute      *SetAttributeParams   `json:"setAttribute,omitempty"`
+	ConfirmProduction bool                  `json:"confirmProduction"`
 }
 
 type ClusterResult struct {
-	ClusterID string `json:"clusterId"`
-	Alias     string `json:"alias"`
-	Host      string `json:"host"`
-	Category  string `json:"category"`
-	Status    string `json:"status"`
-	Message   string `json:"message"`
-	DurationMs int64 `json:"durationMs"`
+	ClusterID  string `json:"clusterId"`
+	Alias      string `json:"alias"`
+	Host       string `json:"host"`
+	Category   string `json:"category"`
+	Status     string `json:"status"`
+	Message    string `json:"message"`
+	DurationMs int64  `json:"durationMs"`
 }
 
 type EnvImport struct {
@@ -168,4 +183,48 @@ type AppVersion struct {
 	Version   string `json:"version"`
 	Commit    string `json:"commit"`
 	BuildDate string `json:"buildDate"`
+}
+
+// RoleSearchRequest searches roles by a substring matched against role name and
+// comment across the selected clusters/categories.
+type RoleSearchRequest struct {
+	Term        string      `json:"term"`
+	CategoryIDs []string    `json:"categoryIds"`
+	ClusterIDs  []string    `json:"clusterIds"`
+	Auth        AuthContext `json:"auth"`
+}
+
+// RoleDetailsRequest loads one login's per-cluster state across the selected
+// clusters/categories.
+type RoleDetailsRequest struct {
+	LoginName   string      `json:"loginName"`
+	CategoryIDs []string    `json:"categoryIds"`
+	ClusterIDs  []string    `json:"clusterIds"`
+	Auth        AuthContext `json:"auth"`
+}
+
+// RoleMatch is one role found on one cluster during a search.
+type RoleMatch struct {
+	ClusterID string `json:"clusterId"`
+	Alias     string `json:"alias"`
+	Host      string `json:"host"`
+	Category  string `json:"category"`
+	LoginName string `json:"loginName"`
+	Comment   string `json:"comment"`
+	FullName  string `json:"fullName"`
+	Error     string `json:"error,omitempty"` // per-cluster connect/query error, if any
+}
+
+// ClusterRoleDetail is one login's state on one cluster (parents = direct memberships).
+type ClusterRoleDetail struct {
+	ClusterID string   `json:"clusterId"`
+	Alias     string   `json:"alias"`
+	Host      string   `json:"host"`
+	Category  string   `json:"category"`
+	Exists     bool            `json:"exists"`
+	Comment    string          `json:"comment"`
+	FullName   string          `json:"fullName"`
+	Parents    []string        `json:"parents"`
+	Attributes map[string]bool `json:"attributes"`
+	Error      string          `json:"error,omitempty"`
 }

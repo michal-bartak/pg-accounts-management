@@ -37,10 +37,7 @@
         <div class="ops-main">
           <div class="op-tabs">
             <button type="button" class="op-tab active" data-op="create_role">Create role</button>
-            <button type="button" class="op-tab" data-op="remove_role">Remove role</button>
-            <button type="button" class="op-tab" data-op="grant_parents">Grant parents</button>
-            <button type="button" class="op-tab" data-op="revoke_parents">Revoke parents</button>
-            <button type="button" class="op-tab" data-op="change_password">Change password</button>
+            <button type="button" class="op-tab" data-op="alter_user">Alter user</button>
           </div>
 
           <form id="form-create_role" class="op-form active" novalidate autocapitalize="none">
@@ -49,42 +46,37 @@
             <label>Email <input name="email" type="email" autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
             <label>Parent role <input name="parentRole" autocapitalize="none" autocomplete="off" spellcheck="false" title="Optional with ${array_concat:parent_role,...}; empty uses fixed groups only" /></label>
           </form>
-          <form id="form-remove_role" class="op-form" novalidate autocapitalize="none">
-            <label>Login name <input name="loginName" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
-          </form>
-          <form id="form-grant_parents" class="op-form" novalidate autocapitalize="none">
-            <label>Login name <input name="loginName" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
-            <label>Parent role(s) <input name="parentRoles" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="comma-separated or single role" /></label>
-          </form>
-          <form id="form-revoke_parents" class="op-form" novalidate autocapitalize="none">
-            <label>Login name <input name="loginName" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
-            <label>Parent role(s) <input name="parentRoles" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="comma-separated or single role" /></label>
-          </form>
-          <form id="form-change_password" class="op-form" novalidate autocapitalize="none">
-            <label>Login name <input name="loginName" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
-            <label>New password <input name="newPassword" type="password" required autocapitalize="none" autocomplete="off" /></label>
-          </form>
 
-          <div class="run-bar">
+          <div id="form-alter_user" class="op-form">
+            <div class="alter-toolbar">
+              <button type="button" id="btn-open-search" class="primary">Find user…</button>
+              <span id="alter-current-hint" class="hint">Search for a role to view and alter it.</span>
+            </div>
+            <div id="alter-detail" class="alter-detail hidden"></div>
+          </div>
+
+          <div class="run-bar" id="create-run-bar">
             <button type="button" id="btn-run" class="primary">Run on selected targets</button>
             <button type="button" id="btn-test-selected">Test connections</button>
           </div>
 
-          <h2>Results</h2>
-          <div class="table-wrap">
-            <table id="results-table">
-              <thead>
-                <tr>
-                  <th>Cluster</th>
-                  <th>Host</th>
-                  <th>Category</th>
-                  <th>Status</th>
-                  <th>Duration</th>
-                  <th>Message</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
+          <div id="status-section" class="hidden">
+            <h2>Status</h2>
+            <div class="table-wrap">
+              <table id="results-table">
+                <thead>
+                  <tr>
+                    <th>Cluster</th>
+                    <th>Host</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>Duration</th>
+                    <th>Message</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -161,6 +153,49 @@
 
       <menu>
         <button type="button" id="template-help-close" class="primary">Close</button>
+      </menu>
+    </div>
+  </dialog>
+
+  <dialog id="search-dialog">
+    <div class="search-dialog-body">
+      <h2>Find user</h2>
+      <div class="alter-search">
+        <input type="search" id="alter-search-term" placeholder="Search by role name or comment…" autocapitalize="none" autocomplete="off" spellcheck="false" />
+        <button type="button" id="btn-alter-search" class="primary">Search</button>
+      </div>
+      <p class="hint">Scans the selected clusters/groups (Target selection). Matches role name and comment.</p>
+      <p class="hint" id="alter-search-scope"></p>
+      <div id="alter-search-errors" class="alter-errors"></div>
+      <div id="alter-results" class="alter-results"></div>
+      <menu>
+        <button type="button" id="search-dialog-close">Close</button>
+      </menu>
+    </div>
+  </dialog>
+
+  <dialog id="scope-dialog">
+    <form method="dialog" id="scope-form" autocapitalize="none">
+      <h2 id="scope-dialog-title">Add privilege</h2>
+      <label id="scope-role-label">Role name
+        <input name="role" id="scope-role" autocapitalize="none" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="hint">Choose where to grant it. Tick a group to select all its clusters.</p>
+      <div id="scope-targets" class="scope-targets"></div>
+      <menu>
+        <button type="button" value="ok" id="scope-dialog-ok" class="primary">Add</button>
+        <button type="button" value="cancel" id="scope-dialog-cancel">Cancel</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="comments-dialog">
+    <div class="comments-dialog-body">
+      <h2>Comments</h2>
+      <p class="hint">Clusters are grouped by identical comment. Edit a box and save it to update all its clusters.</p>
+      <div id="comments-list"></div>
+      <menu>
+        <button type="button" id="comments-dialog-close" class="primary">Close</button>
       </menu>
     </div>
   </dialog>

@@ -39,11 +39,14 @@ Example template: [`config.example.yaml`](config.example.yaml). Implemented in `
 
 ## Wails API (`app.go` → `window.go.main.App`)
 
-- `GetConfig`, `GetConfigPath`, `ReloadConfig`
+- `GetConfig`, `GetConfigPath`, `ReloadConfig`, `GetAppVersion`
 - `AddCluster`, `UpdateCluster`, `DeleteCluster`
 - `ImportFromEnvironment` — reads `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`
-- `SaveDBFunctions`, `SaveBatchSettings`
+- `SaveDBFunctions`, `SaveBatchSettings`, `SaveUISettings`
 - `TestConnection`, `PreviewTargets`, `RunOperation`
+- **Introspection (reads, for Alter user):** `SearchRoles`, `LoadRoleDetails` — scan the
+  **selected** clusters concurrently (`internal/pg/introspect.go` + `batch.Runner`),
+  collecting per-cluster errors instead of failing.
 
 ## Call templates (`internal/calltemplate/`)
 
@@ -56,6 +59,8 @@ Config: `db_functions.<operation>.call` + optional `.execution` (`function` \| `
 | `grant_parents` | loginname, parent_roles | `statement`: `GRANT ${parent_roles} TO ${loginname}` — identifiers, not quoted |
 | `revoke_parents` | loginname, parent_roles | Default `statement`: `REVOKE ${parent_roles} FROM ${loginname}` |
 | `change_password` | loginname, new_password | |
+| `set_comment` | loginname, comment | Default `statement`: `COMMENT ON ROLE ${loginname} IS ${comment}` — comment as escaped literal |
+| `set_attribute` | loginname, attribute | Default `statement`: `ALTER ROLE ${loginname} WITH ${attribute}` — attribute is a whitelisted keyword (SUPERUSER/NOSUPERUSER/…), embedded unquoted |
 
 **Execution:** `function` → `SELECT` + `$n` binds (`Query`). `statement` / `block` → embed values (`Exec`): role fields as identifiers (`loginname`, `parent_roles` list on grant_parents); passwords/names as quoted literals. Do not use raw `$1` in templates.
 
@@ -75,7 +80,21 @@ Config: `db_functions.<operation>.call` + optional `.execution` (`function` \| `
 
 ## UI (`frontend/`)
 
-Tabs: **Clusters**, **Operations**, **Settings**. Prod/UAT badges in CSS. Results table per cluster after run. Do not add heavy frontend framework unless requested.
+Tabs: **Operations**, **Clusters**, **Settings**. Operations op-tabs: **Create role** +
+**Alter user**. Prod/UAT badges in CSS. Per-cluster outcomes render in the **Status**
+panel (hidden until non-empty). Do not add a heavy frontend framework unless requested.
+
+**Alter user** (search-then-edit): **Find user…** dialog searches the *selected*
+clusters (name + `COMMENT ON ROLE`), grouped by login; picking one opens a single
+consolidated form. Privileges (`pg_auth_members`) and attributes (superuser, createrole,
+createdb, inherit, login, replication, bypassrls) list one-per-row with **scope labels**
+judged per group (filled group label when all selected clusters of a group match, else
+transparent per-cluster labels; coloured by environment). **✎ Edit** opens a per-cluster
+checkbox editor that grants **and** revokes; **×** removes everywhere; **↺** discards
+pending. Comments popup groups clusters by comment content (compared as JSON by value)
+and saves via `set_comment`. Edit state: `alterAdd`/`alterRevoke`,
+`alterAttrAdd`/`alterAttrRemove` are `Map<key, Set<clusterId>>`; `describeScope` /
+`scopeLabelsHtml` produce all labels.
 
 ## Versioning & packaging
 
@@ -88,7 +107,7 @@ Tabs: **Clusters**, **Operations**, **Settings**. Prod/UAT badges in CSS. Result
 
 ```bash
 export PATH="/opt/homebrew/bin:$HOME/go/bin:$PATH"
-cd /Users/michalbartak/GitRepo/DbAccounts
+cd /Users/michalbartak/GitRepo/pg-accounts-management
 go mod tidy
 wails dev          # dev window + http://localhost:34115
 make package       # → build/bin/DbAccounts.app + dist/*.tar.gz
@@ -103,8 +122,8 @@ main.go, app.go           Wails entry + bindings
 internal/config/          YAML persistence
 internal/model/           Shared types + RunRequest
 internal/calltemplate/    Call template parse/validate/SQL build (stdlib only)
-internal/pg/              DSN, auth, Connect, CallFunction
-internal/batch/           Concurrent executor
+internal/pg/              DSN, auth, Connect, CallFunction, introspect.go (role reads)
+internal/batch/           Concurrent executor + all-cluster scan (Search/LoadRoleDetails)
 internal/commands/        Op validation + arg maps
 internal/envimport/       PG* env import
 frontend/                 UI (app.js uses backend())

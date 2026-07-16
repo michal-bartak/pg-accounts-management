@@ -25,6 +25,57 @@ func TestBuild_statement_dropRole(t *testing.T) {
 	}
 }
 
+func TestBuild_statement_setComment(t *testing.T) {
+	sql, vals, useQuery, err := Build(
+		"COMMENT ON ROLE ${loginname} IS ${comment}",
+		map[string]string{"loginname": "jdoe", "comment": `{"full_name":"O'Hara"}`},
+		"set_comment",
+		model.ExecutionStatement,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if useQuery || len(vals) != 0 {
+		t.Fatalf("useQuery=%v vals=%v", useQuery, vals)
+	}
+	// login name embedded as identifier; comment embedded as an escaped string literal.
+	want := `COMMENT ON ROLE jdoe IS '{"full_name":"O''Hara"}'`
+	if sql != want {
+		t.Fatalf("got:  %s\nwant: %s", sql, want)
+	}
+}
+
+func TestBuild_statement_setComment_empty(t *testing.T) {
+	sql, _, _, err := Build(
+		"COMMENT ON ROLE ${loginname} IS ${comment}",
+		map[string]string{"loginname": "jdoe", "comment": ""},
+		"set_comment",
+		model.ExecutionStatement,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sql != "COMMENT ON ROLE jdoe IS ''" {
+		t.Fatalf("got: %s", sql)
+	}
+}
+
+func TestBuild_statement_setAttribute(t *testing.T) {
+	sql, _, _, err := Build(
+		"ALTER ROLE ${loginname} WITH ${attribute}",
+		map[string]string{"loginname": "jdoe", "attribute": "NOSUPERUSER"},
+		"set_attribute",
+		model.ExecutionStatement,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Attribute keyword embedded unquoted (like an identifier).
+	if sql != "ALTER ROLE jdoe WITH NOSUPERUSER" {
+		t.Fatalf("got: %s", sql)
+	}
+}
+
 func TestBuild_statement_rolenameAlias(t *testing.T) {
 	sql, _, _, err := Build(
 		"DROP ROLE ${rolename}",

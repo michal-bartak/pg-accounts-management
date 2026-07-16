@@ -65,7 +65,7 @@ grant_parents:
 |------------|----------|-------------------|
 | Identifier | Role/login names | `testuser`, `Gr_devs_all_ro` |
 | Identifier list | `${parent_roles}` on `grant_parents` | `gr_a, gr_b` (comma-separated in form) |
-| Literal (quoted) | Passwords, names, email | `'secret'`, `'John Doe'` |
+| Literal (quoted) | Passwords, names, email, `${comment}` on `set_comment` | `'secret'`, `'John Doe'`, `'{"full_name":"O''Hara"}'` |
 
 Function mode always uses `$n` binds instead of embedding.
 
@@ -187,6 +187,34 @@ Statement/block: `${parent_roles}` → unquoted identifiers (`REVOKE Gr_devs_all
 
 ---
 
+## Set comment
+
+Used by the **Alter user** comments popup to write a role's `COMMENT ON ROLE`. Default in the app:
+
+```yaml
+set_comment:
+  execution: statement
+  call: "COMMENT ON ROLE ${loginname} IS ${comment}"
+```
+
+`${loginname}` is a validated identifier; `${comment}` is embedded as an **escaped string literal** (single quotes doubled), so JSON comments like `{"full_name":"O'Hara"}` are safe.
+
+---
+
+## Set attribute
+
+Used by the **Alter user** attributes section to toggle role flags. Default in the app:
+
+```yaml
+set_attribute:
+  execution: statement
+  call: "ALTER ROLE ${loginname} WITH ${attribute}"
+```
+
+`${attribute}` is a **whitelisted keyword** embedded unquoted — one of `SUPERUSER`/`NOSUPERUSER`, `CREATEROLE`/`NOCREATEROLE`, `CREATEDB`/`NOCREATEDB`, `INHERIT`/`NOINHERIT`, `LOGIN`/`NOLOGIN`, `REPLICATION`/`NOREPLICATION`, `BYPASSRLS`/`NOBYPASSRLS`. The app sends one keyword per call (e.g. `ALTER ROLE jdoe WITH NOSUPERUSER`).
+
+---
+
 ## Allowed placeholders
 
 | Operation | `${...}` names | Statement/block embedding |
@@ -196,6 +224,8 @@ Statement/block: `${parent_roles}` → unquoted identifiers (`REVOKE Gr_devs_all
 | `grant_parents` | `loginname`, `parent_roles` | Identifiers; `parent_roles` = comma-separated identifier list |
 | `revoke_parents` | `loginname`, `parent_roles` | Same as grant_parents |
 | `change_password` | `loginname`, `new_password` | Identifier + literal (password) |
+| `set_comment` | `loginname`, `comment` | Identifier + literal (comment) |
+| `set_attribute` | `loginname`, `attribute` | Identifier + whitelisted keyword (e.g. `NOLOGIN`) |
 
 ---
 

@@ -144,6 +144,36 @@ export namespace model {
 	        this.durationMs = source["durationMs"];
 	    }
 	}
+	export class ClusterRoleDetail {
+	    clusterId: string;
+	    alias: string;
+	    host: string;
+	    category: string;
+	    exists: boolean;
+	    comment: string;
+	    fullName: string;
+	    parents: string[];
+	    attributes: Record<string, boolean>;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ClusterRoleDetail(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.clusterId = source["clusterId"];
+	        this.alias = source["alias"];
+	        this.host = source["host"];
+	        this.category = source["category"];
+	        this.exists = source["exists"];
+	        this.comment = source["comment"];
+	        this.fullName = source["fullName"];
+	        this.parents = source["parents"];
+	        this.attributes = source["attributes"];
+	        this.error = source["error"];
+	    }
+	}
 	export class UISettings {
 	    theme: string;
 	
@@ -180,6 +210,8 @@ export namespace model {
 	    grantParents: DBFunction;
 	    revokeParents: DBFunction;
 	    changePassword: DBFunction;
+	    setComment: DBFunction;
+	    setAttribute: DBFunction;
 	
 	    static createFrom(source: any = {}) {
 	        return new DBFunctions(source);
@@ -192,6 +224,8 @@ export namespace model {
 	        this.grantParents = this.convertValues(source["grantParents"], DBFunction);
 	        this.revokeParents = this.convertValues(source["revokeParents"], DBFunction);
 	        this.changePassword = this.convertValues(source["changePassword"], DBFunction);
+	        this.setComment = this.convertValues(source["setComment"], DBFunction);
+	        this.setAttribute = this.convertValues(source["setAttribute"], DBFunction);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -330,6 +364,132 @@ export namespace model {
 	        this.parentRoles = source["parentRoles"];
 	    }
 	}
+	export class RoleDetailsRequest {
+	    loginName: string;
+	    categoryIds: string[];
+	    clusterIds: string[];
+	    auth: AuthContext;
+	
+	    static createFrom(source: any = {}) {
+	        return new RoleDetailsRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.loginName = source["loginName"];
+	        this.categoryIds = source["categoryIds"];
+	        this.clusterIds = source["clusterIds"];
+	        this.auth = this.convertValues(source["auth"], AuthContext);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class RoleMatch {
+	    clusterId: string;
+	    alias: string;
+	    host: string;
+	    category: string;
+	    loginName: string;
+	    comment: string;
+	    fullName: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RoleMatch(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.clusterId = source["clusterId"];
+	        this.alias = source["alias"];
+	        this.host = source["host"];
+	        this.category = source["category"];
+	        this.loginName = source["loginName"];
+	        this.comment = source["comment"];
+	        this.fullName = source["fullName"];
+	        this.error = source["error"];
+	    }
+	}
+	export class RoleSearchRequest {
+	    term: string;
+	    categoryIds: string[];
+	    clusterIds: string[];
+	    auth: AuthContext;
+	
+	    static createFrom(source: any = {}) {
+	        return new RoleSearchRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.term = source["term"];
+	        this.categoryIds = source["categoryIds"];
+	        this.clusterIds = source["clusterIds"];
+	        this.auth = this.convertValues(source["auth"], AuthContext);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SetAttributeParams {
+	    loginName: string;
+	    attribute: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SetAttributeParams(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.loginName = source["loginName"];
+	        this.attribute = source["attribute"];
+	    }
+	}
+	export class SetCommentParams {
+	    loginName: string;
+	    comment: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SetCommentParams(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.loginName = source["loginName"];
+	        this.comment = source["comment"];
+	    }
+	}
 	export class RunRequest {
 	    operation: string;
 	    categoryIds: string[];
@@ -340,6 +500,8 @@ export namespace model {
 	    grantParents?: GrantParentsParams;
 	    revokeParents?: RevokeParentsParams;
 	    changePassword?: ChangePasswordParams;
+	    setComment?: SetCommentParams;
+	    setAttribute?: SetAttributeParams;
 	    confirmProduction: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -357,6 +519,8 @@ export namespace model {
 	        this.grantParents = this.convertValues(source["grantParents"], GrantParentsParams);
 	        this.revokeParents = this.convertValues(source["revokeParents"], RevokeParentsParams);
 	        this.changePassword = this.convertValues(source["changePassword"], ChangePasswordParams);
+	        this.setComment = this.convertValues(source["setComment"], SetCommentParams);
+	        this.setAttribute = this.convertValues(source["setAttribute"], SetAttributeParams);
 	        this.confirmProduction = source["confirmProduction"];
 	    }
 	
@@ -378,6 +542,8 @@ export namespace model {
 		    return a;
 		}
 	}
+	
+	
 	export class TestConnectionRequest {
 	    clusterId: string;
 	    auth: AuthContext;

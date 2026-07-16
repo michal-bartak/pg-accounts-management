@@ -15,6 +15,8 @@ func migrateDBFunctions(fns *model.DBFunctions) {
 	fns.GrantParents = migrateOne(fns.GrantParents, defaults.GrantParents, "grant_parents")
 	fns.RevokeParents = migrateOne(fns.RevokeParents, defaults.RevokeParents, "revoke_parents")
 	fns.ChangePassword = migrateOne(fns.ChangePassword, defaults.ChangePassword, "change_password")
+	fns.SetComment = migrateOne(fns.SetComment, defaults.SetComment, "set_comment")
+	fns.SetAttribute = migrateOne(fns.SetAttribute, defaults.SetAttribute, "set_attribute")
 }
 
 func normalizeDBFunction(fn model.DBFunction) model.DBFunction {
@@ -80,6 +82,8 @@ func validateDBFunctions(fns model.DBFunctions) error {
 		{"grant_parents", fns.GrantParents},
 		{"revoke_parents", fns.RevokeParents},
 		{"change_password", fns.ChangePassword},
+		{"set_comment", fns.SetComment},
+		{"set_attribute", fns.SetAttribute},
 	}
 	for _, c := range checks {
 		exec := model.NormalizeExecution(c.fn.Execution)

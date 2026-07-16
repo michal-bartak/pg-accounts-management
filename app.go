@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/michalbartak/dbaccounts/internal/batch"
 	"github.com/michalbartak/dbaccounts/internal/config"
@@ -96,6 +97,25 @@ func (a *App) TestConnection(req model.TestConnectionRequest) error {
 
 func (a *App) RunOperation(req model.RunRequest) ([]model.ClusterResult, error) {
 	return a.batch.Run(req)
+}
+
+// SearchRoles scans the selected clusters/categories for roles matching the term
+// (role name or comment). Per-cluster failures are returned as RoleMatch entries
+// with Error set.
+func (a *App) SearchRoles(req model.RoleSearchRequest) ([]model.RoleMatch, error) {
+	if len(strings.TrimSpace(req.Term)) < 2 {
+		return nil, fmt.Errorf("enter at least 2 characters to search")
+	}
+	return a.batch.SearchRoles(req.Term, req.CategoryIDs, req.ClusterIDs, req.Auth)
+}
+
+// LoadRoleDetails scans the selected clusters/categories for one login's per-cluster
+// state (comment, full name, parent memberships). Per-cluster failures carry Error.
+func (a *App) LoadRoleDetails(req model.RoleDetailsRequest) ([]model.ClusterRoleDetail, error) {
+	if strings.TrimSpace(req.LoginName) == "" {
+		return nil, fmt.Errorf("login name is required")
+	}
+	return a.batch.LoadRoleDetails(req.LoginName, req.CategoryIDs, req.ClusterIDs, req.Auth)
 }
 
 func (a *App) PreviewTargets(req model.RunRequest) ([]model.Cluster, error) {

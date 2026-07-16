@@ -41,6 +41,12 @@ db_functions:
   #   call: "your_schema.revoke_role_parents(${loginname}, ${parent_roles})"
   change_password:
     call: "your_schema.change_role_password(${loginname}, ${new_password})"
+  set_comment:
+    execution: statement
+    call: "COMMENT ON ROLE ${loginname} IS ${comment}"
+  set_attribute:
+    execution: statement
+    call: "ALTER ROLE ${loginname} WITH ${attribute}"
 batch:
   max_concurrency: 5
 

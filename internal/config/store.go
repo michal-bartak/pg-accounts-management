@@ -37,6 +37,14 @@ func DefaultConfig() model.Config {
 			ChangePassword: model.DBFunction{
 				Call: "your_schema.change_role_password(${loginname}, ${new_password})",
 			},
+			SetComment: model.DBFunction{
+				Execution: model.ExecutionStatement,
+				Call:      "COMMENT ON ROLE ${loginname} IS ${comment}",
+			},
+			SetAttribute: model.DBFunction{
+				Execution: model.ExecutionStatement,
+				Call:      "ALTER ROLE ${loginname} WITH ${attribute}",
+			},
 		},
 		Batch: model.BatchSettings{MaxConcurrency: 5},
 		UI:    model.UISettings{Theme: model.ThemeSystem},
