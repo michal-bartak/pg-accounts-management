@@ -760,12 +760,13 @@ async function pickUser(login) {
   alterPassword = '';
 
   document.getElementById('search-dialog')?.close();
+  // The detail header shows which role is being edited; hide the empty-state prompt.
+  document.getElementById('alter-current-hint')?.classList.add('hidden');
   const detail = document.getElementById('alter-detail');
   detail.classList.remove('hidden');
   detail.innerHTML = '<p class="hint">Loading role details…</p>';
 
   await reloadDetails();
-  document.getElementById('alter-current-hint').textContent = `Editing ${login}.`;
 }
 
 /** Reload alterDetails for the selected login, preserving pending edits. */
