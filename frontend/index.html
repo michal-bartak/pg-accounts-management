@@ -31,47 +31,50 @@
           <h3>Or pick clusters</h3>
           <div id="cluster-checkboxes" class="checkbox-group cluster-list"></div>
           <p class="hint" id="target-preview"></p>
-
-          <h2>Connection</h2>
-          <label>User <input type="text" id="auth-user" placeholder="PGUSER or cluster default" autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
-          <label>Password <input type="password" id="auth-password" placeholder="optional — trust auth / empty like psql" /></label>
-          <label class="inline"><input type="checkbox" id="confirm-production" /> I confirm production execution</label>
         </aside>
 
         <div class="ops-main">
-          <form id="form-create_role" class="op-form active" novalidate autocapitalize="none">
-            <label>Login name <input name="loginName" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
-            <label>Full name <input name="fullName" autocapitalize="words" autocomplete="name" /></label>
-            <label>Email <input name="email" type="email" autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
-            <label>Parent role <input name="parentRole" autocapitalize="none" autocomplete="off" spellcheck="false" title="Optional with ${array_concat:parent_role,...}; empty uses fixed groups only" /></label>
-          </form>
+          <div class="ops-body">
+            <form id="form-create_role" class="op-form active" novalidate autocapitalize="none">
+              <label>Login name <input name="loginName" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
+              <label>Full name <input name="fullName" autocapitalize="words" autocomplete="name" /></label>
+              <label>Email <input name="email" type="email" autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
+              <label>Parent role <input name="parentRole" autocapitalize="none" autocomplete="off" spellcheck="false" title="Optional with ${array_concat:parent_role,...}; empty uses fixed groups only" /></label>
+            </form>
 
-          <div id="form-alter_user" class="op-form">
-            <p class="hint" id="alter-current-hint">Use the <strong>Alter role</strong> button above to find a role.</p>
-            <div id="alter-detail" class="alter-detail hidden"></div>
+            <div id="form-alter_user" class="op-form">
+              <p class="hint" id="alter-current-hint">Use the <strong>Alter role</strong> button above to find a role.</p>
+              <div id="alter-detail" class="alter-detail hidden"></div>
+            </div>
+
+            <div id="status-section" class="hidden">
+              <h2>Status</h2>
+              <div class="table-wrap">
+                <table id="results-table">
+                  <thead>
+                    <tr>
+                      <th>Cluster</th>
+                      <th>Host</th>
+                      <th>Category</th>
+                      <th>Status</th>
+                      <th>Duration</th>
+                      <th>Message</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
-          <div class="run-bar" id="create-run-bar">
-            <button type="button" id="btn-run" class="primary">Run on selected targets</button>
-            <button type="button" id="btn-test-selected">Test connections</button>
-          </div>
-
-          <div id="status-section" class="hidden">
-            <h2>Status</h2>
-            <div class="table-wrap">
-              <table id="results-table">
-                <thead>
-                  <tr>
-                    <th>Cluster</th>
-                    <th>Host</th>
-                    <th>Category</th>
-                    <th>Status</th>
-                    <th>Duration</th>
-                    <th>Message</th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
+          <div class="ops-footer" id="ops-footer">
+            <div class="run-bar" id="create-run-bar">
+              <button type="button" id="btn-run" class="primary">Run on selected targets</button>
+              <button type="button" id="btn-test-selected">Test connections</button>
+            </div>
+            <div class="alter-actions hidden" id="alter-actions">
+              <button type="button" id="btn-alter-save" class="primary">Save changes</button>
+              <button type="button" id="btn-alter-remove" class="danger">Remove role</button>
             </div>
           </div>
         </div>
@@ -102,30 +105,33 @@
     </section>
 
     <section id="panel-settings" class="panel">
-      <div class="settings-meta">
-        <span class="settings-meta-label">Config file</span>
-        <code id="config-path" class="config-path"></code>
+      <div class="settings-body">
+        <div class="settings-meta">
+          <span class="settings-meta-label">Config file</span>
+          <code id="config-path" class="config-path"></code>
+        </div>
+
+        <div class="settings-row">
+          <label>Appearance
+            <select id="ui-theme">
+              <option value="system">System</option>
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="settings-section-head">
+          <h2>DB command templates</h2>
+          <button type="button" id="btn-template-help">Template syntax help</button>
+        </div>
+        <div id="db-functions-editor"></div>
+
+        <h2>Batch</h2>
+        <label class="settings-batch">Max concurrency <input type="number" id="batch-concurrency" min="1" max="50" value="5" /></label>
       </div>
 
-      <div class="settings-row">
-        <label>Appearance
-          <select id="ui-theme">
-            <option value="system">System</option>
-            <option value="dark">Dark</option>
-            <option value="light">Light</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="settings-section-head">
-        <h2>DB command templates</h2>
-        <button type="button" id="btn-template-help">Template syntax help</button>
-      </div>
-      <div id="db-functions-editor"></div>
-
-      <h2>Batch</h2>
       <div class="settings-footer">
-        <label>Max concurrency <input type="number" id="batch-concurrency" min="1" max="50" value="5" /></label>
         <button type="button" id="btn-save-settings" class="primary">Save settings</button>
       </div>
     </section>

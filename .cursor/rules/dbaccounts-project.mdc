@@ -13,7 +13,7 @@ Cross-platform **PostgreSQL role maintenance** desktop app: manage clusters, bat
 |-------|----------|
 | UI shell | **Wails v2** + embedded WebView; frontend is vanilla HTML/CSS/JS in `frontend/` |
 | DB driver | **pgx/v5**; direct **TCP** to `host:port` (no SSH tunnels in v1) |
-| Secrets | **Never** store passwords in YAML; optional `connect_user` only. Auth: cluster `connect_user` → run-dialog user → `PGUSER`; password: non-empty dialog → `PGPASSWORD` → `~/.pgpass` → **empty** (trust / no password, like psql) |
+| Secrets | **Never** store passwords in YAML; optional `connect_user` only. No in-UI credential fields. Auth: user = cluster `connect_user` → `PGUSER`; password = `PGPASSWORD` → `~/.pgpass` → **empty** (trust / no password, like psql). Production gated by a confirm popup (no checkbox). |
 | Role logic | App calls **call templates** with `${placeholder}` → `SELECT fn($1,...)` — real DDL/privileges live in **DB functions** on each cluster |
 | Categories | Default `production` and `uat`; extensible in config YAML |
 | DB function specs | User will provide real names/signatures; defaults in `config.example.yaml` are placeholders (`your_schema.*`) |
@@ -85,6 +85,13 @@ op-tabs right-aligned in the same bar (visible only while Operations is active).
 badges in CSS. Per-cluster outcomes render in the **Status** panel (hidden until
 non-empty). Do not add a heavy frontend framework unless requested.
 
+**App-shell layout:** `body` is a flex column with `overflow:hidden` (no whole-page
+scroll); header + tabs fixed. Operations = two independently scrolling columns
+(`.ops-sidebar` / `.ops-main`); `.ops-main` has a scrolling `.ops-body` + pinned
+`.ops-footer` (Run/Test or Save/Remove, via `updateOpsFooter()`). Clusters/Settings are
+single-column with fixed toolbar / pinned Save-settings footer. Left sidebar is Target
+selection only.
+
 **Alter role** (search-then-edit): clicking the **Alter role** op-tab opens a search
 dialog (no separate "Find user" button) that searches the *selected*
 clusters (name + `COMMENT ON ROLE`), grouped by login; picking one opens a single
@@ -138,9 +145,9 @@ SSH tunnels, encrypted config vault, audit log file, reading remote `pg_hba.conf
 
 ## Safety (implemented)
 
-- Production badge + checkbox `confirmProduction` + extra confirm dialog
+- Production badge + confirm popup (`askConfirm('Production', …)`); frontend sends `confirmProduction: true` after it. No checkbox.
 - Remove role: in-app `<dialog id="confirm-dialog">` (not `window.confirm()` — broken in Wails WebView)
-- Password inputs masked; not written to config
+- No in-UI credential fields; secrets never written to config
 
 ## Pending / follow-ups
 

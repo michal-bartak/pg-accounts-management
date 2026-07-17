@@ -14,7 +14,7 @@ Cross-platform desktop app for maintaining PostgreSQL roles across many clusters
   - Change password and remove role
   - Changes are committed together with **Save**
 - Operations invoke **your** PostgreSQL functions via **call templates** (`${loginname}`, `ARRAY['fixed'] || ${parent_role}`, etc.)
-- Credentials are **not** stored in config — use `PGUSER` / `PGPASSWORD`, per-cluster connect user, `.pgpass`, or the run dialog
+- Credentials are **not** stored in config — use `PGUSER` / `PGPASSWORD`, per-cluster connect user, or `.pgpass`
 
 ## Config file location
 
@@ -74,10 +74,13 @@ See [`RELEASING.md`](RELEASING.md) for maintainers.
 
 ## Authentication
 
-1. **User**: cluster `connect_user`, else `PGUSER`, else the Operations sidebar user field.
-2. **Password**: Operations password field, else `PGPASSWORD`, else `~/.pgpass`, else **no password** (same as `psql` without `-W` — works with trust auth or empty password).
+1. **User**: cluster `connect_user`, else `PGUSER`.
+2. **Password**: `PGPASSWORD`, else `~/.pgpass`, else **no password** (same as `psql` without `-W` — works with trust auth or empty password).
 
-See [PostgreSQL .pgpass](https://www.postgresql.org/docs/current/libpq-pgpass.html).
+The app has no in-UI user/password fields — credentials come from the cluster's
+`connect_user`, the environment, or `~/.pgpass`. (The Clusters *Test connection*
+action still prompts for a one-off password.) See
+[PostgreSQL .pgpass](https://www.postgresql.org/docs/current/libpq-pgpass.html).
 
 ## Database call templates
 
@@ -144,14 +147,13 @@ active) avoids mistyped role names by searching first.
    cluster where it exists (with confirmation).
 6. **Save** computes the per-cluster diff and applies every change, reusing the
    configured `grant_parents`, `revoke_parents`, and `change_password` templates.
-   Per-cluster outcomes appear in the **Status** panel. Production clusters still
-   require the confirmation
-   checkbox and an extra confirm dialog.
+   Per-cluster outcomes appear in the **Status** panel. Production clusters trigger a
+   confirm dialog before anything runs.
 
 ## Safety
 
 - Production clusters use a distinct badge colour.
-- Runs touching **production** require the confirmation checkbox and an extra confirm dialog.
+- Runs touching **production** require confirmation via a popup dialog before executing.
 - **Remove role** asks for confirmation before execution.
 
 ## Tests

@@ -16,9 +16,13 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
 
 ## Product decisions (don't regress)
 
-- **Secrets never in config.** Auth resolution: cluster `connect_user` → run-dialog
-  user → `PGUSER`; password: dialog → `PGPASSWORD` → `~/.pgpass` → empty (trust, like
-  psql). See [internal/pg/auth.go](internal/pg/auth.go).
+- **Secrets never in config, and no in-UI credential fields.** Auth resolution: user =
+  cluster `connect_user` → `PGUSER`; password = `PGPASSWORD` → `~/.pgpass` → empty
+  (trust, like psql). `getAuth()` returns empty strings. See
+  [internal/pg/auth.go](internal/pg/auth.go).
+- **Production gate is the confirm popup only** (`askConfirm('Production', …)`); there
+  is no "confirm production" checkbox. The frontend sends `confirmProduction: true`
+  after the dialog is accepted.
 - **All writes go through configurable call templates** (`db_functions.<op>`), executed
   via the single bound `RunOperation`. No per-operation bound methods.
 - **Categories** = cluster groups (default `production`, `uat`; extensible in config).
@@ -84,11 +88,19 @@ migrate/validate lists; the Settings editor entries in `frontend/app.js`
 
 ## Frontend (`frontend/`)
 
+**App shell**: header + tabs bar are fixed (`body` is a flex column, `overflow:hidden`,
+no page scroll); `main` fills the rest. Each panel manages its own scroll. Operations is
+a two-column grid — left `.ops-sidebar` and right `.ops-main` scroll **independently**;
+`.ops-main` is a flex column with a scrolling `.ops-body` and a pinned `.ops-footer`
+(Run/Test for Create; Save changes / Remove role for Alter, toggled by
+`updateOpsFooter()`). Clusters and Settings are single-column with a fixed toolbar /
+pinned Save-settings footer.
+
 Top tabs **Operations / Clusters / Settings**, with **Create role** / **Alter role**
 op-tabs right-aligned in the same bar (shown only while Operations is active; toggled in
 the `.tab` click handler). Alter role replaced the individual remove/grant/revoke/
-password tabs. The shared left sidebar (**Target selection** + connection +
-confirm-production) selects the clusters/groups everything acts on.
+password tabs. The left sidebar is **Target selection** only (no connection or
+confirm-production controls).
 
 **Alter role flow** (all in [frontend/app.js](frontend/app.js), styles in
 [frontend/styles.css](frontend/styles.css)):

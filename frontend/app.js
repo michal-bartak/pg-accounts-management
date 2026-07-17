@@ -328,10 +328,9 @@ function getSelectedClusterIDs() {
 }
 
 function getAuth() {
-  return {
-    user: document.getElementById('auth-user').value.trim(),
-    password: document.getElementById('auth-password').value,
-  };
+  // Connection controls were removed from the UI; run-time auth resolves from cluster
+  // connect_user / PGUSER / PGPASSWORD / ~/.pgpass on the backend.
+  return { user: '', password: '' };
 }
 
 async function updateTargetPreview() {
@@ -421,7 +420,7 @@ async function onClusterAction(ev) {
     try {
       await app.TestConnection({
         clusterId: id,
-        auth: { user: document.getElementById('auth-user')?.value?.trim() || '', password },
+        auth: { user: '', password },
       });
       showToast('Connection OK', 'success');
     } catch (e) {
@@ -436,7 +435,7 @@ function buildRunRequest() {
     categoryIds: getSelectedCategories(),
     clusterIds: getSelectedClusterIDs(),
     auth: getAuth(),
-    confirmProduction: document.getElementById('confirm-production').checked,
+    confirmProduction: true, // human gate is the production confirm dialog
   };
 
   const form = document.getElementById(`form-${currentOp}`);
@@ -485,10 +484,6 @@ async function runOperation() {
     if (!ok) {
       return;
     }
-  }
-  if (hasProductionTargets() && !document.getElementById('confirm-production').checked) {
-    showToast('Check "I confirm production execution" to run against production.', 'error');
-    return;
   }
   if (hasProductionTargets()) {
     const ok = await askConfirm(
@@ -970,15 +965,21 @@ function renderAlterDetail(errors = []) {
         <input type="password" id="alter-password" autocapitalize="none" autocomplete="off" placeholder="new password" />
         <label class="inline"><input type="checkbox" id="alter-do-pw"${alterDoPassword ? ' checked' : ''} /> Change password</label>
       </div>
-    </div>
-
-    <div class="alter-save-bar">
-      <button type="button" id="btn-alter-save" class="primary">Save changes</button>
-      <button type="button" id="btn-alter-remove" class="danger">Remove role</button>
     </div>`;
 
   const pwInput = /** @type {HTMLInputElement} */ (document.getElementById('alter-password'));
   if (pwInput) pwInput.value = alterPassword;
+  updateOpsFooter();
+}
+
+/** Show the right pinned footer for the active op: Create → Run/Test; Alter → Save/Remove
+ *  (only once a role is loaded). Hide the footer entirely when neither applies. */
+function updateOpsFooter() {
+  const isCreate = currentOp === 'create_role';
+  const showAlter = !isCreate && !!alterSelected && alterDetails.length > 0;
+  document.getElementById('create-run-bar')?.classList.toggle('hidden', !isCreate);
+  document.getElementById('alter-actions')?.classList.toggle('hidden', !showAlter);
+  document.getElementById('ops-footer')?.classList.toggle('hidden', !isCreate && !showAlter);
 }
 
 function renderDetailErrors(errors) {
@@ -1177,10 +1178,6 @@ async function saveCommentVersion(idx) {
   const text = ta ? ta.value : v.text;
 
   const prod = v.ids.some((cid) => clusterCategory(cid) === 'production');
-  if (prod && !document.getElementById('confirm-production').checked) {
-    showToast('Check "I confirm production execution" to write to production.', 'error');
-    return;
-  }
   if (prod) {
     const ok = await askConfirm('Production', 'This comment update includes PRODUCTION clusters. Continue?');
     if (!ok) return;
@@ -1325,10 +1322,6 @@ async function executeAlterRequests(requests, successMsg) {
   const app = backend();
   const targetIds = [...new Set(requests.map((r) => r.clusterId))];
   const prodInvolved = targetIds.some((id) => clusterCategory(id) === 'production');
-  if (prodInvolved && !document.getElementById('confirm-production').checked) {
-    showToast('Check "I confirm production execution" to write to production.', 'error');
-    return false;
-  }
   if (prodInvolved) {
     const ok = await askConfirm('Production', 'This action includes PRODUCTION clusters. Continue?');
     if (!ok) return false;
@@ -1384,8 +1377,7 @@ document.querySelectorAll('.op-tab').forEach((tab) => {
     document.querySelectorAll('.op-form').forEach((f) => f.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById(`form-${currentOp}`).classList.add('active');
-    // The create-role run bar only applies to the Create role tab.
-    document.getElementById('create-run-bar')?.classList.toggle('hidden', currentOp !== 'create_role');
+    updateOpsFooter();
     if (currentOp === 'create_role') {
       updateTargetPreview();
     } else if (currentOp === 'alter_user') {
@@ -1444,7 +1436,7 @@ document.getElementById('btn-test-cluster').addEventListener('click', async () =
   const form = document.getElementById('cluster-form');
   const password = prompt('Password (leave empty if not required, e.g. trust auth):') ?? '';
   const auth = {
-    user: form.connectUser.value.trim() || document.getElementById('auth-user')?.value?.trim() || '',
+    user: form.connectUser.value.trim() || '',
     password,
   };
 
@@ -1464,7 +1456,6 @@ document.getElementById('btn-test-cluster').addEventListener('click', async () =
 document.getElementById('btn-run').addEventListener('click', runOperation);
 document.getElementById('btn-test-selected').addEventListener('click', testSelectedConnections);
 document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
-document.getElementById('confirm-production').addEventListener('change', updateTargetPreview);
 
 // Alter role tab wiring
 function openSearchDialog() {
@@ -1527,16 +1518,12 @@ document.getElementById('alter-detail')?.addEventListener('click', (ev) => {
   }
   if (target.closest('#btn-alter-comments')) {
     openCommentsDialog();
-    return;
-  }
-  if (target.id === 'btn-alter-save') {
-    saveAlterations();
-    return;
-  }
-  if (target.id === 'btn-alter-remove') {
-    removeRole();
   }
 });
+
+// Save / Remove live in the pinned footer (outside #alter-detail).
+document.getElementById('btn-alter-save')?.addEventListener('click', saveAlterations);
+document.getElementById('btn-alter-remove')?.addEventListener('click', removeRole);
 
 document.getElementById('alter-detail')?.addEventListener('change', (ev) => {
   if (ev.target.id === 'alter-do-pw') {
