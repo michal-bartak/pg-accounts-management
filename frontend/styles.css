@@ -201,6 +201,7 @@ tr:last-child td { border-bottom: none; }
 
 .status-ok { color: var(--ok); }
 .status-error { color: var(--danger); }
+.status-pending { color: var(--muted); }
 
 .ops-layout {
   flex: 1 1 auto;

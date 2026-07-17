@@ -89,10 +89,13 @@ non-empty). Do not add a heavy frontend framework unless requested.
 **App-shell layout:** `body` is a flex column with `overflow:hidden` (no whole-page
 scroll); header + tabs fixed. Operations = two independently scrolling columns
 (`.ops-sidebar` / `.ops-main`); `.ops-main` has a scrolling `.ops-body` + pinned
-`.ops-footer` (Run/Test or Save/Remove, via `updateOpsFooter()`). Clusters/Settings are
-single-column with fixed toolbar / pinned Save-settings footer. Left sidebar is Target
-selection only; "Or pick clusters" collapses/expands (collapsed by default; expanded
-list flexes to fill). Settings hosts the **Cluster groups** editor.
+`.ops-footer` (Run or Save/Remove, via `updateOpsFooter()`). Clusters/Settings are
+single-column with fixed toolbar / pinned Save-settings footer. **Test connections**
+(`btn-test-clusters` → `testAllClusters`) is in the Clusters toolbar; it tests every
+cluster into a per-row **Status** column (`setClusterStatus`), shared with the per-row
+Test button. Left sidebar is Target selection only; "Or pick clusters" collapses/expands
+(collapsed by default; expanded list flexes to fill). Settings hosts the **Cluster
+groups** editor.
 
 **Alter role** (search-then-edit): clicking the **Alter role** op-tab opens a search
 dialog (no separate "Find user" button) that searches the *selected*

@@ -287,7 +287,7 @@ function renderClustersTable() {
   const tbody = document.querySelector('#clusters-table tbody');
   tbody.innerHTML = '';
   if (!state?.clusters?.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="hint">No clusters configured.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="hint">No clusters configured.</td></tr>';
     return;
   }
   for (const c of state.clusters) {
@@ -299,6 +299,7 @@ function renderClustersTable() {
       <td>${escapeHtml(c.database)}</td>
       <td><span class="badge" data-cat="${escapeAttr(c.category)}">${escapeHtml(categoryLabel(c.category))}</span></td>
       <td>${escapeHtml(c.sslmode || 'prefer')}</td>
+      <td class="cluster-status" data-status-for="${escapeAttr(c.id)}"></td>
       <td>
         <button class="small" data-action="edit" data-id="${c.id}">Edit</button>
         <button class="small" data-action="test" data-id="${c.id}">Test</button>
@@ -517,13 +518,16 @@ async function onClusterAction(ev) {
   }
   if (action === 'test') {
     const password = prompt('Password (leave empty if not required, e.g. trust auth):') ?? '';
+    setClusterStatus(id, 'pending', 'testing…');
     try {
       await app.TestConnection({
         clusterId: id,
         auth: { user: '', password },
       });
+      setClusterStatus(id, 'ok', 'connected');
       showToast('Connection OK', 'success');
     } catch (e) {
+      setClusterStatus(id, 'error', String(e));
       showToast(String(e), 'error');
     }
   }
@@ -609,50 +613,50 @@ async function runOperation() {
   }
 }
 
-async function testSelectedConnections() {
+/** Update the inline Status cell for a cluster row on the Clusters page. */
+function setClusterStatus(id, status, message) {
+  const cell = [...document.querySelectorAll('#clusters-table td.cluster-status')]
+    .find((td) => td.dataset.statusFor === id);
+  if (!cell) return;
+  const cls = status === 'ok' ? 'status-ok' : status === 'error' ? 'status-error' : 'status-pending';
+  cell.className = `cluster-status ${cls}`;
+  cell.textContent = message;
+  cell.title = message;
+}
+
+/** Test every configured cluster and show the result inline in the table. */
+async function testAllClusters() {
   const app = backend();
-  let targets;
-  try {
-    targets = await app.PreviewTargets({
-      operation: currentOp,
-      categoryIds: getSelectedCategories(),
-      clusterIds: getSelectedClusterIDs(),
-      auth: getAuth(),
-      confirmProduction: true,
-    });
-  } catch (e) {
-    showToast(String(e), 'error');
+  if (!app) {
+    showToast('Wails backend not available', 'error');
     return;
   }
-
+  const clusters = state?.clusters || [];
+  if (!clusters.length) {
+    showToast('No clusters configured', 'error');
+    return;
+  }
+  const btn = document.getElementById('btn-test-clusters');
+  if (btn) btn.disabled = true;
   const auth = getAuth();
-  const results = [];
-  for (const c of targets) {
-    const start = Date.now();
+  clusters.forEach((c) => setClusterStatus(c.id, 'pending', 'testing…'));
+  let ok = 0;
+  let failed = 0;
+  for (const c of clusters) {
     try {
       await app.TestConnection({ clusterId: c.id, auth });
-      results.push({
-        clusterId: c.id,
-        alias: c.alias,
-        host: c.host,
-        category: c.category,
-        status: 'ok',
-        message: 'connected',
-        durationMs: Date.now() - start,
-      });
+      setClusterStatus(c.id, 'ok', 'connected');
+      ok += 1;
     } catch (e) {
-      results.push({
-        clusterId: c.id,
-        alias: c.alias,
-        host: c.host,
-        category: c.category,
-        status: 'error',
-        message: String(e),
-        durationMs: Date.now() - start,
-      });
+      setClusterStatus(c.id, 'error', String(e));
+      failed += 1;
     }
   }
-  renderResults(results);
+  if (btn) btn.disabled = false;
+  showToast(
+    `Tested ${clusters.length} cluster${clusters.length === 1 ? '' : 's'}: ${ok} OK, ${failed} failed`,
+    failed ? 'error' : 'success',
+  );
 }
 
 function readDBFunctionsFromEditor() {
@@ -1729,7 +1733,7 @@ document.getElementById('btn-test-cluster').addEventListener('click', async () =
 });
 
 document.getElementById('btn-run').addEventListener('click', runOperation);
-document.getElementById('btn-test-selected').addEventListener('click', testSelectedConnections);
+document.getElementById('btn-test-clusters').addEventListener('click', testAllClusters);
 document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
 
 document.getElementById('btn-toggle-clusters')?.addEventListener('click', (ev) => {

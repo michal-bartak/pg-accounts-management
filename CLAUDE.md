@@ -102,9 +102,12 @@ migrate/validate lists; the Settings editor entries in `frontend/app.js`
 no page scroll); `main` fills the rest. Each panel manages its own scroll. Operations is
 a two-column grid — left `.ops-sidebar` and right `.ops-main` scroll **independently**;
 `.ops-main` is a flex column with a scrolling `.ops-body` and a pinned `.ops-footer`
-(Run/Test for Create; Save changes / Remove role for Alter, toggled by
+(Run on selected targets for Create; Save changes / Remove role for Alter, toggled by
 `updateOpsFooter()`). Clusters and Settings are single-column with a fixed toolbar /
-pinned Save-settings footer.
+pinned Save-settings footer. The **Test connections** button lives in the Clusters
+toolbar (`btn-test-clusters` → `testAllClusters`): it tests every configured cluster and
+writes the outcome into a per-row **Status** column (`setClusterStatus`); the per-row
+**Test** button reports into the same cell.
 
 Top tabs **Operations / Clusters / Settings**, with **Create role** / **Alter role**
 op-tabs right-aligned in the same bar (shown only while Operations is active; toggled in
