@@ -185,7 +185,7 @@ func (r *Runner) LoadRoleDetails(loginName string, categoryIDs, clusterIDs []str
 
 	r.scanClusters(clusters, auth,
 		func(ctx context.Context, cl model.Cluster, conn *pgx.Conn) error {
-			exists, comment, parents, attrs, err := pg.RoleDetail(ctx, conn, loginName)
+			exists, comment, parents, attrs, settings, err := pg.RoleDetail(ctx, conn, loginName)
 			if err != nil {
 				return err
 			}
@@ -200,6 +200,7 @@ func (r *Runner) LoadRoleDetails(loginName string, categoryIDs, clusterIDs []str
 				FullName:   pg.ParseFullName(comment),
 				Parents:    parents,
 				Attributes: attrs,
+				Settings:   settings,
 			})
 			mu.Unlock()
 			return nil

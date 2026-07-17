@@ -4,12 +4,12 @@ Cross-platform desktop app for maintaining PostgreSQL roles across many clusters
 
 ## Features
 
-- Manage PostgreSQL clusters (alias, host, port, database, category)
-- Categories: **Production** and **UAT** (extensible in config)
-- **Create role** in batch against selected categories and/or clusters (login, full name, email, parent role)
+- Manage PostgreSQL clusters (alias, host, port, database, group)
+- **Cluster groups** (default Production / UAT, editable in Settings): each has a base **colour** and a **require-confirmation** flag that gates production-style runs behind a popup
+- **Create role** in batch against selected groups and/or clusters (login, full name, email, parent role)
 - **Alter role** — find a role from a search popup (matched on role name and comment across the **selected** clusters/groups), then edit its whole identity in **one form**:
-  - Privileges (parent-role memberships) and role **attributes** (superuser, create role, create DB, inherit, login, replication, bypass RLS) listed per row and labelled by scope (a filled group label like `PRODUCTION` when a whole group matches, else individual cluster aliases)
-  - Add a privilege / enable an attribute on any mix of **groups and clusters** via a scope picker
+  - Privileges (parent-role memberships), role **attributes** (superuser, create role, create DB, inherit, login, replication, bypass RLS), and role **settings** (GUCs like `statement_timeout`, `log_statement`) listed per row and labelled by scope (a filled group label like `PRODUCTION` when a whole group matches, else individual cluster aliases)
+  - Add/edit on any mix of **groups and clusters** via a scope picker; settings support per-cluster values
   - View and consolidate **comments** (grouped by identical content) in a popup
   - Change password and remove role
   - Changes are committed together with **Save**
@@ -138,6 +138,10 @@ active) avoids mistyped role names by searching first.
    revokes struck through); **×** removes everywhere; **↺** discards pending changes;
    **Add privilege…** adds a new membership. Attribute changes run `ALTER ROLE … WITH
    SUPERUSER` / `… WITH NOSUPERUSER` via the `set_attribute` template.
+   **Settings** (role GUCs from `pg_roles.rolconfig`) work the same way, keyed by
+   `name = value`; **Add setting…** takes a name + value, and a setting can hold
+   different values on different clusters. They run hardcoded `ALTER ROLE … SET x = '…'`
+   / `RESET x` (no template).
 4. **Comments** — the *View / edit comments* popup groups clusters by comment
    content (JSON compared by value), labels each group by scope, and lets you edit a
    comment and save it to all its clusters (writes `COMMENT ON ROLE` via the

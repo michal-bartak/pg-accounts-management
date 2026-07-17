@@ -45,15 +45,35 @@ export namespace model {
 	export class Category {
 	    id: string;
 	    label: string;
-	
+	    color?: string;
+	    confirm?: boolean;
+
 	    static createFrom(source: any = {}) {
 	        return new Category(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.label = source["label"];
+	        this.color = source["color"];
+	        this.confirm = source["confirm"];
+	    }
+	}
+	export class CategoryInput {
+	    label: string;
+	    color: string;
+	    confirm: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new CategoryInput(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.label = source["label"];
+	        this.color = source["color"];
+	        this.confirm = source["confirm"];
 	    }
 	}
 	export class ChangePasswordParams {
@@ -154,12 +174,13 @@ export namespace model {
 	    fullName: string;
 	    parents: string[];
 	    attributes: Record<string, boolean>;
+	    settings: Record<string, string>;
 	    error?: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ClusterRoleDetail(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.clusterId = source["clusterId"];
@@ -171,6 +192,7 @@ export namespace model {
 	        this.fullName = source["fullName"];
 	        this.parents = source["parents"];
 	        this.attributes = source["attributes"];
+	        this.settings = source["settings"];
 	        this.error = source["error"];
 	    }
 	}
@@ -479,15 +501,45 @@ export namespace model {
 	export class SetCommentParams {
 	    loginName: string;
 	    comment: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new SetCommentParams(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.loginName = source["loginName"];
 	        this.comment = source["comment"];
+	    }
+	}
+	export class SetConfigParams {
+	    loginName: string;
+	    configName: string;
+	    configValue: string;
+
+	    static createFrom(source: any = {}) {
+	        return new SetConfigParams(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.loginName = source["loginName"];
+	        this.configName = source["configName"];
+	        this.configValue = source["configValue"];
+	    }
+	}
+	export class ResetConfigParams {
+	    loginName: string;
+	    configName: string;
+
+	    static createFrom(source: any = {}) {
+	        return new ResetConfigParams(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.loginName = source["loginName"];
+	        this.configName = source["configName"];
 	    }
 	}
 	export class RunRequest {
@@ -502,6 +554,8 @@ export namespace model {
 	    changePassword?: ChangePasswordParams;
 	    setComment?: SetCommentParams;
 	    setAttribute?: SetAttributeParams;
+	    setConfig?: SetConfigParams;
+	    resetConfig?: ResetConfigParams;
 	    confirmProduction: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -521,6 +575,8 @@ export namespace model {
 	        this.changePassword = this.convertValues(source["changePassword"], ChangePasswordParams);
 	        this.setComment = this.convertValues(source["setComment"], SetCommentParams);
 	        this.setAttribute = this.convertValues(source["setAttribute"], SetAttributeParams);
+	        this.setConfig = this.convertValues(source["setConfig"], SetConfigParams);
+	        this.resetConfig = this.convertValues(source["resetConfig"], ResetConfigParams);
 	        this.confirmProduction = source["confirmProduction"];
 	    }
 	

@@ -15,7 +15,7 @@ Cross-platform **PostgreSQL role maintenance** desktop app: manage clusters, bat
 | DB driver | **pgx/v5**; direct **TCP** to `host:port` (no SSH tunnels in v1) |
 | Secrets | **Never** store passwords in YAML; optional `connect_user` only. No in-UI credential fields. Auth: user = cluster `connect_user` → `PGUSER`; password = `PGPASSWORD` → `~/.pgpass` → **empty** (trust / no password, like psql). Production gated by a confirm popup (no checkbox). |
 | Role logic | App calls **call templates** with `${placeholder}` → `SELECT fn($1,...)` — real DDL/privileges live in **DB functions** on each cluster |
-| Categories | Default `production` and `uat`; extensible in config YAML |
+| Categories | = cluster groups. Editable in Settings (label + base `color` + `confirm` flag); id is a slug of the label. Colours applied via a generated `<style id="cat-colors">` keyed on `data-cat` (no hardcoded prod/uat colours). `confirm` drives the production popup. |
 | DB function specs | User will provide real names/signatures; defaults in `config.example.yaml` are placeholders (`your_schema.*`) |
 
 ## Stack (current)
@@ -61,6 +61,7 @@ Config: `db_functions.<operation>.call` + optional `.execution` (`function` \| `
 | `change_password` | loginname, new_password | |
 | `set_comment` | loginname, comment | Default `statement`: `COMMENT ON ROLE ${loginname} IS ${comment}` — comment as escaped literal |
 | `set_attribute` | loginname, attribute | Default `statement`: `ALTER ROLE ${loginname} WITH ${attribute}` — attribute is a whitelisted keyword (SUPERUSER/NOSUPERUSER/…), embedded unquoted |
+| `set_config` / `reset_config` | loginname, config_name(, config_value) | **No template.** Hardcoded in `pg.ExecuteOperation`: `ALTER ROLE … SET x = '…'` / `RESET x` for role GUCs (read from `pg_roles.rolconfig`). |
 
 **Execution:** `function` → `SELECT` + `$n` binds (`Query`). `statement` / `block` → embed values (`Exec`): role fields as identifiers (`loginname`, `parent_roles` list on grant_parents); passwords/names as quoted literals. Do not use raw `$1` in templates.
 
@@ -90,7 +91,8 @@ scroll); header + tabs fixed. Operations = two independently scrolling columns
 (`.ops-sidebar` / `.ops-main`); `.ops-main` has a scrolling `.ops-body` + pinned
 `.ops-footer` (Run/Test or Save/Remove, via `updateOpsFooter()`). Clusters/Settings are
 single-column with fixed toolbar / pinned Save-settings footer. Left sidebar is Target
-selection only.
+selection only; "Or pick clusters" collapses/expands (collapsed by default; expanded
+list flexes to fill). Settings hosts the **Cluster groups** editor.
 
 **Alter role** (search-then-edit): clicking the **Alter role** op-tab opens a search
 dialog (no separate "Find user" button) that searches the *selected*
@@ -100,10 +102,11 @@ createdb, inherit, login, replication, bypassrls) list one-per-row with **scope 
 judged per group (filled group label when all selected clusters of a group match, else
 transparent per-cluster labels; coloured by environment). **✎ Edit** opens a per-cluster
 checkbox editor that grants **and** revokes; **×** removes everywhere; **↺** discards
-pending. Comments popup groups clusters by comment content (compared as JSON by value)
-and saves via `set_comment`. Edit state: `alterAdd`/`alterRevoke`,
-`alterAttrAdd`/`alterAttrRemove` are `Map<key, Set<clusterId>>`; `describeScope` /
-`scopeLabelsHtml` produce all labels.
+pending. **Settings** (role GUCs) use the same editor keyed by `name=value`
+(`alterConfigSet`/`alterConfigReset`), emitting `set_config`/`reset_config`. Comments
+popup groups clusters by comment content (compared as JSON by value) and saves via
+`set_comment`. Edit state: `alterAdd`/`alterRevoke`, `alterAttrAdd`/`alterAttrRemove` are
+`Map<key, Set<clusterId>>`; `describeScope` / `scopeLabelsHtml` produce all labels.
 
 ## Versioning & packaging
 

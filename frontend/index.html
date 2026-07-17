@@ -28,8 +28,10 @@
         <aside class="ops-sidebar">
           <h2>Target selection</h2>
           <div id="category-checkboxes" class="checkbox-group"></div>
-          <h3>Or pick clusters</h3>
-          <div id="cluster-checkboxes" class="checkbox-group cluster-list"></div>
+          <button type="button" class="clusters-toggle" id="btn-toggle-clusters" aria-expanded="false">
+            <span class="caret">▸</span> Or pick clusters
+          </button>
+          <div id="cluster-checkboxes" class="checkbox-group cluster-list hidden"></div>
           <p class="hint" id="target-preview"></p>
         </aside>
 
@@ -122,6 +124,13 @@
         </div>
 
         <div class="settings-section-head">
+          <h2>Cluster groups</h2>
+          <button type="button" id="btn-add-group">Add group</button>
+        </div>
+        <p class="hint">Colour and a "require confirmation" gate per group. Deleting a group in use by a cluster is blocked.</p>
+        <div id="groups-editor"></div>
+
+        <div class="settings-section-head">
           <h2>DB command templates</h2>
           <button type="button" id="btn-template-help">Template syntax help</button>
         </div>
@@ -182,7 +191,13 @@
       <label id="scope-role-label">Role name
         <input name="role" id="scope-role" autocapitalize="none" autocomplete="off" spellcheck="false" />
       </label>
-      <p class="hint">Choose where to grant it. Tick a group to select all its clusters.</p>
+      <label id="scope-cname-label" class="hidden">Setting name
+        <input name="cname" id="scope-cname" placeholder="e.g. log_statement" autocapitalize="none" autocomplete="off" spellcheck="false" />
+      </label>
+      <label id="scope-cvalue-label" class="hidden">Value
+        <input name="cvalue" id="scope-cvalue" placeholder="e.g. all" autocapitalize="none" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="hint">Choose the clusters. Tick a group to select all its clusters.</p>
       <div id="scope-targets" class="scope-targets"></div>
       <menu>
         <button type="button" value="ok" id="scope-dialog-ok" class="primary">Add</button>

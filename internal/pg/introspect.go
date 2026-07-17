@@ -25,7 +25,8 @@ ORDER BY r.rolname`
 
 const roleDetailSQL = `SELECT r.rolsuper, r.rolcreaterole, r.rolcreatedb, r.rolinherit,
        r.rolcanlogin, r.rolreplication, r.rolbypassrls,
-       COALESCE(d.description, '')
+       COALESCE(d.description, ''),
+       COALESCE(r.rolconfig, '{}')
 FROM pg_roles r
 LEFT JOIN pg_shdescription d
   ON d.objoid = r.oid AND d.classoid = 'pg_authid'::regclass
@@ -57,18 +58,19 @@ func SearchRoles(ctx context.Context, conn *pgx.Conn, term string) ([]RoleRow, e
 	return out, rows.Err()
 }
 
-// RoleDetail reads whether a login exists, its comment, attribute flags, and direct
-// parent memberships.
-func RoleDetail(ctx context.Context, conn *pgx.Conn, loginName string) (exists bool, comment string, parents []string, attrs map[string]bool, err error) {
+// RoleDetail reads whether a login exists, its comment, attribute flags, role GUC
+// settings (rolconfig), and direct parent memberships.
+func RoleDetail(ctx context.Context, conn *pgx.Conn, loginName string) (exists bool, comment string, parents []string, attrs map[string]bool, settings map[string]string, err error) {
 	var super, createRole, createDB, inherit, canLogin, replication, bypassRLS bool
+	var rolconfig []string
 	err = conn.QueryRow(ctx, roleDetailSQL, loginName).Scan(
-		&super, &createRole, &createDB, &inherit, &canLogin, &replication, &bypassRLS, &comment,
+		&super, &createRole, &createDB, &inherit, &canLogin, &replication, &bypassRLS, &comment, &rolconfig,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return false, "", nil, nil, nil
+			return false, "", nil, nil, nil, nil
 		}
-		return false, "", nil, nil, err
+		return false, "", nil, nil, nil, err
 	}
 	exists = true
 	attrs = map[string]bool{
@@ -80,20 +82,32 @@ func RoleDetail(ctx context.Context, conn *pgx.Conn, loginName string) (exists b
 		"replication": replication,
 		"bypassrls":   bypassRLS,
 	}
+	settings = parseRoleConfig(rolconfig)
 
 	rows, err := conn.Query(ctx, roleParentsSQL, loginName)
 	if err != nil {
-		return exists, comment, nil, attrs, err
+		return exists, comment, nil, attrs, settings, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var p string
 		if err := rows.Scan(&p); err != nil {
-			return exists, comment, parents, attrs, err
+			return exists, comment, parents, attrs, settings, err
 		}
 		parents = append(parents, p)
 	}
-	return exists, comment, parents, attrs, rows.Err()
+	return exists, comment, parents, attrs, settings, rows.Err()
+}
+
+// parseRoleConfig turns rolconfig entries ("name=value") into a name→value map.
+func parseRoleConfig(rolconfig []string) map[string]string {
+	out := make(map[string]string, len(rolconfig))
+	for _, entry := range rolconfig {
+		if i := strings.IndexByte(entry, '='); i > 0 {
+			out[entry[:i]] = entry[i+1:]
+		}
+	}
+	return out
 }
 
 // ParseFullName extracts full_name from a JSON comment, or "" if the comment is not

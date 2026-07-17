@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/michalbartak/dbaccounts/internal/model"
@@ -16,8 +17,8 @@ func DefaultConfig() model.Config {
 	return model.Config{
 		Version: 1,
 		Categories: []model.Category{
-			{ID: "production", Label: "Production"},
-			{ID: "uat", Label: "UAT"},
+			{ID: "production", Label: "Production", Color: "#e8a838", Confirm: true},
+			{ID: "uat", Label: "UAT", Color: "#6eb5ff", Confirm: false},
 		},
 		Clusters: []model.Cluster{},
 		DBFunctions: model.DBFunctions{
@@ -232,6 +233,98 @@ func (s *Store) ClustersByCategories(categoryIDs []string) []model.Cluster {
 		}
 	}
 	return out
+}
+
+func (s *Store) CategoryByID(id string) (model.Category, bool) {
+	for _, c := range s.cfg.Categories {
+		if c.ID == id {
+			return c, true
+		}
+	}
+	return model.Category{}, false
+}
+
+func (s *Store) AddCategory(in model.CategoryInput) (model.Category, error) {
+	label := strings.TrimSpace(in.Label)
+	if label == "" {
+		return model.Category{}, errors.New("label is required")
+	}
+	id := slugify(label)
+	if id == "" {
+		return model.Category{}, errors.New("label must contain a letter or digit")
+	}
+	for _, c := range s.cfg.Categories {
+		if c.ID == id {
+			return model.Category{}, fmt.Errorf("a group with id %q already exists", id)
+		}
+	}
+	c := model.Category{ID: id, Label: label, Color: normalizeColor(in.Color), Confirm: in.Confirm}
+	s.cfg.Categories = append(s.cfg.Categories, c)
+	if err := s.Save(); err != nil {
+		return model.Category{}, err
+	}
+	return c, nil
+}
+
+func (s *Store) UpdateCategory(id string, in model.CategoryInput) (model.Category, error) {
+	label := strings.TrimSpace(in.Label)
+	if label == "" {
+		return model.Category{}, errors.New("label is required")
+	}
+	for i, c := range s.cfg.Categories {
+		if c.ID != id {
+			continue
+		}
+		s.cfg.Categories[i] = model.Category{ID: id, Label: label, Color: normalizeColor(in.Color), Confirm: in.Confirm}
+		if err := s.Save(); err != nil {
+			return model.Category{}, err
+		}
+		return s.cfg.Categories[i], nil
+	}
+	return model.Category{}, fmt.Errorf("group not found: %s", id)
+}
+
+func (s *Store) DeleteCategory(id string) error {
+	for _, cl := range s.cfg.Clusters {
+		if cl.Category == id {
+			return fmt.Errorf("group %q is in use by cluster %q", id, cl.Alias)
+		}
+	}
+	for i, c := range s.cfg.Categories {
+		if c.ID == id {
+			s.cfg.Categories = append(s.cfg.Categories[:i], s.cfg.Categories[i+1:]...)
+			return s.Save()
+		}
+	}
+	return fmt.Errorf("group not found: %s", id)
+}
+
+// slugify turns a label into a lowercase [a-z0-9_] id.
+func slugify(label string) string {
+	var b strings.Builder
+	prevUnderscore := false
+	for _, r := range strings.ToLower(strings.TrimSpace(label)) {
+		switch {
+		case (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'):
+			b.WriteRune(r)
+			prevUnderscore = false
+		default:
+			if b.Len() > 0 && !prevUnderscore {
+				b.WriteByte('_')
+				prevUnderscore = true
+			}
+		}
+	}
+	return strings.Trim(b.String(), "_")
+}
+
+// normalizeColor keeps a #rrggbb hex or returns "" (frontend falls back to a default).
+func normalizeColor(c string) string {
+	c = strings.TrimSpace(c)
+	if len(c) == 7 && c[0] == '#' {
+		return strings.ToLower(c)
+	}
+	return ""
 }
 
 func validateClusterInput(in model.ClusterInput) error {

@@ -215,6 +215,14 @@ set_attribute:
 
 ---
 
+## Role settings (no template)
+
+The Alter-role **Settings** section reads `pg_roles.rolconfig` and writes role GUCs with
+**hardcoded** SQL — there is no configurable template. Set: `ALTER ROLE <role> SET <name> = '<value>'`
+(name validated as a GUC identifier, value single-quote-escaped). Remove: `ALTER ROLE <role> RESET <name>`.
+
+---
+
 ## Allowed placeholders
 
 | Operation | `${...}` names | Statement/block embedding |

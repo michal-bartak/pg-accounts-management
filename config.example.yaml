@@ -9,11 +9,18 @@
 #   - set parent role → "... || $n::text[]"
 
 version: 1
+# Cluster groups. color = base hex (shades derived); confirm = require the
+# production-style confirm popup before running against that group's clusters.
+# Edit these in-app under Settings → Cluster groups.
 categories:
   - id: production
     label: Production
+    color: "#e8a838"
+    confirm: true
   - id: uat
     label: UAT
+    color: "#6eb5ff"
+    confirm: false
 clusters: []
 db_functions:
   create_role:

@@ -22,8 +22,16 @@ func NormalizeExecution(execution string) string {
 }
 
 type Category struct {
-	ID    string `yaml:"id" json:"id"`
-	Label string `yaml:"label" json:"label"`
+	ID      string `yaml:"id" json:"id"`
+	Label   string `yaml:"label" json:"label"`
+	Color   string `yaml:"color,omitempty" json:"color,omitempty"`     // base hex, e.g. #e8a838
+	Confirm bool   `yaml:"confirm,omitempty" json:"confirm,omitempty"` // require confirm popup before running
+}
+
+type CategoryInput struct {
+	Label   string `json:"label"`
+	Color   string `json:"color"`
+	Confirm bool   `json:"confirm"`
 }
 
 type Cluster struct {
@@ -141,6 +149,19 @@ type SetAttributeParams struct {
 	Attribute string `json:"attribute"`
 }
 
+// SetConfigParams sets one role GUC: ALTER ROLE <login> SET <name> = '<value>'.
+type SetConfigParams struct {
+	LoginName   string `json:"loginName"`
+	ConfigName  string `json:"configName"`
+	ConfigValue string `json:"configValue"`
+}
+
+// ResetConfigParams clears one role GUC: ALTER ROLE <login> RESET <name>.
+type ResetConfigParams struct {
+	LoginName  string `json:"loginName"`
+	ConfigName string `json:"configName"`
+}
+
 type RunRequest struct {
 	Operation         string                `json:"operation"`
 	CategoryIDs       []string              `json:"categoryIds"`
@@ -153,6 +174,8 @@ type RunRequest struct {
 	ChangePassword    *ChangePasswordParams `json:"changePassword,omitempty"`
 	SetComment        *SetCommentParams     `json:"setComment,omitempty"`
 	SetAttribute      *SetAttributeParams   `json:"setAttribute,omitempty"`
+	SetConfig         *SetConfigParams      `json:"setConfig,omitempty"`
+	ResetConfig       *ResetConfigParams    `json:"resetConfig,omitempty"`
 	ConfirmProduction bool                  `json:"confirmProduction"`
 }
 
@@ -217,14 +240,15 @@ type RoleMatch struct {
 
 // ClusterRoleDetail is one login's state on one cluster (parents = direct memberships).
 type ClusterRoleDetail struct {
-	ClusterID string   `json:"clusterId"`
-	Alias     string   `json:"alias"`
-	Host      string   `json:"host"`
-	Category  string   `json:"category"`
-	Exists     bool            `json:"exists"`
-	Comment    string          `json:"comment"`
-	FullName   string          `json:"fullName"`
-	Parents    []string        `json:"parents"`
-	Attributes map[string]bool `json:"attributes"`
-	Error      string          `json:"error,omitempty"`
+	ClusterID  string            `json:"clusterId"`
+	Alias      string            `json:"alias"`
+	Host       string            `json:"host"`
+	Category   string            `json:"category"`
+	Exists     bool              `json:"exists"`
+	Comment    string            `json:"comment"`
+	FullName   string            `json:"fullName"`
+	Parents    []string          `json:"parents"`
+	Attributes map[string]bool   `json:"attributes"`
+	Settings   map[string]string `json:"settings"`
+	Error      string            `json:"error,omitempty"`
 }

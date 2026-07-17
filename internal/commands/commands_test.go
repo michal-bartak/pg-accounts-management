@@ -386,15 +386,50 @@ func TestBuildQuery_removeRole_customTemplate(t *testing.T) {
 	}
 }
 
+func TestValidateRequest_setConfig(t *testing.T) {
+	cfg := testConfig()
+	ok := model.RunRequest{
+		Operation: OpSetConfig, ClusterIDs: []string{"c"},
+		SetConfig: &model.SetConfigParams{LoginName: "t", ConfigName: "log_statement", ConfigValue: "all"},
+	}
+	if err := ValidateRequest(cfg, ok); err != nil {
+		t.Fatalf("valid set_config rejected: %v", err)
+	}
+	bad := model.RunRequest{
+		Operation: OpSetConfig, ClusterIDs: []string{"c"},
+		SetConfig: &model.SetConfigParams{LoginName: "t", ConfigName: "bad name;", ConfigValue: "x"},
+	}
+	if err := ValidateRequest(cfg, bad); err == nil {
+		t.Fatal("expected invalid setting name to be rejected")
+	}
+	if !ValidConfigName("auto_explain.log_min_duration") || ValidConfigName("a b") {
+		t.Fatal("ValidConfigName wrong")
+	}
+	// set_config/reset_config build empty DBFunction (handled directly in pg).
+	fn, args, err := BuildArgs(cfg, ok)
+	if err != nil || fn.Call != "" || args["config_name"] != "log_statement" || args["config_value"] != "all" {
+		t.Fatalf("BuildArgs set_config: fn=%q args=%v err=%v", fn.Call, args, err)
+	}
+}
+
 func TestRequiresProductionConfirm(t *testing.T) {
+	cats := []model.Category{
+		{ID: "uat", Confirm: false},
+		{ID: "production", Confirm: true},
+	}
 	clusters := []model.Cluster{
 		{ID: "1", Category: "uat"},
 		{ID: "2", Category: "production"},
 	}
-	if !RequiresProductionConfirm(nil, clusters) {
-		t.Fatal("expected true")
+	if !RequiresProductionConfirm(cats, clusters) {
+		t.Fatal("expected true when a target's group has Confirm=true")
 	}
-	if RequiresProductionConfirm(nil, []model.Cluster{{Category: "uat"}}) {
-		t.Fatal("expected false")
+	if RequiresProductionConfirm(cats, []model.Cluster{{Category: "uat"}}) {
+		t.Fatal("expected false when no target's group requires confirm")
+	}
+	// A group without the flag never triggers, even if named 'production'.
+	noFlag := []model.Category{{ID: "production", Confirm: false}}
+	if RequiresProductionConfirm(noFlag, []model.Cluster{{Category: "production"}}) {
+		t.Fatal("expected false when the group's Confirm flag is off")
 	}
 }

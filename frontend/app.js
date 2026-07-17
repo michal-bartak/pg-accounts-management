@@ -37,6 +37,10 @@ let alterScopeClusters = [];
 let alterAttrAdd = new Map();
 /** @type {Map<string, Set<string>>} attribute key -> clusterIds to disable */
 let alterAttrRemove = new Map();
+/** @type {Map<string, Set<string>>} "name=value" -> clusterIds to SET */
+let alterConfigSet = new Map();
+/** @type {Map<string, Set<string>>} setting name -> clusterIds to RESET */
+let alterConfigReset = new Map();
 
 // Editable role attributes (pg_roles flag -> ALTER ROLE enable/disable keywords).
 const ROLE_ATTRIBUTES = [
@@ -182,6 +186,66 @@ function categoryLabel(id) {
   return c?.label || id;
 }
 
+const DEFAULT_CAT_COLOR = '#9aa3b5';
+function categoryColor(id) {
+  const c = state?.categories?.find((x) => x.id === id);
+  return (c && c.color) || DEFAULT_CAT_COLOR;
+}
+
+/** Whether a group requires the production-style confirm popup. */
+function categoryConfirm(id) {
+  return !!state?.categories?.find((x) => x.id === id)?.confirm;
+}
+
+/** #rrggbb → rgba(r,g,b,a). Falls back to the default colour on bad input. */
+function hexToRgba(hex, a) {
+  const m = /^#?([0-9a-f]{6})$/i.exec((hex || '').trim());
+  const h = m ? m[1] : DEFAULT_CAT_COLOR.slice(1);
+  const n = parseInt(h, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+}
+
+/** Generate per-group colour rules (badges, scope labels, checkbox highlight). */
+function renderCategoryColors() {
+  let el = document.getElementById('cat-colors');
+  if (!el) {
+    el = document.createElement('style');
+    el.id = 'cat-colors';
+    document.head.appendChild(el);
+  }
+  el.textContent = (state?.categories || [])
+    .map((c) => {
+      const hex = c.color || DEFAULT_CAT_COLOR;
+      const id = (window.CSS && CSS.escape) ? CSS.escape(c.id) : c.id;
+      return [
+        `.badge[data-cat="${id}"]{color:${hex};background:${hexToRgba(hex, 0.2)}}`,
+        `.chip-scope.scope-kind-group[data-cat="${id}"]{color:${hex};background:${hexToRgba(hex, 0.16)}}`,
+        `.chip-scope.scope-kind-cluster[data-cat="${id}"]{color:${hex};background:transparent;border-color:${hex}}`,
+        `.checkbox-group label[data-category="${id}"]:has(input:checked){border-color:${hex};background:${hexToRgba(hex, 0.18)}}`,
+      ].join('');
+    })
+    .join('\n');
+}
+
+function groupRowHtml(c) {
+  const color = (c && c.color) || DEFAULT_CAT_COLOR;
+  const idCell = c && c.id ? `<code class="group-id">${escapeHtml(c.id)}</code>` : '<span class="group-id hint">new</span>';
+  return `<div class="group-row" data-id="${escapeAttr(c ? c.id : '')}">
+    <input type="color" class="group-color" value="${escapeAttr(color)}" title="Group colour" />
+    <input type="text" class="group-label" placeholder="Group label" value="${escapeAttr(c ? c.label : '')}" autocapitalize="none" autocomplete="off" spellcheck="false" />
+    ${idCell}
+    <label class="inline"><input type="checkbox" class="group-confirm"${c && c.confirm ? ' checked' : ''} /> confirm</label>
+    <button type="button" class="small group-save">Save</button>
+    <button type="button" class="small danger group-del">Delete</button>
+  </div>`;
+}
+
+function renderGroupsEditor() {
+  const root = document.getElementById('groups-editor');
+  if (!root) return;
+  root.innerHTML = (state?.categories || []).map((c) => groupRowHtml(c)).join('');
+}
+
 function renderClustersTable() {
   const tbody = document.querySelector('#clusters-table tbody');
   tbody.innerHTML = '';
@@ -191,13 +255,12 @@ function renderClustersTable() {
   }
   for (const c of state.clusters) {
     const tr = document.createElement('tr');
-    const catClass = c.category === 'production' ? 'production' : c.category === 'uat' ? 'uat' : '';
     tr.innerHTML = `
       <td>${escapeHtml(c.alias)}</td>
       <td>${escapeHtml(c.host)}</td>
       <td>${c.port}</td>
       <td>${escapeHtml(c.database)}</td>
-      <td><span class="badge ${catClass}">${escapeHtml(categoryLabel(c.category))}</span></td>
+      <td><span class="badge" data-cat="${escapeAttr(c.category)}">${escapeHtml(categoryLabel(c.category))}</span></td>
       <td>${escapeHtml(c.sslmode || 'prefer')}</td>
       <td>
         <button class="small" data-action="edit" data-id="${c.id}">Edit</button>
@@ -216,9 +279,9 @@ function renderCategoryCheckboxes() {
   box.innerHTML = '';
   for (const cat of state?.categories || []) {
     const label = document.createElement('label');
-    const catClass = cat.id === 'production' ? 'production' : cat.id === 'uat' ? 'uat' : '';
-    label.innerHTML = `<input type="checkbox" name="category" value="${cat.id}" checked />
-      <span class="badge ${catClass}">${escapeHtml(cat.label)}</span>`;
+    label.dataset.category = cat.id;
+    label.innerHTML = `<input type="checkbox" name="category" value="${escapeAttr(cat.id)}" checked />
+      <span class="badge" data-cat="${escapeAttr(cat.id)}">${escapeHtml(cat.label)}</span>`;
     box.appendChild(label);
     label.querySelector('input')?.addEventListener('change', updateTargetPreview);
   }
@@ -229,11 +292,10 @@ function renderClusterCheckboxes() {
   box.innerHTML = '';
   for (const c of state?.clusters || []) {
     const label = document.createElement('label');
-    const catClass = c.category === 'production' ? 'production' : c.category === 'uat' ? 'uat' : '';
     if (c.category) label.dataset.category = c.category;
-    label.innerHTML = `<input type="checkbox" name="cluster" value="${c.id}" />
+    label.innerHTML = `<input type="checkbox" name="cluster" value="${escapeAttr(c.id)}" />
       <span class="target-cluster-text">${escapeHtml(c.alias)} <span class="target-cluster-host">(${escapeHtml(c.host)})</span></span>
-      <span class="badge ${catClass}">${escapeHtml(categoryLabel(c.category))}</span>`;
+      <span class="badge" data-cat="${escapeAttr(c.category)}">${escapeHtml(categoryLabel(c.category))}</span>`;
     box.appendChild(label);
     label.querySelector('input')?.addEventListener('change', updateTargetPreview);
   }
@@ -299,11 +361,10 @@ function renderResults(rows) {
   if (!rows?.length) return;
   for (const r of rows) {
     const tr = document.createElement('tr');
-    const catClass = r.category === 'production' ? 'production' : r.category === 'uat' ? 'uat' : '';
     tr.innerHTML = `
       <td>${escapeHtml(r.alias)}</td>
       <td>${escapeHtml(r.host)}</td>
-      <td><span class="badge ${catClass}">${escapeHtml(categoryLabel(r.category))}</span></td>
+      <td><span class="badge" data-cat="${escapeAttr(r.category)}">${escapeHtml(categoryLabel(r.category))}</span></td>
       <td class="${r.status === 'ok' ? 'status-ok' : 'status-error'}">${escapeHtml(r.status)}</td>
       <td>${r.durationMs} ms</td>
       <td>${escapeHtml(r.message || '')}</td>`;
@@ -312,9 +373,11 @@ function renderResults(rows) {
 }
 
 function renderAll() {
+  renderCategoryColors();
   renderClustersTable();
   renderCategoryCheckboxes();
   renderClusterCheckboxes();
+  renderGroupsEditor();
   renderDBFunctionsEditor();
   updateTargetPreview();
 }
@@ -453,10 +516,8 @@ function buildRunRequest() {
 }
 
 function hasProductionTargets() {
-  const catIds = getSelectedCategories();
-  const clusterIds = new Set(getSelectedClusterIDs());
-  if (catIds.includes('production')) return true;
-  return state?.clusters?.some((c) => clusterIds.has(c.id) && c.category === 'production');
+  // "Production" = any selected target in a group flagged require-confirmation.
+  return resolveSelectedClusters().some((c) => categoryConfirm(c.category));
 }
 
 async function runOperation() {
@@ -627,10 +688,6 @@ let scopeDialogCtx = null;
 /** @type {Array<{text:string, ids:string[]}>} distinct comment values for the popup */
 let commentVersions = [];
 
-function categoryClass(cat) {
-  return cat === 'production' ? 'production' : cat === 'uat' ? 'uat' : '';
-}
-
 function clusterCategory(clusterId) {
   return state?.clusters?.find((c) => c.id === clusterId)?.category || '';
 }
@@ -751,6 +808,8 @@ async function pickUser(login) {
   alterRevoke = new Map();
   alterAttrAdd = new Map();
   alterAttrRemove = new Map();
+  alterConfigSet = new Map();
+  alterConfigReset = new Map();
   alterDoPassword = false;
   alterPassword = '';
 
@@ -801,6 +860,35 @@ function clusterIdsWithAttr(key) {
   return new Set(alterDetails.filter((d) => d.attributes && d.attributes[key]).map((d) => d.clusterId));
 }
 
+/** Set of clusterIds where setting `name` currently equals `value`. */
+function clusterIdsWithConfig(name, value) {
+  return new Set(alterDetails.filter((d) => d.settings && d.settings[name] === value).map((d) => d.clusterId));
+}
+
+/** Distinct {name,value} pairs across present clusters, sorted by name then value. */
+function allSettings() {
+  const seen = new Set();
+  const out = [];
+  for (const d of alterDetails) {
+    for (const [name, value] of Object.entries(d.settings || {})) {
+      const k = name + '=' + value;
+      if (!seen.has(k)) {
+        seen.add(k);
+        out.push({ name, value });
+      }
+    }
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name) || a.value.localeCompare(b.value));
+}
+
+const CFG_SEP = ' '; // internal key separator (GUC names/values won't contain NUL)
+// Row key is "name=value"; GUC names never contain '=', so split on the first one.
+const cfgKey = (name, value) => name + '=' + value;
+const cfgParse = (key) => {
+  const i = key.indexOf('=');
+  return { name: key.slice(0, i), value: key.slice(i + 1) };
+};
+
 /**
  * Describe a set of clusterIds against a universe (the selected comparison scope).
  * Completeness is judged per group only: if every universe cluster of a category is in
@@ -838,11 +926,13 @@ function describeScope(idSet, universe = scopeUniverse()) {
 }
 
 function scopeLabelsHtml(parts, extraCls = '') {
+  // Pending labels (add=green / strike=red) carry only the overlay class so it wins;
+  // normal labels carry data-cat so the generated per-group colour applies.
   return parts
-    .map(
-      (p) =>
-        `<span class="chip-scope scope-${categoryClass(p.cat) || 'other'} scope-kind-${p.kind} ${extraCls}">${escapeHtml(p.label)}</span>`
-    )
+    .map((p) => {
+      const cat = extraCls ? '' : ` data-cat="${escapeAttr(p.cat)}"`;
+      return `<span class="chip-scope scope-kind-${p.kind} ${extraCls}"${cat}>${escapeHtml(p.label)}</span>`;
+    })
     .join('');
 }
 
@@ -930,6 +1020,18 @@ function renderAlterDetail(errors = []) {
     scopeRowHtml('attr', a.key, a.label, clusterIdsWithAttr(a.key), alterAttrAdd.get(a.key) || new Set(), alterAttrRemove.get(a.key) || new Set())
   ).join('');
 
+  // SETTINGS: existing (name,value) pairs plus any brand-new pending sets.
+  const settingPairs = allSettings();
+  const seenCfg = new Set(settingPairs.map((p) => cfgKey(p.name, p.value)));
+  for (const key of alterConfigSet.keys()) {
+    if (!seenCfg.has(key)) {
+      seenCfg.add(key);
+      settingPairs.push(cfgParse(key));
+    }
+  }
+  const cfgRows = settingPairs.map((p) => configRowHtml(p.name, p.value)).join('');
+  const cfgHtml = cfgRows || '<p class="hint">No settings.</p>';
+
   root.innerHTML = `
     <div class="alter-detail-head">
       <h3>Editing <strong>${escapeHtml(alterSelected)}</strong>${headFull}</h3>
@@ -957,6 +1059,15 @@ function renderAlterDetail(errors = []) {
       <div class="alter-privs-label">Attributes</div>
       <div class="scope-rows" id="alter-attrs">${attrRows}</div>
       <p class="hint">Each attribute shows where it is enabled. Use ✎ to enable/disable per cluster, × to disable everywhere.</p>
+    </div>
+
+    <div class="alter-section">
+      <div class="alter-privs-label">Settings</div>
+      <div class="scope-rows" id="alter-configs">${cfgHtml}</div>
+      <div class="alter-add-priv">
+        <button type="button" class="small" id="btn-alter-add-config">Add setting…</button>
+      </div>
+      <p class="hint">Role GUCs (ALTER ROLE … SET/RESET). Use ✎ to set on chosen clusters, × to reset everywhere it has that value.</p>
     </div>
 
     <div class="alter-section">
@@ -1018,7 +1129,7 @@ function scopeRowHtml(kind, key, name, curSet, addSet, revSet) {
   const labels = keptLabels + addLabels + revLabels || emptyNote;
 
   const editBtn = `<button type="button" class="chip-extend" data-kind="${kind}" data-act="scope" data-key="${k}" title="Edit clusters">✎</button>`;
-  const verbRemove = kind === 'attr' ? 'Disable everywhere' : 'Revoke everywhere';
+  const verbRemove = kind === 'attr' ? 'Disable everywhere' : kind === 'config' ? 'Reset everywhere' : 'Revoke everywhere';
   let xBtn = '';
   if (!isNew) {
     xBtn = `<button type="button" class="chip-x" data-kind="${kind}" data-act="revoke" data-key="${k}" title="${verbRemove}">×</button>`;
@@ -1038,6 +1149,29 @@ function scopeRowHtml(kind, key, name, curSet, addSet, revSet) {
   </div>`;
 }
 
+/** A SETTINGS row (name=value): current scope = clusters where the setting has that value;
+ *  a cluster is "removed" if pending-reset for the name or pending-set to a different value. */
+function configRowHtml(name, value) {
+  const key = cfgKey(name, value);
+  const cur = clusterIdsWithConfig(name, value);
+  const add = alterConfigSet.get(key) || new Set();
+  const resetIds = alterConfigReset.get(name) || new Set();
+  const rev = new Set();
+  for (const cid of cur) {
+    if (resetIds.has(cid)) {
+      rev.add(cid);
+      continue;
+    }
+    for (const [k, ids] of alterConfigSet) {
+      if (k !== key && cfgParse(k).name === name && ids.has(cid)) {
+        rev.add(cid);
+        break;
+      }
+    }
+  }
+  return scopeRowHtml('config', key, `${name} = ${value}`, cur, add, rev);
+}
+
 // --- Scope dialog (add a new privilege, or extend a privilege/attribute) ---
 
 /** ctx: null → new privilege; {kind:'priv',key} → edit privilege; {kind:'attr',key} → edit attribute. */
@@ -1047,31 +1181,57 @@ function openScopeDialog(ctx) {
   const title = document.getElementById('scope-dialog-title');
   const roleLabel = document.getElementById('scope-role-label');
   const roleInput = /** @type {HTMLInputElement} */ (document.getElementById('scope-role'));
+  const cnameLabel = document.getElementById('scope-cname-label');
+  const cvalueLabel = document.getElementById('scope-cvalue-label');
   const ok = document.getElementById('scope-dialog-ok');
+
+  roleLabel.classList.add('hidden');
+  cnameLabel.classList.add('hidden');
+  cvalueLabel.classList.add('hidden');
 
   if (!ctx) {
     title.textContent = 'Add privilege';
     roleLabel.classList.remove('hidden');
     roleInput.value = '';
     ok.textContent = 'Add';
+  } else if (ctx.kind === 'config' && ctx.isNew) {
+    title.textContent = 'Add setting';
+    cnameLabel.classList.remove('hidden');
+    cvalueLabel.classList.remove('hidden');
+    document.getElementById('scope-cname').value = '';
+    document.getElementById('scope-cvalue').value = '';
+    ok.textContent = 'Add';
+  } else if (ctx.kind === 'config') {
+    const { name } = cfgParse(ctx.key);
+    title.textContent = `Set "${name}" on clusters`;
+    ok.textContent = 'Apply';
   } else if (ctx.kind === 'attr') {
     const a = ROLE_ATTRIBUTES.find((x) => x.key === ctx.key);
     title.textContent = `Edit "${a ? a.label : ctx.key}" clusters`;
-    roleLabel.classList.add('hidden');
     ok.textContent = 'Apply';
   } else {
     title.textContent = `Edit "${ctx.key}" clusters`;
-    roleLabel.classList.add('hidden');
     ok.textContent = 'Apply';
   }
   buildScopeTargets(ctx);
   dlg.showModal();
   if (!ctx) roleInput.focus();
+  else if (ctx.kind === 'config' && ctx.isNew) document.getElementById('scope-cname').focus();
 }
 
 /** Desired-state set currently reflected for a ctx: (current − pendingRevoke) ∪ pendingAdd. */
 function scopeDesired(ctx) {
   if (!ctx) return new Set();
+  if (ctx.kind === 'config') {
+    if (ctx.isNew) return new Set();
+    const { name, value } = cfgParse(ctx.key);
+    const cur = clusterIdsWithConfig(name, value);
+    const rev = alterConfigReset.get(name) || new Set();
+    const add = alterConfigSet.get(ctx.key) || new Set();
+    const desired = setMinus(cur, rev);
+    for (const cid of add) desired.add(cid);
+    return desired;
+  }
   const cur = ctx.kind === 'attr' ? clusterIdsWithAttr(ctx.key) : clusterIdsWith(ctx.key);
   const add = (ctx.kind === 'attr' ? alterAttrAdd : alterAdd).get(ctx.key) || new Set();
   const rev = (ctx.kind === 'attr' ? alterAttrRemove : alterRevoke).get(ctx.key) || new Set();
@@ -1113,6 +1273,11 @@ function confirmScopeDialog() {
       .map((cb) => cb.dataset.cluster)
   );
 
+  if (ctx && ctx.kind === 'config') {
+    confirmConfigScope(ctx, desired);
+    return;
+  }
+
   const key = ctx ? ctx.key : document.getElementById('scope-role').value.trim();
   if (!ctx && !ROLE_NAME_RE.test(key)) {
     showToast('Invalid role name: use letters, digits, underscore', 'error');
@@ -1130,6 +1295,54 @@ function confirmScopeDialog() {
   else addMap.delete(key);
   if (revoke.size) revMap.set(key, revoke);
   else revMap.delete(key);
+
+  document.getElementById('scope-dialog').close();
+  renderAlterDetail();
+}
+
+/** Apply the scope dialog for a role SETTING (name=value): SET on desired clusters,
+ *  RESET on clusters that had this value but are no longer desired. */
+function confirmConfigScope(ctx, desired) {
+  let name, value;
+  if (ctx.isNew) {
+    name = document.getElementById('scope-cname').value.trim();
+    value = document.getElementById('scope-cvalue').value;
+    if (!/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/.test(name)) {
+      showToast('Invalid setting name (letters, digits, underscore, optional dot)', 'error');
+      return;
+    }
+  } else {
+    ({ name, value } = cfgParse(ctx.key));
+  }
+  const key = cfgKey(name, value);
+  const cur = clusterIdsWithConfig(name, value);
+  const set = new Set(alterConfigSet.get(key) || []);
+  const reset = new Set(alterConfigReset.get(name) || []);
+
+  const clearOtherSets = (cid) => {
+    for (const [k, ids] of alterConfigSet) {
+      if (k !== key && cfgParse(k).name === name && ids.has(cid)) {
+        ids.delete(cid);
+        if (!ids.size) alterConfigSet.delete(k);
+      }
+    }
+  };
+  for (const cid of desired) {
+    if (cur.has(cid)) set.delete(cid); // already this value → no SET needed
+    else set.add(cid);
+    reset.delete(cid);
+    clearOtherSets(cid);
+  }
+  for (const cid of cur) {
+    if (!desired.has(cid)) {
+      reset.add(cid);
+      set.delete(cid);
+    }
+  }
+  if (set.size) alterConfigSet.set(key, set);
+  else alterConfigSet.delete(key);
+  if (reset.size) alterConfigReset.set(name, reset);
+  else alterConfigReset.delete(name);
 
   document.getElementById('scope-dialog').close();
   renderAlterDetail();
@@ -1177,7 +1390,7 @@ async function saveCommentVersion(idx) {
   const ta = document.querySelector(`.comment-edit[data-idx="${idx}"]`);
   const text = ta ? ta.value : v.text;
 
-  const prod = v.ids.some((cid) => clusterCategory(cid) === 'production');
+  const prod = v.ids.some((cid) => categoryConfirm(clusterCategory(cid)));
   if (prod) {
     const ok = await askConfirm('Production', 'This comment update includes PRODUCTION clusters. Continue?');
     if (!ok) return;
@@ -1259,6 +1472,29 @@ function buildAlterRequests() {
         });
       }
     }
+
+    // Settings: SET name=value where pending & not already that value; RESET where pending.
+    const settings = d.settings || {};
+    for (const [key, ids] of alterConfigSet) {
+      if (!ids.has(d.clusterId)) continue;
+      const { name, value } = cfgParse(key);
+      if (settings[name] !== value) {
+        requests.push({
+          op: 'set_config',
+          clusterId: d.clusterId,
+          params: { setConfig: { loginName: alterSelected, configName: name, configValue: value } },
+        });
+      }
+    }
+    for (const [name, ids] of alterConfigReset) {
+      if (ids.has(d.clusterId) && Object.prototype.hasOwnProperty.call(settings, name)) {
+        requests.push({
+          op: 'reset_config',
+          clusterId: d.clusterId,
+          params: { resetConfig: { loginName: alterSelected, configName: name } },
+        });
+      }
+    }
   }
   return requests;
 }
@@ -1288,6 +1524,8 @@ async function saveAlterations() {
   alterRevoke = new Map();
   alterAttrAdd = new Map();
   alterAttrRemove = new Map();
+  alterConfigSet = new Map();
+  alterConfigReset = new Map();
   alterDoPassword = false;
   alterPassword = '';
   if (alterSelected) await reloadDetails();
@@ -1321,7 +1559,7 @@ async function removeRole() {
 async function executeAlterRequests(requests, successMsg) {
   const app = backend();
   const targetIds = [...new Set(requests.map((r) => r.clusterId))];
-  const prodInvolved = targetIds.some((id) => clusterCategory(id) === 'production');
+  const prodInvolved = targetIds.some((id) => categoryConfirm(clusterCategory(id)));
   if (prodInvolved) {
     const ok = await askConfirm('Production', 'This action includes PRODUCTION clusters. Continue?');
     if (!ok) return false;
@@ -1457,6 +1695,55 @@ document.getElementById('btn-run').addEventListener('click', runOperation);
 document.getElementById('btn-test-selected').addEventListener('click', testSelectedConnections);
 document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
 
+document.getElementById('btn-toggle-clusters')?.addEventListener('click', (ev) => {
+  const btn = ev.currentTarget;
+  const list = document.getElementById('cluster-checkboxes');
+  const expanded = list.classList.toggle('hidden') === false;
+  btn.setAttribute('aria-expanded', String(expanded));
+  const caret = btn.querySelector('.caret');
+  if (caret) caret.textContent = expanded ? '▾' : '▸';
+});
+
+// Cluster groups editor
+document.getElementById('btn-add-group')?.addEventListener('click', () => {
+  document.getElementById('groups-editor')?.insertAdjacentHTML('beforeend', groupRowHtml(null));
+});
+document.getElementById('groups-editor')?.addEventListener('click', async (ev) => {
+  const app = backend();
+  const row = ev.target.closest('.group-row');
+  if (!row) return;
+  const id = row.dataset.id;
+  if (ev.target.closest('.group-save')) {
+    const input = {
+      label: row.querySelector('.group-label').value.trim(),
+      color: row.querySelector('.group-color').value,
+      confirm: row.querySelector('.group-confirm').checked,
+    };
+    try {
+      if (id) await app.UpdateCategory(id, input);
+      else await app.AddCategory(input);
+      await loadConfig();
+      showToast('Group saved', 'success');
+    } catch (e) {
+      showToast(String(e), 'error');
+    }
+  } else if (ev.target.closest('.group-del')) {
+    if (!id) {
+      row.remove();
+      return;
+    }
+    const ok = await askConfirm('Delete group', `Delete cluster group "${id}"?`);
+    if (!ok) return;
+    try {
+      await app.DeleteCategory(id);
+      await loadConfig();
+      showToast('Group deleted', 'success');
+    } catch (e) {
+      showToast(String(e), 'error');
+    }
+  }
+});
+
 // Alter role tab wiring
 function openSearchDialog() {
   const dlg = document.getElementById('search-dialog');
@@ -1495,6 +1782,29 @@ document.getElementById('alter-detail')?.addEventListener('click', (ev) => {
       openScopeDialog({ kind, key });
       return;
     }
+    if (kind === 'config') {
+      const { name, value } = cfgParse(key);
+      const cur = clusterIdsWithConfig(name, value);
+      if (act === 'revoke') {
+        alterConfigSet.delete(key);
+        if (cur.size) {
+          const reset = new Set(alterConfigReset.get(name) || []);
+          for (const cid of cur) reset.add(cid);
+          alterConfigReset.set(name, reset);
+        }
+      } else if (act === 'deladd') {
+        alterConfigSet.delete(key);
+      } else if (act === 'reset') {
+        alterConfigSet.delete(key);
+        const reset = alterConfigReset.get(name);
+        if (reset) {
+          for (const cid of cur) reset.delete(cid);
+          if (!reset.size) alterConfigReset.delete(name);
+        }
+      }
+      renderAlterDetail();
+      return;
+    }
     const isAttr = kind === 'attr';
     const addMap = isAttr ? alterAttrAdd : alterAdd;
     const revMap = isAttr ? alterAttrRemove : alterRevoke;
@@ -1514,6 +1824,10 @@ document.getElementById('alter-detail')?.addEventListener('click', (ev) => {
   }
   if (target.closest('#btn-alter-add')) {
     openScopeDialog(null);
+    return;
+  }
+  if (target.closest('#btn-alter-add-config')) {
+    openScopeDialog({ kind: 'config', isNew: true });
     return;
   }
   if (target.closest('#btn-alter-comments')) {

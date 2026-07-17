@@ -2,6 +2,8 @@ package pg
 
 import (
 	"context"
+	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -9,7 +11,41 @@ import (
 	"github.com/michalbartak/dbaccounts/internal/model"
 )
 
+var (
+	roleIdentRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	gucNameRE   = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$`)
+)
+
+// execRoleConfig runs ALTER ROLE <login> SET <name> = '<value>' / RESET <name>.
+// Role name and GUC name are validated as identifiers; the value is a quoted literal.
+func execRoleConfig(ctx context.Context, conn *pgx.Conn, operation string, args map[string]string) (string, error) {
+	login := strings.TrimSpace(args["loginname"])
+	name := strings.TrimSpace(args["config_name"])
+	if !roleIdentRE.MatchString(login) {
+		return "", fmt.Errorf("invalid role name: %q", login)
+	}
+	if !gucNameRE.MatchString(name) {
+		return "", fmt.Errorf("invalid setting name: %q", name)
+	}
+	var sql string
+	if operation == "reset_config" {
+		sql = fmt.Sprintf("ALTER ROLE %s RESET %s", login, name)
+	} else {
+		value := strings.ReplaceAll(args["config_value"], "'", "''")
+		sql = fmt.Sprintf("ALTER ROLE %s SET %s = '%s'", login, name, value)
+	}
+	if _, err := conn.Exec(ctx, sql); err != nil {
+		return "", err
+	}
+	return "ok", nil
+}
+
 func ExecuteOperation(ctx context.Context, conn *pgx.Conn, fn model.DBFunction, operation string, args map[string]string) (string, error) {
+	// Role GUC settings are written with hardcoded ALTER ROLE SET/RESET (no template).
+	if operation == "set_config" || operation == "reset_config" {
+		return execRoleConfig(ctx, conn, operation, args)
+	}
+
 	call := strings.TrimSpace(fn.Call)
 	if call == "" {
 		return "", errCallNotConfigured()

@@ -83,6 +83,18 @@ func (a *App) DeleteCluster(id string) error {
 	return a.store.DeleteCluster(id)
 }
 
+func (a *App) AddCategory(in model.CategoryInput) (model.Category, error) {
+	return a.store.AddCategory(in)
+}
+
+func (a *App) UpdateCategory(id string, in model.CategoryInput) (model.Category, error) {
+	return a.store.UpdateCategory(id, in)
+}
+
+func (a *App) DeleteCategory(id string) error {
+	return a.store.DeleteCategory(id)
+}
+
 func (a *App) ImportFromEnvironment() model.EnvImport {
 	return envimport.FromEnvironment()
 }

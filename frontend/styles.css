@@ -178,8 +178,8 @@ tr:last-child td { border-bottom: none; }
   text-transform: uppercase;
   flex-shrink: 0;
 }
-.badge.production { background: rgba(232, 168, 56, 0.2); color: var(--prod); }
-.badge.uat { background: rgba(110, 181, 255, 0.2); color: var(--uat); }
+/* Per-group badge colours are generated into #cat-colors from state.categories. */
+.badge { background: rgba(154, 163, 181, 0.2); color: var(--muted); }
 
 .status-ok { color: var(--ok); }
 .status-error { color: var(--danger); }
@@ -194,7 +194,16 @@ tr:last-child td { border-bottom: none; }
 }
 
 /* Left (target selection) and right (form) scroll independently. */
-.ops-sidebar { overflow-y: auto; min-height: 0; }
+.ops-sidebar { display: flex; flex-direction: column; overflow-y: auto; min-height: 0; }
+/* "Or pick clusters" toggle; expanded list fills the remaining sidebar height. */
+.clusters-toggle {
+  display: flex; align-items: center; gap: 0.4rem;
+  width: 100%; margin: 0.75rem 0 0.25rem; padding: 0.35rem 0;
+  background: transparent; border: none; color: var(--text);
+  font: inherit; font-size: 0.85rem; cursor: pointer;
+}
+.clusters-toggle .caret { color: var(--muted); }
+.cluster-list:not(.hidden) { flex: 1 1 auto; min-height: 4rem; max-height: none; }
 .ops-main { display: flex; flex-direction: column; min-height: 0; }
 .ops-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 0.25rem; }
 .ops-footer { flex: none; display: flex; gap: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.75rem; margin-top: 0.5rem; }
@@ -245,25 +254,7 @@ tr:last-child td { border-bottom: none; }
   color: var(--text);
 }
 
-.checkbox-group label:has(input[value="production"]:checked) {
-  background: rgba(232, 168, 56, 0.18);
-  border-color: var(--prod);
-}
-
-.checkbox-group label:has(input[value="uat"]:checked) {
-  background: rgba(110, 181, 255, 0.18);
-  border-color: var(--uat);
-}
-
-.checkbox-group label[data-category="production"]:has(input:checked) {
-  background: rgba(232, 168, 56, 0.18);
-  border-color: var(--prod);
-}
-
-.checkbox-group label[data-category="uat"]:has(input:checked) {
-  background: rgba(110, 181, 255, 0.18);
-  border-color: var(--uat);
-}
+/* Checked-state group tint is generated per group into #cat-colors. */
 
 .checkbox-group input[type="checkbox"] {
   width: 1.25rem;
@@ -355,6 +346,14 @@ tr:last-child td { border-bottom: none; }
 }
 
 .run-bar { display: flex; gap: 0.5rem; margin: 1.25rem 0; flex-wrap: wrap; }
+
+/* Cluster groups editor */
+#groups-editor { display: grid; gap: 0.4rem; margin-bottom: 1rem; }
+.group-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.group-row .group-color { width: 2.2rem; height: 2rem; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); cursor: pointer; }
+.group-row .group-label { flex: 1; min-width: 8rem; padding: 0.4rem 0.5rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+.group-row .group-id { color: var(--muted); font-size: 0.8rem; min-width: 5rem; }
+.group-row label.inline { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; }
 
 /* Settings panel */
 .settings-meta {
@@ -750,10 +749,9 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
   border-radius: 999px;
   padding: 0.05rem 0.4rem;
 }
-/* Scope labels are coloured by cluster environment (category). */
-.chip-scope.scope-production { color: var(--prod); background: rgba(232, 168, 56, 0.16); }
-.chip-scope.scope-uat { color: var(--uat); background: rgba(110, 181, 255, 0.16); }
-.chip-scope.scope-other { color: var(--muted); background: rgba(154, 163, 181, 0.18); }
+/* Scope-label colours are generated per group into #cat-colors (keyed by data-cat);
+   this is the neutral fallback for labels without a matching group. */
+.chip-scope { color: var(--muted); background: rgba(154, 163, 181, 0.18); }
 /* Whole group matched: filled + uppercase. One cluster of a group: transparent. */
 .chip-scope.scope-kind-group { text-transform: uppercase; }
 .chip-scope.scope-kind-cluster { background: transparent; border: 1px solid currentColor; }

@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/michalbartak/dbaccounts/internal/model"
@@ -15,7 +16,17 @@ const (
 	OpChangePassword = "change_password"
 	OpSetComment     = "set_comment"
 	OpSetAttribute   = "set_attribute"
+	OpSetConfig      = "set_config"
+	OpResetConfig    = "reset_config"
 )
+
+// configNameRE validates a GUC name (optionally namespaced, e.g. auto_explain.log_min_duration).
+var configNameRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$`)
+
+// ValidConfigName reports whether name is an acceptable role GUC name.
+func ValidConfigName(name string) bool {
+	return configNameRE.MatchString(strings.TrimSpace(name))
+}
 
 // allowedAttributeKeywords are the ALTER ROLE attribute keywords the app may emit.
 var allowedAttributeKeywords = map[string]bool{
@@ -90,6 +101,24 @@ func BuildArgs(cfg model.Config, req model.RunRequest) (model.DBFunction, map[st
 			"loginname": req.SetAttribute.LoginName,
 			"attribute": req.SetAttribute.Attribute,
 		}, nil
+	case OpSetConfig:
+		if req.SetConfig == nil {
+			return model.DBFunction{}, nil, fmt.Errorf("set config parameters missing")
+		}
+		// Built directly in pg.ExecuteOperation (no template); empty DBFunction.
+		return model.DBFunction{}, map[string]string{
+			"loginname":    req.SetConfig.LoginName,
+			"config_name":  req.SetConfig.ConfigName,
+			"config_value": req.SetConfig.ConfigValue,
+		}, nil
+	case OpResetConfig:
+		if req.ResetConfig == nil {
+			return model.DBFunction{}, nil, fmt.Errorf("reset config parameters missing")
+		}
+		return model.DBFunction{}, map[string]string{
+			"loginname":   req.ResetConfig.LoginName,
+			"config_name": req.ResetConfig.ConfigName,
+		}, nil
 	default:
 		return model.DBFunction{}, nil, fmt.Errorf("unknown operation: %s", req.Operation)
 	}
@@ -135,15 +164,35 @@ func ValidateRequest(cfg model.Config, req model.RunRequest) error {
 		if !allowedAttributeKeywords[strings.ToUpper(strings.TrimSpace(req.SetAttribute.Attribute))] {
 			return fmt.Errorf("unsupported role attribute: %q", req.SetAttribute.Attribute)
 		}
+	case OpSetConfig:
+		if req.SetConfig == nil || strings.TrimSpace(req.SetConfig.LoginName) == "" {
+			return fmt.Errorf("login name is required")
+		}
+		if !ValidConfigName(req.SetConfig.ConfigName) {
+			return fmt.Errorf("invalid setting name: %q", req.SetConfig.ConfigName)
+		}
+	case OpResetConfig:
+		if req.ResetConfig == nil || strings.TrimSpace(req.ResetConfig.LoginName) == "" {
+			return fmt.Errorf("login name is required")
+		}
+		if !ValidConfigName(req.ResetConfig.ConfigName) {
+			return fmt.Errorf("invalid setting name: %q", req.ResetConfig.ConfigName)
+		}
 	default:
 		return fmt.Errorf("unknown operation: %s", req.Operation)
 	}
 	return nil
 }
 
+// RequiresProductionConfirm reports whether any target cluster belongs to a group
+// flagged Confirm (the per-group replacement for the old hardcoded "production" id).
 func RequiresProductionConfirm(categories []model.Category, clusters []model.Cluster) bool {
+	confirm := make(map[string]bool, len(categories))
+	for _, cat := range categories {
+		confirm[cat.ID] = cat.Confirm
+	}
 	for _, c := range clusters {
-		if c.Category == "production" {
+		if confirm[c.Category] {
 			return true
 		}
 	}
