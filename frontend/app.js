@@ -229,21 +229,29 @@ function renderCategoryColors() {
 
 function groupRowHtml(c) {
   const color = (c && c.color) || DEFAULT_CAT_COLOR;
-  const idCell = c && c.id ? `<code class="group-id">${escapeHtml(c.id)}</code>` : '<span class="group-id hint">new</span>';
-  return `<div class="group-row" data-id="${escapeAttr(c ? c.id : '')}">
-    <input type="color" class="group-color" value="${escapeAttr(color)}" title="Group colour" />
-    <input type="text" class="group-label" placeholder="Group label" value="${escapeAttr(c ? c.label : '')}" autocapitalize="none" autocomplete="off" spellcheck="false" />
-    ${idCell}
-    <label class="inline"><input type="checkbox" class="group-confirm"${c && c.confirm ? ' checked' : ''} /> confirm</label>
-    <button type="button" class="small group-save">Save</button>
-    <button type="button" class="small danger group-del">Delete</button>
-  </div>`;
+  return `<tr class="group-row" data-id="${escapeAttr(c ? c.id : '')}">
+    <td><input type="color" class="group-color" value="${escapeAttr(color)}" title="Group colour" /></td>
+    <td><input type="text" class="group-label" placeholder="Group label" value="${escapeAttr(c ? c.label : '')}" autocapitalize="none" autocomplete="off" spellcheck="false" /></td>
+    <td><input type="checkbox" class="group-confirm"${c && c.confirm ? ' checked' : ''} /></td>
+    <td>
+      <button type="button" class="small group-save">Save</button>
+      <button type="button" class="small danger group-del">Delete</button>
+    </td>
+  </tr>`;
 }
 
 function renderGroupsEditor() {
   const root = document.getElementById('groups-editor');
   if (!root) return;
-  root.innerHTML = (state?.categories || []).map((c) => groupRowHtml(c)).join('');
+  const rows = (state?.categories || []).map((c) => groupRowHtml(c)).join('');
+  root.innerHTML = `<div class="table-wrap">
+    <table id="groups-table">
+      <thead>
+        <tr><th>Colour</th><th>Group</th><th>Confirm</th><th>Actions</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
 }
 
 function renderClustersTable() {
@@ -1706,7 +1714,8 @@ document.getElementById('btn-toggle-clusters')?.addEventListener('click', (ev) =
 
 // Cluster groups editor
 document.getElementById('btn-add-group')?.addEventListener('click', () => {
-  document.getElementById('groups-editor')?.insertAdjacentHTML('beforeend', groupRowHtml(null));
+  const tbody = document.querySelector('#groups-table tbody');
+  if (tbody) tbody.insertAdjacentHTML('beforeend', groupRowHtml(null));
 });
 document.getElementById('groups-editor')?.addEventListener('click', async (ev) => {
   const app = backend();

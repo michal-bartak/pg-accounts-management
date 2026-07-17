@@ -47,11 +47,11 @@ export namespace model {
 	    label: string;
 	    color?: string;
 	    confirm?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Category(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -64,11 +64,11 @@ export namespace model {
 	    label: string;
 	    color: string;
 	    confirm: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CategoryInput(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.label = source["label"];
@@ -176,11 +176,11 @@ export namespace model {
 	    attributes: Record<string, boolean>;
 	    settings: Record<string, string>;
 	    error?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ClusterRoleDetail(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.clusterId = source["clusterId"];
@@ -372,6 +372,20 @@ export namespace model {
 	        this.loginName = source["loginName"];
 	    }
 	}
+	export class ResetConfigParams {
+	    loginName: string;
+	    configName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ResetConfigParams(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.loginName = source["loginName"];
+	        this.configName = source["configName"];
+	    }
+	}
 	export class RevokeParentsParams {
 	    loginName: string;
 	    parentRoles: string;
@@ -484,6 +498,22 @@ export namespace model {
 		    return a;
 		}
 	}
+	export class SetConfigParams {
+	    loginName: string;
+	    configName: string;
+	    configValue: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SetConfigParams(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.loginName = source["loginName"];
+	        this.configName = source["configName"];
+	        this.configValue = source["configValue"];
+	    }
+	}
 	export class SetAttributeParams {
 	    loginName: string;
 	    attribute: string;
@@ -501,45 +531,15 @@ export namespace model {
 	export class SetCommentParams {
 	    loginName: string;
 	    comment: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SetCommentParams(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.loginName = source["loginName"];
 	        this.comment = source["comment"];
-	    }
-	}
-	export class SetConfigParams {
-	    loginName: string;
-	    configName: string;
-	    configValue: string;
-
-	    static createFrom(source: any = {}) {
-	        return new SetConfigParams(source);
-	    }
-
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.loginName = source["loginName"];
-	        this.configName = source["configName"];
-	        this.configValue = source["configValue"];
-	    }
-	}
-	export class ResetConfigParams {
-	    loginName: string;
-	    configName: string;
-
-	    static createFrom(source: any = {}) {
-	        return new ResetConfigParams(source);
-	    }
-
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.loginName = source["loginName"];
-	        this.configName = source["configName"];
 	    }
 	}
 	export class RunRequest {
@@ -598,6 +598,7 @@ export namespace model {
 		    return a;
 		}
 	}
+	
 	
 	
 	export class TestConnectionRequest {

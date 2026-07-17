@@ -14,10 +14,6 @@ export function DeleteCategory(arg1) {
   return window['go']['main']['App']['DeleteCategory'](arg1);
 }
 
-export function UpdateCategory(arg1, arg2) {
-  return window['go']['main']['App']['UpdateCategory'](arg1, arg2);
-}
-
 export function DeleteCluster(arg1) {
   return window['go']['main']['App']['DeleteCluster'](arg1);
 }
@@ -72,6 +68,10 @@ export function SearchRoles(arg1) {
 
 export function TestConnection(arg1) {
   return window['go']['main']['App']['TestConnection'](arg1);
+}
+
+export function UpdateCategory(arg1, arg2) {
+  return window['go']['main']['App']['UpdateCategory'](arg1, arg2);
 }
 
 export function UpdateCluster(arg1, arg2) {

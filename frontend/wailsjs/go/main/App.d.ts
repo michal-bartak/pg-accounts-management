@@ -8,8 +8,6 @@ export function AddCluster(arg1:model.ClusterInput):Promise<model.Cluster>;
 
 export function DeleteCategory(arg1:string):Promise<void>;
 
-export function UpdateCategory(arg1:string,arg2:model.CategoryInput):Promise<model.Category>;
-
 export function DeleteCluster(arg1:string):Promise<void>;
 
 export function GetAppVersion():Promise<model.AppVersion>;
@@ -37,5 +35,7 @@ export function SaveUISettings(arg1:model.UISettings):Promise<void>;
 export function SearchRoles(arg1:model.RoleSearchRequest):Promise<Array<model.RoleMatch>>;
 
 export function TestConnection(arg1:model.TestConnectionRequest):Promise<void>;
+
+export function UpdateCategory(arg1:string,arg2:model.CategoryInput):Promise<model.Category>;
 
 export function UpdateCluster(arg1:string,arg2:model.ClusterInput):Promise<model.Cluster>;
