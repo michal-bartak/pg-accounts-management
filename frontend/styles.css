@@ -44,6 +44,18 @@
 
 * { box-sizing: border-box; }
 
+/* One scrollbar look everywhere (Firefox + WebKit); transparent track so it sits on
+   any panel colour, subtle thumb that brightens on hover. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+*::-webkit-scrollbar-corner { background: transparent; }
+
 /* Homogeneous form controls (inputs, selects, textareas) — one baseline everywhere. */
 input, select, textarea, button { font-family: var(--font); font-size: var(--fs-base); }
 input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
@@ -164,13 +176,7 @@ select option {
   overflow: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) var(--surface);
 }
-
-.table-wrap::-webkit-scrollbar { width: 8px; height: 8px; }
-.table-wrap::-webkit-scrollbar-track { background: var(--surface); }
-.table-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
 table {
   width: 100%;
@@ -313,13 +319,7 @@ tr:last-child td { border-bottom: none; }
 .cluster-list {
   max-height: 220px;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) var(--surface);
 }
-
-.cluster-list::-webkit-scrollbar { width: 8px; }
-.cluster-list::-webkit-scrollbar-track { background: var(--surface); }
-.cluster-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
 .ops-sidebar label:not(.inline) {
   display: block;
