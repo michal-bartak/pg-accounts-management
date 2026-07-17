@@ -1233,15 +1233,13 @@ function scopeRowHtml(kind, key, name, curSet, addSet, revSet) {
   const verbRemove = kind === 'attr' ? 'Disable everywhere' : kind === 'config' ? 'Reset everywhere' : 'Revoke everywhere';
   let xAct = 'revoke';
   let xTitle = verbRemove;
-  let xOn = true;
-  if (isNew) {
-    if (addSet.size) {
-      xAct = 'deladd';
-      xTitle = 'Cancel';
-    } else {
-      xOn = false; // nothing granted or pending to remove
-    }
+  if (isNew && addSet.size) {
+    xAct = 'deladd';
+    xTitle = 'Cancel';
   }
+  // × only acts while a grant remains (kept) or a pending add exists; once everything
+  // is revoked/cancelled it has nothing left to do, so it goes inactive.
+  const xOn = kept.size > 0 || addSet.size > 0;
   const xBtn = `<button type="button" class="chip-x" data-kind="${kind}" data-act="${xAct}" data-key="${k}" title="${escapeAttr(xTitle)}"${xOn ? '' : ' disabled'}>×</button>`;
 
   const resetBtn = `<button type="button" class="chip-restore" data-kind="${kind}" data-act="reset" data-key="${k}" title="Discard pending changes"${pending ? '' : ' disabled'}>↺</button>`;
