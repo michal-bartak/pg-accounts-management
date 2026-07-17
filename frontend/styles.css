@@ -348,12 +348,15 @@ tr:last-child td { border-bottom: none; }
 .run-bar { display: flex; gap: 0.5rem; margin: 1.25rem 0; flex-wrap: wrap; }
 
 /* Cluster groups editor */
-/* Cluster groups reuse the Clusters table look (.table-wrap + table). */
-#groups-editor { margin-bottom: 1rem; }
-#groups-table td { vertical-align: middle; }
-#groups-table .group-color { width: 2.4rem; height: 1.9rem; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); cursor: pointer; vertical-align: middle; }
-#groups-table .group-label { width: 100%; min-width: 8rem; padding: 0.4rem 0.5rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg); color: var(--text); }
-#groups-table .group-confirm { width: 1.15rem; height: 1.15rem; accent-color: var(--primary); cursor: pointer; }
+/* Cluster groups use the Clusters table look; add/edit happens in #group-dialog. */
+.group-swatch {
+  display: inline-block;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  vertical-align: middle;
+}
 
 /* Settings panel */
 .settings-meta {
@@ -472,7 +475,8 @@ tr:last-child td { border-bottom: none; }
 .settings-batch { display: inline-flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
 
 #confirm-dialog form menu,
-#cluster-form menu {
+#cluster-form menu,
+#group-form menu {
   display: flex;
   gap: 0.5rem;
   justify-content: flex-end;
@@ -498,27 +502,32 @@ dialog {
 
 dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 
-#cluster-form {
+#cluster-form,
+#group-form {
   padding: 1.25rem;
   display: grid;
   gap: 0.65rem;
 }
 
-#cluster-form label {
+#cluster-form label,
+#group-form label {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
   font-size: 0.88rem;
 }
+#group-form label.inline { flex-direction: row; align-items: center; gap: 0.5rem; }
 
 #cluster-form input,
-#cluster-form select {
+#cluster-form select,
+#group-form input {
   padding: 0.4rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
   color: var(--text);
 }
+#group-form input[type="color"] { width: 3rem; height: 2rem; padding: 0; cursor: pointer; }
 
 #confirm-form,
 #template-help-form {

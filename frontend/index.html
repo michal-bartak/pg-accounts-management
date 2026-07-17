@@ -128,7 +128,19 @@
           <button type="button" id="btn-add-group">Add group</button>
         </div>
         <p class="hint">Colour and a "require confirmation" gate per group. Deleting a group in use by a cluster is blocked.</p>
-        <div id="groups-editor"></div>
+        <div class="table-wrap">
+          <table id="groups-table">
+            <thead>
+              <tr>
+                <th>Colour</th>
+                <th>Group</th>
+                <th>Confirm</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
 
         <div class="settings-section-head">
           <h2>DB command templates</h2>
@@ -249,6 +261,20 @@
       <label>Connect user (optional) <input name="connectUser" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="Uses PGUSER if empty" /></label>
       <menu>
         <button type="button" id="btn-test-cluster">Test connection</button>
+        <button type="submit" value="save" class="primary">Save</button>
+        <button type="button" value="cancel">Cancel</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="group-dialog">
+    <form method="dialog" id="group-form" autocapitalize="none">
+      <h2 id="group-dialog-title">Add group</h2>
+      <input type="hidden" name="id" />
+      <label>Label <input name="label" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
+      <label>Colour <input name="color" type="color" value="#9aa3b5" /></label>
+      <label class="inline"><input type="checkbox" name="confirm" /> Require confirmation before running</label>
+      <menu>
         <button type="submit" value="save" class="primary">Save</button>
         <button type="button" value="cancel">Cancel</button>
       </menu>

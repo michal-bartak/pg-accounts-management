@@ -227,31 +227,60 @@ function renderCategoryColors() {
     .join('\n');
 }
 
-function groupRowHtml(c) {
-  const color = (c && c.color) || DEFAULT_CAT_COLOR;
-  return `<tr class="group-row" data-id="${escapeAttr(c ? c.id : '')}">
-    <td><input type="color" class="group-color" value="${escapeAttr(color)}" title="Group colour" /></td>
-    <td><input type="text" class="group-label" placeholder="Group label" value="${escapeAttr(c ? c.label : '')}" autocapitalize="none" autocomplete="off" spellcheck="false" /></td>
-    <td><input type="checkbox" class="group-confirm"${c && c.confirm ? ' checked' : ''} /></td>
-    <td>
-      <button type="button" class="small group-save">Save</button>
-      <button type="button" class="small danger group-del">Delete</button>
-    </td>
-  </tr>`;
+function renderGroupsTable() {
+  const tbody = document.querySelector('#groups-table tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  if (!state?.categories?.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="hint">No groups defined.</td></tr>';
+    return;
+  }
+  for (const c of state.categories) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="group-swatch" style="background:${escapeAttr(c.color || DEFAULT_CAT_COLOR)}"></span></td>
+      <td><span class="badge" data-cat="${escapeAttr(c.id)}">${escapeHtml(c.label)}</span></td>
+      <td>${c.confirm ? 'Yes' : '—'}</td>
+      <td>
+        <button class="small" data-action="edit" data-id="${escapeAttr(c.id)}">Edit</button>
+        <button class="small danger" data-action="delete" data-id="${escapeAttr(c.id)}">Delete</button>
+      </td>`;
+    tbody.appendChild(tr);
+  }
+  tbody.querySelectorAll('button').forEach((btn) => btn.addEventListener('click', onGroupAction));
 }
 
-function renderGroupsEditor() {
-  const root = document.getElementById('groups-editor');
-  if (!root) return;
-  const rows = (state?.categories || []).map((c) => groupRowHtml(c)).join('');
-  root.innerHTML = `<div class="table-wrap">
-    <table id="groups-table">
-      <thead>
-        <tr><th>Colour</th><th>Group</th><th>Confirm</th><th>Actions</th></tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-  </div>`;
+function openGroupDialog(cat) {
+  const dlg = document.getElementById('group-dialog');
+  const form = document.getElementById('group-form');
+  document.getElementById('group-dialog-title').textContent = cat ? 'Edit group' : 'Add group';
+  form.id.value = cat?.id || '';
+  form.label.value = cat?.label || '';
+  form.color.value = cat?.color || DEFAULT_CAT_COLOR;
+  form.confirm.checked = !!cat?.confirm;
+  dlg.showModal();
+}
+
+async function onGroupAction(ev) {
+  const btn = ev.currentTarget;
+  const id = btn.dataset.id;
+  const app = backend();
+  const cat = state?.categories?.find((c) => c.id === id);
+  if (btn.dataset.action === 'edit') {
+    openGroupDialog(cat);
+    return;
+  }
+  if (btn.dataset.action === 'delete') {
+    const ok = await askConfirm('Delete group', `Delete cluster group "${cat?.label || id}"?`);
+    if (!ok) return;
+    try {
+      await app.DeleteCategory(id);
+      await loadConfig();
+      showToast('Group deleted', 'success');
+    } catch (e) {
+      showToast(String(e), 'error');
+    }
+  }
 }
 
 function renderClustersTable() {
@@ -385,7 +414,7 @@ function renderAll() {
   renderClustersTable();
   renderCategoryCheckboxes();
   renderClusterCheckboxes();
-  renderGroupsEditor();
+  renderGroupsTable();
   renderDBFunctionsEditor();
   updateTargetPreview();
 }
@@ -1712,45 +1741,31 @@ document.getElementById('btn-toggle-clusters')?.addEventListener('click', (ev) =
   if (caret) caret.textContent = expanded ? '▾' : '▸';
 });
 
-// Cluster groups editor
-document.getElementById('btn-add-group')?.addEventListener('click', () => {
-  const tbody = document.querySelector('#groups-table tbody');
-  if (tbody) tbody.insertAdjacentHTML('beforeend', groupRowHtml(null));
-});
-document.getElementById('groups-editor')?.addEventListener('click', async (ev) => {
+// Cluster groups editor (table + popup dialog, mirrors the Clusters tab)
+document.getElementById('btn-add-group')?.addEventListener('click', () => openGroupDialog(null));
+
+document.getElementById('group-form')?.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
   const app = backend();
-  const row = ev.target.closest('.group-row');
-  if (!row) return;
-  const id = row.dataset.id;
-  if (ev.target.closest('.group-save')) {
-    const input = {
-      label: row.querySelector('.group-label').value.trim(),
-      color: row.querySelector('.group-color').value,
-      confirm: row.querySelector('.group-confirm').checked,
-    };
-    try {
-      if (id) await app.UpdateCategory(id, input);
-      else await app.AddCategory(input);
-      await loadConfig();
-      showToast('Group saved', 'success');
-    } catch (e) {
-      showToast(String(e), 'error');
-    }
-  } else if (ev.target.closest('.group-del')) {
-    if (!id) {
-      row.remove();
-      return;
-    }
-    const ok = await askConfirm('Delete group', `Delete cluster group "${id}"?`);
-    if (!ok) return;
-    try {
-      await app.DeleteCategory(id);
-      await loadConfig();
-      showToast('Group deleted', 'success');
-    } catch (e) {
-      showToast(String(e), 'error');
-    }
+  const form = ev.target;
+  const input = {
+    label: form.label.value.trim(),
+    color: form.color.value,
+    confirm: form.confirm.checked,
+  };
+  try {
+    if (form.id.value) await app.UpdateCategory(form.id.value, input);
+    else await app.AddCategory(input);
+    document.getElementById('group-dialog').close();
+    await loadConfig();
+    showToast('Group saved', 'success');
+  } catch (e) {
+    showToast(String(e), 'error');
   }
+});
+
+document.getElementById('group-form')?.addEventListener('click', (ev) => {
+  if (ev.target.value === 'cancel') document.getElementById('group-dialog').close();
 });
 
 // Alter role tab wiring
