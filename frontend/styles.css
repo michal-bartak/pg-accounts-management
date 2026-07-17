@@ -227,13 +227,6 @@ tr:last-child td { border-bottom: none; }
 .ops-footer { flex: none; display: flex; gap: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.75rem; margin-top: 0.5rem; }
 .ops-footer .run-bar, .ops-footer .alter-actions { margin: 0; flex: 1; }
 
-@media (max-width: 900px) {
-  main { overflow: auto; }
-  .panel.active { height: auto; }
-  .ops-layout { grid-template-columns: 1fr; }
-  .ops-sidebar, .ops-body { overflow: visible; }
-}
-
 .ops-sidebar {
   background: var(--surface);
   border: 1px solid var(--border);
