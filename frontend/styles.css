@@ -223,7 +223,8 @@ tr:last-child td { border-bottom: none; }
 .clusters-toggle .caret { color: var(--muted); }
 .cluster-list:not(.hidden) { flex: 1 1 auto; min-height: 4rem; max-height: none; }
 .ops-main { display: flex; flex-direction: column; min-height: 0; }
-.ops-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 0.25rem; }
+/* Small inset so focus outlines aren't clipped by the scroll container edges. */
+.ops-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0.25rem 0.5rem; }
 .ops-footer { flex: none; display: flex; gap: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.75rem; margin-top: 0.5rem; }
 .ops-footer .run-bar, .ops-footer .alter-actions { margin: 0; flex: 1; }
 
