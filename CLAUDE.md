@@ -141,7 +141,10 @@ Cluster groups (Settings), and the Find-role / Comments dialogs.
 - Edit model: `alterAdd`/`alterRevoke` and `alterAttrAdd`/`alterAttrRemove` are
   `Map<key, Set<clusterId>>`. **✎ Edit** opens a per-cluster checkbox editor that both
   grants and revokes (diff of desired vs current); **×** removes everywhere; **↺**
-  discards pending. `buildAlterRequests` emits one `RunOperation` per (cluster, op);
+  discards pending. All three action buttons always render (stable row layout); the
+  inapplicable ones are `disabled` (greyed, `pointer-events:none`) rather than hidden —
+  `×` when nothing is granted/pending, `↺` when there are no pending changes.
+  `buildAlterRequests` emits one `RunOperation` per (cluster, op);
   `is-added` (green) applies only to a pending grant, not to attributes that are simply
   off.
 - **Settings** (role GUCs) reuse the same row/scope-editor as attributes but keyed by

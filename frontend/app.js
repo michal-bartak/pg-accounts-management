@@ -738,8 +738,11 @@ function positionQHint(btn) {
     qHintPop = document.createElement('div');
     qHintPop.className = 'q-hint-pop';
     qHintPop.setAttribute('role', 'tooltip');
-    document.body.appendChild(qHintPop);
   }
+  // A modal <dialog> renders in the browser top layer, above any z-index; when the
+  // badge lives in one, host the popover inside it so it isn't drawn under the dialog.
+  const host = btn.closest('dialog[open]') || document.body;
+  if (qHintPop.parentElement !== host) host.appendChild(qHintPop);
   qHintPop.textContent = text;
   qHintPop.hidden = false;
   const m = 8; // viewport margin
@@ -1223,17 +1226,25 @@ function scopeRowHtml(kind, key, name, curSet, addSet, revSet) {
   const revLabels = revSet.size ? scopeLabelsHtml(describeScope(revSet), 'chip-scope-strike') : '';
   const labels = keptLabels + addLabels + revLabels || emptyNote;
 
+  // All three actions always render; the ones that don't apply are disabled (greyed,
+  // inert to the mouse) rather than hidden, so the row layout stays stable.
   const editBtn = `<button type="button" class="chip-extend" data-kind="${kind}" data-act="scope" data-key="${k}" title="Edit clusters">✎</button>`;
+
   const verbRemove = kind === 'attr' ? 'Disable everywhere' : kind === 'config' ? 'Reset everywhere' : 'Revoke everywhere';
-  let xBtn = '';
-  if (!isNew) {
-    xBtn = `<button type="button" class="chip-x" data-kind="${kind}" data-act="revoke" data-key="${k}" title="${verbRemove}">×</button>`;
-  } else if (addSet.size) {
-    xBtn = `<button type="button" class="chip-x" data-kind="${kind}" data-act="deladd" data-key="${k}" title="Cancel">×</button>`;
+  let xAct = 'revoke';
+  let xTitle = verbRemove;
+  let xOn = true;
+  if (isNew) {
+    if (addSet.size) {
+      xAct = 'deladd';
+      xTitle = 'Cancel';
+    } else {
+      xOn = false; // nothing granted or pending to remove
+    }
   }
-  const resetBtn = pending
-    ? `<button type="button" class="chip-restore" data-kind="${kind}" data-act="reset" data-key="${k}" title="Discard pending changes">↺</button>`
-    : '';
+  const xBtn = `<button type="button" class="chip-x" data-kind="${kind}" data-act="${xAct}" data-key="${k}" title="${escapeAttr(xTitle)}"${xOn ? '' : ' disabled'}>×</button>`;
+
+  const resetBtn = `<button type="button" class="chip-restore" data-kind="${kind}" data-act="reset" data-key="${k}" title="Discard pending changes"${pending ? '' : ' disabled'}>↺</button>`;
 
   const fullyRemoved = kept.size === 0 && addSet.size === 0 && revSet.size > 0;
   const stateCls = fullyRemoved ? 'is-removed' : isNew && addSet.size ? 'is-added' : pending ? 'is-extending' : '';

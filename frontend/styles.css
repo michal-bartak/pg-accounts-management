@@ -661,6 +661,11 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 }
 .chip-x:hover, .chip-restore:hover { opacity: 1; }
 .chip-restore { text-decoration: none; }
+.chip-extend:disabled, .chip-x:disabled, .chip-restore:disabled {
+  opacity: 0.25;
+  cursor: default;
+  pointer-events: none;
+}
 
 .alter-add-priv { display: flex; gap: 0.4rem; margin-top: 0.7rem; }
 
