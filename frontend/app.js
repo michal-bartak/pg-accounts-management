@@ -1479,7 +1479,7 @@ function renderCommentsDialog() {
       const labels = scopeLabelsHtml(describeScope(new Set(v.ids)));
       return `<div class="comment-version">
         <div class="comment-scope">${labels || '<span class="hint">no clusters</span>'}</div>
-        <textarea class="comment-edit" data-idx="${i}" rows="3" autocapitalize="none" spellcheck="false">${escapeHtml(v.text)}</textarea>
+        <textarea class="comment-edit" data-idx="${i}" rows="3" autocapitalize="none" spellcheck="false"${i === 0 ? ' autofocus' : ''}>${escapeHtml(v.text)}</textarea>
         <div class="comment-actions">
           <button type="button" class="small comment-save" data-idx="${i}">Save to these clusters</button>
         </div>

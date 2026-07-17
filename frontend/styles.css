@@ -219,7 +219,10 @@ tr:last-child td { border-bottom: none; }
   display: inline-flex; align-items: center; justify-content: center;
   vertical-align: middle; position: relative; top: -1px;
 }
-.q-hint:hover { color: var(--text); border-color: var(--muted); }
+/* Focus looks identical to hover — no jarring OS "selected" ring on the badge. */
+.q-hint:hover,
+.q-hint:focus,
+.q-hint:focus-visible { color: var(--text); border-color: var(--muted); outline: none; }
 .q-hint-pop {
   position: fixed; max-width: 280px;
   background: var(--surface); color: var(--text);
