@@ -203,6 +203,27 @@ tr:last-child td { border-bottom: none; }
 .status-error { color: var(--danger); }
 .status-pending { color: var(--muted); }
 
+/* "?" help badge — reveals a description on hover/focus. The popover
+   (.q-hint-pop) is fixed-positioned in JS so overflow:hidden containers never
+   clip it, and clamped to the viewport. */
+.q-hint {
+  width: 16px; height: 16px; min-height: 0; padding: 0; line-height: 1;
+  flex: 0 0 auto; border-radius: 50%; font-size: 0.72rem; cursor: help;
+  color: var(--muted); background: var(--bg); border: 1px solid var(--border);
+  display: inline-flex; align-items: center; justify-content: center;
+  vertical-align: middle; position: relative; top: -1px;
+}
+.q-hint:hover { color: var(--text); border-color: var(--muted); }
+.q-hint-pop {
+  position: fixed; max-width: 280px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 0.5rem 0.7rem; font-size: var(--fs-sm); line-height: 1.45;
+  z-index: 100; box-shadow: 0 6px 20px #0006; pointer-events: none;
+  white-space: normal;
+}
+.q-hint-pop[hidden] { display: none; }
+
 .ops-layout {
   flex: 1 1 auto;
   min-height: 0;

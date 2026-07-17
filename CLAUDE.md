@@ -117,6 +117,15 @@ confirm-production controls); "Or pick clusters" is a collapse/expand toggle (co
 by default; the expanded `.cluster-list` flexes to fill the sidebar). Settings hosts the
 **Cluster groups** editor (colour + confirm) plus DB templates + batch.
 
+Feature descriptions are not shown inline — they live behind a **`?` help badge**
+(`.q-hint`; markup via `hintBadge(text)` in JS, or hand-written next to a static heading).
+Hovering/focusing the badge reveals the text in a single shared, `position:fixed`
+popover (`.q-hint-pop`) that is positioned in JS (centred, viewport-clamped, flips above
+when it would overflow) so `overflow:hidden` panels never clip it. One delegated
+mouseover/focusin handler drives it, so JS-rendered badges (e.g. the Alter-role sections)
+work without per-element wiring. Used on Privileges/Attributes/Settings (Alter role),
+Cluster groups (Settings), and the Find-role / Comments dialogs.
+
 **Alter role flow** (all in [frontend/app.js](frontend/app.js), styles in
 [frontend/styles.css](frontend/styles.css)):
 - Clicking the **Alter role** op-tab opens the search dialog (`openSearchDialog`; there

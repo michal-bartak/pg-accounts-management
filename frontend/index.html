@@ -125,10 +125,9 @@
         </div>
 
         <div class="settings-section-head">
-          <h2>Cluster groups</h2>
+          <h2>Cluster groups <button type="button" class="q-hint" tabindex="0" aria-label="Colour and a &quot;require confirmation&quot; gate per group. Deleting a group in use by a cluster is blocked." data-hint="Colour and a &quot;require confirmation&quot; gate per group. Deleting a group in use by a cluster is blocked.">?</button></h2>
           <button type="button" id="btn-add-group">Add group</button>
         </div>
-        <p class="hint">Colour and a "require confirmation" gate per group. Deleting a group in use by a cluster is blocked.</p>
         <div class="table-wrap">
           <table id="groups-table">
             <thead>
@@ -183,12 +182,11 @@
 
   <dialog id="search-dialog">
     <div class="search-dialog-body">
-      <h2>Find role</h2>
+      <h2>Find role <button type="button" class="q-hint" tabindex="0" aria-label="Scans the selected clusters/groups (Target selection). Matches role name and comment." data-hint="Scans the selected clusters/groups (Target selection). Matches role name and comment.">?</button></h2>
       <div class="alter-search">
         <input type="search" id="alter-search-term" placeholder="Search by role name or comment…" autocapitalize="none" autocomplete="off" spellcheck="false" />
         <button type="button" id="btn-alter-search" class="primary">Search</button>
       </div>
-      <p class="hint">Scans the selected clusters/groups (Target selection). Matches role name and comment.</p>
       <p class="hint" id="alter-search-scope"></p>
       <div id="alter-search-errors" class="alter-errors"></div>
       <div id="alter-results" class="alter-results"></div>
@@ -221,8 +219,7 @@
 
   <dialog id="comments-dialog">
     <div class="comments-dialog-body">
-      <h2>Comments</h2>
-      <p class="hint">Clusters are grouped by identical comment. Edit a box and save it to update all its clusters.</p>
+      <h2>Comments <button type="button" class="q-hint" tabindex="0" aria-label="Clusters are grouped by identical comment. Edit a box and save it to update all its clusters." data-hint="Clusters are grouped by identical comment. Edit a box and save it to update all its clusters.">?</button></h2>
       <div id="comments-list"></div>
       <menu>
         <button type="button" id="comments-dialog-close" class="primary">Close</button>

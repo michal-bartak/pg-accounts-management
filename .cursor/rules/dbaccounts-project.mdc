@@ -95,7 +95,9 @@ single-column with fixed toolbar / pinned Save-settings footer. **Test connectio
 cluster into a per-row **Status** column (`setClusterStatus`), shared with the per-row
 Test button. Left sidebar is Target selection only; "Or pick clusters" collapses/expands
 (collapsed by default; expanded list flexes to fill). Settings hosts the **Cluster
-groups** editor.
+groups** editor. Feature descriptions live behind a **`?` help badge** (`.q-hint`, via
+`hintBadge(text)`); hover/focus shows a shared `position:fixed`, viewport-clamped popover
+(`.q-hint-pop`) driven by one delegated handler so JS-rendered badges work too.
 
 **Alter role** (search-then-edit): clicking the **Alter role** op-tab opens a search
 dialog (no separate "Find user" button) that searches the *selected*

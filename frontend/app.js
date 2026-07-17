@@ -720,6 +720,63 @@ function escapeAttr(s) {
 }
 
 // ------------------------------------------------------------------
+// "?" help badges — hide a feature description behind a hover/focus popover.
+// ------------------------------------------------------------------
+
+/** Markup for a "?" badge whose hover popover shows `text`. */
+function hintBadge(text) {
+  return `<button type="button" class="q-hint" tabindex="0" aria-label="${escapeAttr(text)}" data-hint="${escapeAttr(text)}">?</button>`;
+}
+
+/** @type {HTMLDivElement | null} */
+let qHintPop = null;
+
+function positionQHint(btn) {
+  const text = btn.dataset.hint || '';
+  if (!text) return;
+  if (!qHintPop) {
+    qHintPop = document.createElement('div');
+    qHintPop.className = 'q-hint-pop';
+    qHintPop.setAttribute('role', 'tooltip');
+    document.body.appendChild(qHintPop);
+  }
+  qHintPop.textContent = text;
+  qHintPop.hidden = false;
+  const m = 8; // viewport margin
+  const r = btn.getBoundingClientRect();
+  const pw = qHintPop.offsetWidth;
+  const ph = qHintPop.offsetHeight;
+  // Centre on the badge, clamped inside the viewport.
+  const left = Math.max(m, Math.min(r.left + r.width / 2 - pw / 2, window.innerWidth - pw - m));
+  // Prefer below the badge; flip above if it would overflow the bottom edge.
+  let top = r.bottom + 6;
+  if (top + ph > window.innerHeight - m) top = r.top - ph - 6;
+  if (top < m) top = m;
+  qHintPop.style.left = `${left}px`;
+  qHintPop.style.top = `${top}px`;
+}
+
+function hideQHint() {
+  if (qHintPop) qHintPop.hidden = true;
+}
+
+// Delegated so badges rendered later (e.g. the Alter-role detail) work too.
+document.addEventListener('mouseover', (e) => {
+  const btn = e.target.closest?.('.q-hint');
+  if (btn) positionQHint(btn);
+});
+document.addEventListener('mouseout', (e) => {
+  if (e.target.closest?.('.q-hint')) hideQHint();
+});
+document.addEventListener('focusin', (e) => {
+  const btn = e.target.closest?.('.q-hint');
+  if (btn) positionQHint(btn);
+});
+document.addEventListener('focusout', (e) => {
+  if (e.target.closest?.('.q-hint')) hideQHint();
+});
+
+// ------------------------------------------------------------------
 // Alter role tab
 // ------------------------------------------------------------------
 
@@ -1088,27 +1145,24 @@ function renderAlterDetail(errors = []) {
     </div>
 
     <div class="alter-section">
-      <div class="alter-privs-label">Privileges</div>
+      <div class="alter-privs-label">Privileges ${hintBadge('Each privilege shows the clusters/groups it is granted on. Use ✎ to add or remove clusters, × to revoke everywhere.')}</div>
       <div class="scope-rows" id="alter-privs">${privHtml}</div>
       <div class="alter-add-priv">
         <button type="button" class="small" id="btn-alter-add">Add privilege…</button>
       </div>
-      <p class="hint">Each privilege shows the clusters/groups it is granted on. Use ✎ to add or remove clusters, × to revoke everywhere.</p>
     </div>
 
     <div class="alter-section">
-      <div class="alter-privs-label">Attributes</div>
+      <div class="alter-privs-label">Attributes ${hintBadge('Each attribute shows where it is enabled. Use ✎ to enable/disable per cluster, × to disable everywhere.')}</div>
       <div class="scope-rows" id="alter-attrs">${attrRows}</div>
-      <p class="hint">Each attribute shows where it is enabled. Use ✎ to enable/disable per cluster, × to disable everywhere.</p>
     </div>
 
     <div class="alter-section">
-      <div class="alter-privs-label">Settings</div>
+      <div class="alter-privs-label">Settings ${hintBadge('Role GUCs (ALTER ROLE … SET/RESET). Use ✎ to set on chosen clusters, × to reset everywhere it has that value.')}</div>
       <div class="scope-rows" id="alter-configs">${cfgHtml}</div>
       <div class="alter-add-priv">
         <button type="button" class="small" id="btn-alter-add-config">Add setting…</button>
       </div>
-      <p class="hint">Role GUCs (ALTER ROLE … SET/RESET). Use ✎ to set on chosen clusters, × to reset everywhere it has that value.</p>
     </div>
 
     <div class="alter-section">
@@ -1124,7 +1178,7 @@ function renderAlterDetail(errors = []) {
   updateOpsFooter();
 }
 
-/** Show the right pinned footer for the active op: Create → Run/Test; Alter → Save/Remove
+/** Show the right pinned footer for the active op: Create → Run; Alter → Save/Remove
  *  (only once a role is loaded). Hide the footer entirely when neither applies. */
 function updateOpsFooter() {
   const isCreate = currentOp === 'create_role';
