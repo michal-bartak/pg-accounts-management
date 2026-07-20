@@ -720,6 +720,9 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
   flex-wrap: wrap;
   margin-bottom: 0.6rem;
 }
+/* Keep the value labels next to the "Present on" text (not pushed to the right edge like
+   the scope rows, which is where .alter-cluster-badges' margin-left:auto is meant for). */
+.alter-present .alter-cluster-badges { margin-left: 0; }
 .alter-meta-label,
 .alter-privs-label {
   font-size: var(--fs-xs);
