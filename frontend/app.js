@@ -1396,14 +1396,13 @@ function renderScopePreconfigured() {
     return;
   }
   box.innerHTML =
-    '<span class="picker-label">Preconfigured groups</span><div class="pp-list">' +
+    '<span class="picker-label">Add preconfigured:</span>' +
     roles
       .map(
         (r) =>
-          `<label class="pp-item"><input type="checkbox" class="pp-check" data-role="${escapeAttr(r)}" /> ${escapeHtml(r)}</label>`
+          `<button type="button" class="pick-chip" data-role="${escapeAttr(r)}">${escapeHtml(r)}</button>`
       )
-      .join('') +
-    '</div>';
+      .join('');
   box.classList.remove('hidden');
 }
 
@@ -1477,8 +1476,8 @@ function confirmScopeDialog() {
       }
       roles.push(typed);
     }
-    for (const cb of document.querySelectorAll('#scope-preconfigured .pp-check:checked')) {
-      if (!roles.includes(cb.dataset.role)) roles.push(cb.dataset.role);
+    for (const chip of document.querySelectorAll('#scope-preconfigured .pick-chip.active')) {
+      if (!roles.includes(chip.dataset.role)) roles.push(chip.dataset.role);
     }
     if (!roles.length) {
       showToast('Enter a role name or pick at least one preconfigured group', 'error');
@@ -2075,6 +2074,10 @@ document.getElementById('alter-detail')?.addEventListener('input', (ev) => {
 document.getElementById('scope-dialog-ok')?.addEventListener('click', confirmScopeDialog);
 document.getElementById('scope-dialog-cancel')?.addEventListener('click', () => {
   document.getElementById('scope-dialog').close();
+});
+document.getElementById('scope-preconfigured')?.addEventListener('click', (ev) => {
+  const chip = ev.target.closest('.pick-chip');
+  if (chip) chip.classList.toggle('active');
 });
 document.getElementById('scope-targets')?.addEventListener('change', (ev) => {
   const t = ev.target;

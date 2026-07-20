@@ -856,9 +856,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
   color: var(--text);
 }
 .pick-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
-.scope-preconfigured .picker-label { display: block; margin-bottom: 0.3rem; }
-.scope-preconfigured .pp-list { display: grid; gap: 0.2rem; max-height: 24vh; overflow-y: auto; }
-.pp-item { display: flex; align-items: center; gap: 0.4rem; font-size: var(--fs-label); }
+.scope-preconfigured { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
 
 /* Comments dialog */
 #comments-list { display: grid; gap: 0.9rem; max-height: 55vh; overflow-y: auto; }
