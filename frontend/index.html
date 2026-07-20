@@ -116,13 +116,14 @@
         </div>
 
         <div class="settings-row">
-          <label>Appearance
-            <select id="ui-theme">
-              <option value="system">System</option>
-              <option value="dark">Dark</option>
-              <option value="light">Light</option>
-            </select>
-          </label>
+          <div class="settings-field">
+            <span class="settings-field-label">Appearance</span>
+            <div class="segmented" id="ui-theme" role="group" aria-label="Appearance">
+              <button type="button" class="seg-btn" data-pref="system">System</button>
+              <button type="button" class="seg-btn" data-pref="dark">Dark</button>
+              <button type="button" class="seg-btn" data-pref="light">Light</button>
+            </div>
+          </div>
         </div>
 
         <div class="settings-section-head">

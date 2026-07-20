@@ -405,12 +405,27 @@ tr:last-child td { border-bottom: none; }
   margin-bottom: 1.25rem;
 }
 
-.settings-row label {
+.settings-row label,
+.settings-field {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   font-size: var(--fs-label);
 }
+
+/* Segmented control (e.g. Appearance) — connected buttons, one active. */
+.segmented { display: inline-flex; align-self: flex-start; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.segmented .seg-btn {
+  min-height: var(--control-h);
+  border: none;
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--muted);
+  padding: var(--control-pad-y) 0.9rem;
+}
+.segmented .seg-btn + .seg-btn { border-left: 1px solid var(--border); }
+.segmented .seg-btn:hover { color: var(--text); border-color: var(--border); }
+.segmented .seg-btn.active { background: var(--primary); color: #fff; }
 
 .settings-section-head {
   display: flex;

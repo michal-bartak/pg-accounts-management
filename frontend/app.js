@@ -131,6 +131,20 @@ function showToast(msg, type = '') {
   setTimeout(() => el.classList.add('hidden'), 4500);
 }
 
+/** Currently-selected Appearance preference (from the segmented button group). */
+function currentThemePref() {
+  return document.querySelector('#ui-theme .seg-btn.active')?.dataset.pref || state?.ui?.theme || 'system';
+}
+
+/** Reflect a preference in the segmented Appearance buttons. */
+function setThemeButtons(pref) {
+  document.querySelectorAll('#ui-theme .seg-btn').forEach((b) => {
+    const on = b.dataset.pref === pref;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+}
+
 function applyTheme(themePref) {
   const pref = themePref || 'system';
   let resolved = pref;
@@ -138,8 +152,7 @@ function applyTheme(themePref) {
     if (!systemThemeMedia) {
       systemThemeMedia = window.matchMedia('(prefers-color-scheme: dark)');
       systemThemeMedia.addEventListener('change', () => {
-        const current = document.getElementById('ui-theme')?.value || state?.ui?.theme || 'system';
-        if (current === 'system') applyTheme('system');
+        if (currentThemePref() === 'system') applyTheme('system');
       });
     }
     resolved = systemThemeMedia.matches ? 'dark' : 'light';
@@ -170,10 +183,7 @@ async function loadConfig() {
   try {
     state = await app.GetConfig();
     document.getElementById('config-path').textContent = await app.GetConfigPath();
-    const themeEl = document.getElementById('ui-theme');
-    if (themeEl) {
-      themeEl.value = state?.ui?.theme || 'system';
-    }
+    setThemeButtons(state?.ui?.theme || 'system');
     applyTheme(state?.ui?.theme || 'system');
     renderAll();
   } catch (e) {
@@ -355,9 +365,9 @@ function renderDBFunctionsEditor() {
   ];
 
   const executionOptions = [
-    ['function', 'Function call (SELECT fn($1, …))'],
-    ['statement', 'SQL statement (e.g. DROP ROLE ${loginname})'],
-    ['block', 'PL/pgSQL block (app wraps DO $dbaccounts$ …)'],
+    ['function', 'Function call'],
+    ['statement', 'SQL statement'],
+    ['block', 'PL/pgSQL block'],
   ];
 
   for (const [key, title, fn] of entries) {
@@ -697,7 +707,7 @@ async function saveSettings() {
       maxConcurrency: parseInt(document.getElementById('batch-concurrency').value, 10) || 5,
     });
     await app.SaveUISettings({
-      theme: document.getElementById('ui-theme')?.value || 'system',
+      theme: currentThemePref(),
     });
     await loadConfig();
     showToast('Settings saved', 'success');
@@ -1975,8 +1985,11 @@ document.getElementById('comments-list')?.addEventListener('click', (ev) => {
   if (btn) saveCommentVersion(Number(btn.dataset.idx));
 });
 
-document.getElementById('ui-theme')?.addEventListener('change', (ev) => {
-  applyTheme(ev.target.value);
+document.getElementById('ui-theme')?.addEventListener('click', (ev) => {
+  const btn = ev.target.closest('.seg-btn');
+  if (!btn) return;
+  setThemeButtons(btn.dataset.pref);
+  applyTheme(btn.dataset.pref);
 });
 
 document.getElementById('btn-template-help')?.addEventListener('click', () => {
