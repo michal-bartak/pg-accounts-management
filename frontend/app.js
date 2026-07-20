@@ -41,8 +41,59 @@ let alterAttrRemove = new Map();
 let alterConfigSet = new Map();
 /** @type {Map<string, Set<string>>} setting name -> clusterIds to RESET */
 let alterConfigReset = new Map();
-/** @type {Map<string, Set<string>>} Create role: parent role -> clusterIds to grant it on */
-let createParents = new Map();
+
+// The role form is shared by Create and Alter. Create = editing a not-yet-existing role
+// across the selected clusters with an empty baseline; Alter = editing an existing role
+// over the clusters it lives on. `currentOp` selects the mode.
+function isCreateMode() {
+  return currentOp === 'create_role';
+}
+
+/** Clear all pending edit maps + password state (both modes). */
+function resetEditMaps() {
+  alterAdd = new Map();
+  alterRevoke = new Map();
+  alterAttrAdd = new Map();
+  alterAttrRemove = new Map();
+  alterConfigSet = new Map();
+  alterConfigReset = new Map();
+  alterDoPassword = false;
+  alterPassword = '';
+}
+
+/** Create mode: baseline = the selected clusters as empty (not-yet-existing) rows. */
+function synthCreateBaseline() {
+  alterScopeClusters = [];
+  alterSelected = document.getElementById('role-login')?.value.trim() || null;
+  alterDetails = resolveSelectedClusters().map((c) => ({
+    clusterId: c.id,
+    alias: c.alias,
+    category: c.category,
+    exists: false,
+    comment: '',
+    fullName: '',
+    parents: [],
+    attributes: {},
+    settings: {},
+  }));
+}
+
+/** Create mode: drop pending grants/enables/sets that point at no-longer-selected clusters. */
+function reconcilePendingWithUniverse() {
+  const universe = new Set(alterDetails.map((d) => d.clusterId));
+  const prune = (map) => {
+    for (const [key, ids] of map) {
+      for (const id of [...ids]) if (!universe.has(id)) ids.delete(id);
+      if (!ids.size) map.delete(key);
+    }
+  };
+  prune(alterAdd);
+  prune(alterRevoke);
+  prune(alterAttrAdd);
+  prune(alterAttrRemove);
+  prune(alterConfigSet);
+  prune(alterConfigReset);
+}
 
 // Editable role attributes (pg_roles flag -> ALTER ROLE enable/disable keywords).
 const ROLE_ATTRIBUTES = [
@@ -94,17 +145,6 @@ function askConfirm(title, message) {
   });
 }
 
-function validateActiveOpForm() {
-  const form = document.getElementById(`form-${currentOp}`);
-  if (!form) {
-    showToast('Internal error: operation form not found', 'error');
-    return false;
-  }
-  if (!form.reportValidity()) {
-    return false;
-  }
-  return true;
-}
 
 /** Disable auto-capitalization on technical fields; only fullName uses words. */
 function configureInputCapitalization(root = document) {
@@ -430,7 +470,6 @@ function renderAll() {
   renderClusterCheckboxes();
   renderGroupsTable();
   renderDBFunctionsEditor();
-  renderCreatePrivs();
   updateTargetPreview();
 }
 
@@ -451,8 +490,13 @@ function getAuth() {
 async function updateTargetPreview() {
   const app = backend();
   const preview = document.getElementById('target-preview');
-  // Create-role privilege scope labels are relative to the selected clusters.
-  renderCreatePrivs();
+  // Create mode: the universe is the selected clusters, so rebuild the synthetic baseline
+  // (and drop pending edits on deselected clusters) whenever the selection changes.
+  if (isCreateMode()) {
+    synthCreateBaseline();
+    reconcilePendingWithUniverse();
+    renderAlterDetail();
+  }
   if (!app || !state) {
     preview.textContent = '';
     return;
@@ -563,56 +607,25 @@ function parseRoleList(value) {
 }
 
 /** Create-role privilege universe = the clusters covered by the sidebar target selection. */
-function createUniverse() {
+/** Read the shared identity inputs (login / full name / email). */
+function roleIdentityInputs() {
+  return {
+    loginName: document.getElementById('role-login')?.value.trim() || '',
+    fullName: document.getElementById('role-fullname')?.value.trim() || '',
+    email: document.getElementById('role-email')?.value.trim() || '',
+  };
+}
+
+/** Build one create_role per selected cluster: base role + template base groups only
+ *  (empty parent_role). Parents/attributes/settings/password layer on via buildAlterRequests. */
+function buildCreateRoleRequests(base) {
   return resolveSelectedClusters().map((c) => ({
+    op: 'create_role',
     clusterId: c.id,
-    category: c.category,
-    alias: c.alias,
+    params: {
+      createRole: { loginName: base.loginName, fullName: base.fullName, email: base.email, parentRole: '' },
+    },
   }));
-}
-
-/** One Create-role privilege row: role name, scope labels, edit (✎) / remove (×). */
-function createPrivRowHtml(role, ids) {
-  const k = escapeAttr(role);
-  const labels = scopeLabelsHtml(describeScope(ids, createUniverse())) || '<span class="hint">no clusters</span>';
-  const edit = `<button type="button" class="chip-extend" data-act="cp-scope" data-key="${k}" title="Edit clusters">✎</button>`;
-  const x = `<button type="button" class="chip-x" data-act="cp-remove" data-key="${k}" title="Remove">×</button>`;
-  return `<div class="scope-row is-added">
-    <span class="scope-row-name">${escapeHtml(role)}</span>
-    <span class="scope-row-labels">${labels}</span>
-    <span class="scope-row-actions">${edit}${x}</span>
-  </div>`;
-}
-
-/** Render the Create-role Privileges section from `createParents`. */
-function renderCreatePrivs() {
-  const box = document.getElementById('create-privs');
-  if (!box) return;
-  const roles = [...createParents.keys()].sort();
-  box.innerHTML = roles.length
-    ? roles.map((r) => createPrivRowHtml(r, createParents.get(r) || new Set())).join('')
-    : '<p class="hint">No privileges — the role is created with the template’s base groups only.</p>';
-}
-
-/** Build one create_role request per selected cluster, each with the parents scoped to it. */
-function buildCreateRequests(base) {
-  return resolveSelectedClusters().map((c) => {
-    const parents = [...createParents.entries()]
-      .filter(([, ids]) => ids.has(c.id))
-      .map(([role]) => role);
-    return {
-      op: 'create_role',
-      clusterId: c.id,
-      params: {
-        createRole: {
-          loginName: base.loginName,
-          fullName: base.fullName,
-          email: base.email,
-          parentRole: parents.join(', '),
-        },
-      },
-    };
-  });
 }
 
 async function runOperation() {
@@ -621,10 +634,11 @@ async function runOperation() {
     showToast('Wails backend not available', 'error');
     return;
   }
-  if (currentOp !== 'create_role') {
-    return;
-  }
-  if (!validateActiveOpForm()) {
+  if (!isCreateMode()) return;
+
+  const base = roleIdentityInputs();
+  if (!base.loginName || !ROLE_NAME_RE.test(base.loginName)) {
+    showToast('Enter a valid login name (letters, digits, underscore)', 'error');
     return;
   }
   const clusters = resolveSelectedClusters();
@@ -632,16 +646,36 @@ async function runOperation() {
     showToast('Select at least one category or cluster', 'error');
     return;
   }
+  alterSelected = base.loginName; // buildAlterRequests keys its ops on this login
 
-  const fd = new FormData(document.getElementById('form-create_role'));
-  const base = {
-    loginName: fd.get('loginName')?.toString().trim() || '',
-    fullName: fd.get('fullName')?.toString().trim() || '',
-    email: fd.get('email')?.toString().trim() || '',
-  };
+  // Pre-flight: warn if the role already exists on any selected cluster (create would error).
+  try {
+    const found = await app.LoadRoleDetails({
+      loginName: base.loginName,
+      categoryIds: getSelectedCategories(),
+      clusterIds: getSelectedClusterIDs(),
+      auth: getAuth(),
+    });
+    const present = (found || []).filter((d) => d.exists).map((d) => d.alias);
+    if (present.length) {
+      const ok = await askConfirm(
+        'Role exists',
+        `"${base.loginName}" already exists on ${present.join(', ')}. create_role will error there. Continue anyway?`
+      );
+      if (!ok) return;
+    }
+  } catch {
+    /* pre-flight is best-effort; per-cluster errors will still surface on run */
+  }
 
-  // One create_role per selected cluster, each carrying the parents scoped to it.
-  await executeAlterRequests(buildCreateRequests(base), 'Role created');
+  // create_role first (each cluster), then the grant/attr/setting/password diff.
+  const requests = buildCreateRoleRequests(base).concat(buildAlterRequests());
+  const ok = await executeAlterRequests(requests, 'Role created');
+  if (!ok) return;
+  resetEditMaps();
+  loadRoleIdentityValues(); // clears the identity inputs (create mode)
+  synthCreateBaseline();
+  renderAlterDetail();
 }
 
 /** Update the inline Status cell for a cluster row on the Clusters page. */
@@ -937,14 +971,7 @@ function renderAlterResults() {
 
 async function pickUser(login) {
   alterSelected = login;
-  alterAdd = new Map();
-  alterRevoke = new Map();
-  alterAttrAdd = new Map();
-  alterAttrRemove = new Map();
-  alterConfigSet = new Map();
-  alterConfigReset = new Map();
-  alterDoPassword = false;
-  alterPassword = '';
+  resetEditMaps();
 
   document.getElementById('search-dialog')?.close();
   // The detail header shows which role is being edited; hide the empty-state prompt.
@@ -973,6 +1000,7 @@ async function reloadDetails() {
   }
   alterDetails = (details || []).filter((d) => d.exists && !d.error);
   const errors = (details || []).filter((d) => d.error);
+  loadRoleIdentityValues();
   renderAlterDetail(errors);
 }
 
@@ -1105,9 +1133,68 @@ function identityConsensus() {
   };
 }
 
+/** Read a string field from a JSON role comment (e.g. full_name, email); '' if absent. */
+function parseCommentField(comment, key) {
+  const t = (comment || '').trim();
+  if (!t || t[0] !== '{') return '';
+  try {
+    const m = JSON.parse(t);
+    return typeof m[key] === 'string' ? m[key].trim() : '';
+  } catch {
+    return '';
+  }
+}
+
+/** Populate the static #role-identity inputs. Called on mode entry / role load only —
+ *  NOT on every re-render, so pending user edits aren't clobbered. */
+function loadRoleIdentityValues() {
+  const login = document.getElementById('role-login');
+  const fullname = document.getElementById('role-fullname');
+  const email = document.getElementById('role-email');
+  const note = document.getElementById('role-identity-note');
+  if (!login) return;
+  if (isCreateMode()) {
+    login.value = '';
+    fullname.value = '';
+    email.value = '';
+    note.textContent = '';
+    return;
+  }
+  login.value = alterSelected || '';
+  const fns = [...new Set(alterDetails.map((d) => d.fullName).filter(Boolean))];
+  const emails = [...new Set(alterDetails.map((d) => parseCommentField(d.comment, 'email')).filter(Boolean))];
+  fullname.value = fns.length === 1 ? fns[0] : '';
+  email.value = emails.length === 1 ? emails[0] : '';
+  const varies = [];
+  if (fns.length > 1) varies.push('full name');
+  if (emails.length > 1) varies.push('email');
+  note.textContent = varies.length
+    ? `Current ${varies.join(' and ')} varies across clusters; a value here applies to all.`
+    : '';
+}
+
 function renderAlterDetail(errors = []) {
   const root = document.getElementById('alter-detail');
-  if (!alterSelected) {
+  const identity = document.getElementById('role-identity');
+  const hint = document.getElementById('alter-current-hint');
+  const login = document.getElementById('role-login');
+  const create = isCreateMode();
+
+  // Identity block + empty-state hint visibility (values set on load, not here).
+  if (create) {
+    identity.classList.remove('hidden');
+    hint.classList.add('hidden');
+    if (login) login.readOnly = false;
+  } else if (alterSelected && alterDetails.length) {
+    identity.classList.remove('hidden');
+    hint.classList.add('hidden');
+    if (login) login.readOnly = true;
+  } else {
+    identity.classList.add('hidden');
+    hint.classList.remove('hidden');
+  }
+
+  if (!create && !alterSelected) {
     root.classList.add('hidden');
     root.innerHTML = '';
     return;
@@ -1115,31 +1202,43 @@ function renderAlterDetail(errors = []) {
   root.classList.remove('hidden');
 
   if (!alterDetails.length) {
-    root.innerHTML =
-      `<p class="hint">Role <strong>${escapeHtml(alterSelected)}</strong> was not found on any reachable cluster.</p>` +
-      renderDetailErrors(errors);
+    root.innerHTML = create
+      ? '<p class="hint">Select at least one target cluster to define privileges, attributes and settings.</p>'
+      : `<p class="hint">Role <strong>${escapeHtml(alterSelected)}</strong> was not found on any reachable cluster.</p>` +
+        renderDetailErrors(errors);
     return;
   }
 
   const id = identityConsensus();
-  const headFull = !id.fullNameVaries && id.fullName
-    ? ` — <span class="alter-fullname">${escapeHtml(id.fullName)}</span>`
-    : '';
-
   const presentLabels = scopeLabelsHtml(describeScope(new Set(alterDetails.map((d) => d.clusterId))));
 
-  let identityRows = '';
-  if (id.fullNameVaries) {
-    identityRows += `<div class="alter-identity-row">Full name <em>varies across clusters</em></div>`;
+  // Edit-only header: login heading, present-on, and raw-comment info + Comments dialog.
+  // (Full name / email live in the editable #role-identity block above, both modes.)
+  let editHead = '';
+  if (!create) {
+    let commentRow;
+    if (id.commentVaries) {
+      commentRow = `<div class="alter-identity-row">Comment <em>varies across clusters</em></div>`;
+    } else if (id.hasComment) {
+      commentRow = `<div class="alter-identity-row">Comment <code>${escapeHtml(id.comment)}</code></div>`;
+    } else {
+      commentRow = `<div class="alter-identity-row">Comment <em>none</em></div>`;
+    }
+    const commentsBtn = `<button type="button" class="small" id="btn-alter-comments">${id.commentVaries ? 'Comments differ — view / edit' : 'View / edit comments'}</button>`;
+    editHead = `
+    <div class="alter-detail-head">
+      <h3>Editing <strong>${escapeHtml(alterSelected)}</strong></h3>
+    </div>
+    ${renderDetailErrors(errors)}
+    <div class="alter-present">
+      <span class="alter-meta-label">Present on</span>
+      <span class="alter-cluster-badges">${presentLabels}</span>
+    </div>
+    <div class="alter-identity">
+      ${commentRow}
+      <div class="alter-identity-actions">${commentsBtn}</div>
+    </div>`;
   }
-  if (id.commentVaries) {
-    identityRows += `<div class="alter-identity-row">Comment <em>varies across clusters</em></div>`;
-  } else if (id.hasComment) {
-    identityRows += `<div class="alter-identity-row">Comment <code>${escapeHtml(id.comment)}</code></div>`;
-  } else {
-    identityRows += `<div class="alter-identity-row">Comment <em>none</em></div>`;
-  }
-  const commentsBtn = `<button type="button" class="small" id="btn-alter-comments">${id.commentVaries ? 'Comments differ — view / edit' : 'View / edit comments'}</button>`;
 
   const existing = allPrivileges();
   const existingSet = new Set(existing);
@@ -1166,19 +1265,7 @@ function renderAlterDetail(errors = []) {
   const cfgHtml = cfgRows || '<p class="hint">No settings.</p>';
 
   root.innerHTML = `
-    <div class="alter-detail-head">
-      <h3>Editing <strong>${escapeHtml(alterSelected)}</strong>${headFull}</h3>
-    </div>
-    ${renderDetailErrors(errors)}
-    <div class="alter-present">
-      <span class="alter-meta-label">Present on</span>
-      <span class="alter-cluster-badges">${presentLabels}</span>
-    </div>
-    <div class="alter-identity">
-      ${identityRows}
-      <div class="alter-identity-actions">${commentsBtn}</div>
-    </div>
-
+    ${editHead}
     <div class="alter-section">
       <div class="alter-privs-label">Privileges ${hintBadge('Each privilege shows the clusters/groups it is granted on. Use ✎ to add or remove clusters, × to revoke everywhere.')}</div>
       <div class="scope-rows" id="alter-privs">${privHtml}</div>
@@ -1216,7 +1303,7 @@ function renderAlterDetail(errors = []) {
 /** Show the right pinned footer for the active op: Create → Run; Alter → Save/Remove
  *  (only once a role is loaded). Hide the footer entirely when neither applies. */
 function updateOpsFooter() {
-  const isCreate = currentOp === 'create_role';
+  const isCreate = isCreateMode();
   const showAlter = !isCreate && !!alterSelected && alterDetails.length > 0;
   document.getElementById('create-run-bar')?.classList.toggle('hidden', !isCreate);
   document.getElementById('alter-actions')?.classList.toggle('hidden', !showAlter);
@@ -1326,16 +1413,7 @@ function openScopeDialog(ctx) {
   cvalueLabel.classList.add('hidden');
   document.getElementById('scope-preconfigured')?.classList.add('hidden');
 
-  if (ctx && ctx.mode === 'create' && !ctx.key) {
-    title.textContent = 'Add privilege';
-    roleLabel.classList.remove('hidden');
-    roleInput.value = '';
-    renderScopePreconfigured();
-    ok.textContent = 'Add';
-  } else if (ctx && ctx.mode === 'create') {
-    title.textContent = `Edit "${ctx.key}" clusters`;
-    ok.textContent = 'Apply';
-  } else if (!ctx) {
+  if (!ctx) {
     title.textContent = 'Add privilege';
     roleLabel.classList.remove('hidden');
     roleInput.value = '';
@@ -1362,7 +1440,7 @@ function openScopeDialog(ctx) {
   }
   buildScopeTargets(ctx);
   dlg.showModal();
-  if (!ctx || (ctx.mode === 'create' && !ctx.key)) roleInput.focus();
+  if (!ctx) roleInput.focus();
   else if (ctx.kind === 'config' && ctx.isNew) document.getElementById('scope-cname').focus();
 }
 
@@ -1390,9 +1468,6 @@ function renderScopePreconfigured() {
 /** Desired-state set currently reflected for a ctx: (current − pendingRevoke) ∪ pendingAdd. */
 function scopeDesired(ctx) {
   if (!ctx) return new Set();
-  if (ctx.mode === 'create') {
-    return new Set(ctx.key ? createParents.get(ctx.key) || [] : []);
-  }
   if (ctx.kind === 'config') {
     if (ctx.isNew) return new Set();
     const { name, value } = cfgParse(ctx.key);
@@ -1415,9 +1490,8 @@ function buildScopeTargets(ctx) {
   const box = document.getElementById('scope-targets');
   const desired = scopeDesired(ctx);
 
-  const universe = ctx && ctx.mode === 'create' ? createUniverse() : alterDetails;
   const byCat = new Map();
-  for (const d of universe) {
+  for (const d of alterDetails) {
     if (!byCat.has(d.category)) byCat.set(d.category, []);
     byCat.get(d.category).push(d);
   }
@@ -1447,39 +1521,6 @@ function confirmScopeDialog() {
 
   if (ctx && ctx.kind === 'config') {
     confirmConfigScope(ctx, desired);
-    return;
-  }
-
-  // Create-role privileges: write to createParents (no current state to diff against).
-  if (ctx && ctx.mode === 'create') {
-    if (ctx.key) {
-      if (desired.size) createParents.set(ctx.key, desired);
-      else createParents.delete(ctx.key);
-    } else {
-      const roles = [];
-      const typed = document.getElementById('scope-role').value.trim();
-      if (typed) {
-        if (!ROLE_NAME_RE.test(typed)) {
-          showToast('Invalid role name: use letters, digits, underscore', 'error');
-          return;
-        }
-        roles.push(typed);
-      }
-      for (const chip of document.querySelectorAll('#scope-preconfigured .pick-chip.active')) {
-        if (!roles.includes(chip.dataset.role)) roles.push(chip.dataset.role);
-      }
-      if (!roles.length) {
-        showToast('Enter a role name or pick at least one preconfigured group', 'error');
-        return;
-      }
-      for (const r of roles) {
-        const merged = new Set(createParents.get(r) || []);
-        for (const id of desired) merged.add(id);
-        createParents.set(r, merged);
-      }
-    }
-    document.getElementById('scope-dialog').close();
-    renderCreatePrivs();
     return;
   }
 
@@ -1653,9 +1694,33 @@ async function saveCommentVersion(idx) {
   renderCommentsDialog();
 }
 
+/** Merge full_name/email into a role comment's JSON, preserving other keys. Returns the
+ *  new comment string, or null to skip (existing comment is free text — leave it alone). */
+function identityCommentJSON(existingComment, fullName, email) {
+  const t = (existingComment || '').trim();
+  let obj = {};
+  if (t && t[0] === '{') {
+    try {
+      obj = JSON.parse(t);
+    } catch {
+      obj = {};
+    }
+  } else if (t) {
+    return null; // non-JSON free text: don't clobber via the identity inputs
+  }
+  if (fullName) obj.full_name = fullName;
+  else delete obj.full_name;
+  if (email) obj.email = email;
+  else delete obj.email;
+  return Object.keys(obj).length ? JSON.stringify(sortKeysDeep(obj)) : '';
+}
+
 function buildAlterRequests() {
   /** @type {Array<{op:string, clusterId:string, params:object}>} */
   const requests = [];
+  // Edit mode: full name / email persist through set_comment (comment JSON). Create passes
+  // them to create_role instead, so skip the comment step there.
+  const identity = isCreateMode() ? null : roleIdentityInputs();
 
   for (const d of alterDetails) {
     const parents = d.parents || [];
@@ -1729,6 +1794,18 @@ function buildAlterRequests() {
         });
       }
     }
+
+    // Identity (full name / email) via set_comment where it actually changes the comment.
+    if (identity) {
+      const desired = identityCommentJSON(d.comment, identity.fullName, identity.email);
+      if (desired !== null && canonicalComment(desired) !== canonicalComment(d.comment || '')) {
+        requests.push({
+          op: 'set_comment',
+          clusterId: d.clusterId,
+          params: { setComment: { loginName: alterSelected, comment: desired } },
+        });
+      }
+    }
   }
   return requests;
 }
@@ -1754,14 +1831,7 @@ async function saveAlterations() {
   const ok = await executeAlterRequests(requests, 'Changes saved');
   if (!ok) return;
   // Applied — clear pending edits and refresh from the DB.
-  alterAdd = new Map();
-  alterRevoke = new Map();
-  alterAttrAdd = new Map();
-  alterAttrRemove = new Map();
-  alterConfigSet = new Map();
-  alterConfigReset = new Map();
-  alterDoPassword = false;
-  alterPassword = '';
+  resetEditMaps();
   if (alterSelected) await reloadDetails();
 }
 
@@ -1846,14 +1916,21 @@ document.querySelectorAll('.op-tab').forEach((tab) => {
   tab.addEventListener('click', () => {
     currentOp = tab.dataset.op;
     document.querySelectorAll('.op-tab').forEach((t) => t.classList.remove('active'));
-    document.querySelectorAll('.op-form').forEach((f) => f.classList.remove('active'));
     tab.classList.add('active');
-    document.getElementById(`form-${currentOp}`).classList.add('active');
-    updateOpsFooter();
-    if (currentOp === 'create_role') {
-      updateTargetPreview();
-    } else if (currentOp === 'alter_user') {
-      // Alter role doubles as "find user": open the search popup.
+    if (isCreateMode()) {
+      // Fresh, empty create form over the current target selection.
+      resetEditMaps();
+      loadRoleIdentityValues(); // clears the identity inputs
+      synthCreateBaseline();
+      renderAlterDetail();
+      updateOpsFooter();
+    } else {
+      // Alter doubles as "find role": clear state, show the prompt, open the search popup.
+      alterSelected = null;
+      alterDetails = [];
+      resetEditMaps();
+      renderAlterDetail();
+      updateOpsFooter();
       openSearchDialog();
     }
   });
@@ -1927,24 +2004,6 @@ document.getElementById('btn-test-cluster').addEventListener('click', async () =
 
 document.getElementById('btn-run').addEventListener('click', runOperation);
 document.getElementById('btn-test-clusters').addEventListener('click', testAllClusters);
-
-// Create-role Privileges: add opens the scope dialog in create mode; row actions edit/remove.
-document.getElementById('btn-create-add-priv')?.addEventListener('click', () => {
-  if (!resolveSelectedClusters().length) {
-    showToast('Select at least one category or cluster first', 'error');
-    return;
-  }
-  openScopeDialog({ mode: 'create' });
-});
-document.getElementById('create-privs')?.addEventListener('click', (ev) => {
-  const btn = ev.target.closest('[data-act]');
-  if (!btn) return;
-  if (btn.dataset.act === 'cp-scope') openScopeDialog({ mode: 'create', key: btn.dataset.key });
-  else if (btn.dataset.act === 'cp-remove') {
-    createParents.delete(btn.dataset.key);
-    renderCreatePrivs();
-  }
-});
 document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
 
 document.getElementById('btn-toggle-clusters')?.addEventListener('click', (ev) => {
@@ -2070,10 +2129,18 @@ document.getElementById('alter-detail')?.addEventListener('click', (ev) => {
     return;
   }
   if (target.closest('#btn-alter-add')) {
+    if (isCreateMode() && !alterDetails.length) {
+      showToast('Select at least one category or cluster first', 'error');
+      return;
+    }
     openScopeDialog(null);
     return;
   }
   if (target.closest('#btn-alter-add-config')) {
+    if (isCreateMode() && !alterDetails.length) {
+      showToast('Select at least one category or cluster first', 'error');
+      return;
+    }
     openScopeDialog({ kind: 'config', isNew: true });
     return;
   }

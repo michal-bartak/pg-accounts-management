@@ -37,20 +37,13 @@
 
         <div class="ops-main">
           <div class="ops-body">
-            <form id="form-create_role" class="op-form active" novalidate autocapitalize="none">
-              <label>Login name <input name="loginName" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
-              <label>Full name <input name="fullName" autocapitalize="words" autocomplete="name" /></label>
-              <label>Email <input name="email" type="email" autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
-              <div class="alter-section" id="create-privs-section">
-                <div class="alter-privs-label">Privileges <button type="button" class="q-hint" tabindex="0" aria-label="Parent roles to grant, scoped per cluster or group. Add a privilege, then use the edit icon to choose its clusters. Select targets first." data-hint="Parent roles to grant, scoped per cluster or group. Add a privilege, then use the edit icon to choose its clusters. Select targets first.">?</button></div>
-                <div class="scope-rows" id="create-privs"></div>
-                <div class="alter-add-priv">
-                  <button type="button" class="small" id="btn-create-add-priv">Add privilege…</button>
-                </div>
+            <div id="role-form" class="op-form active">
+              <div id="role-identity" class="role-identity">
+                <label>Login name <input id="role-login" name="loginName" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
+                <label>Full name <input id="role-fullname" name="fullName" autocapitalize="words" autocomplete="name" /></label>
+                <label>Email <input id="role-email" name="email" type="email" autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
+                <p class="hint" id="role-identity-note"></p>
               </div>
-            </form>
-
-            <div id="form-alter_user" class="op-form">
               <p class="hint" id="alter-current-hint">Use the <strong>Alter role</strong> button above to find a role.</p>
               <div id="alter-detail" class="alter-detail hidden"></div>
             </div>
@@ -77,7 +70,7 @@
 
           <div class="ops-footer" id="ops-footer">
             <div class="run-bar" id="create-run-bar">
-              <button type="button" id="btn-run" class="primary">Run on selected targets</button>
+              <button type="button" id="btn-run" class="primary">Create role</button>
             </div>
             <div class="alter-actions hidden" id="alter-actions">
               <button type="button" id="btn-alter-save" class="primary">Save changes</button>

@@ -369,6 +369,11 @@ tr:last-child td { border-bottom: none; }
   font-size: var(--fs-label);
 }
 
+/* Shared identity block (login / full name / email), sits above #alter-detail. */
+.role-identity { display: grid; gap: 0.75rem; }
+.role-identity #role-identity-note:empty { display: none; }
+#role-login[readonly] { opacity: 0.7; cursor: default; }
+
 .run-bar { display: flex; gap: 0.5rem; margin: 1.25rem 0; flex-wrap: wrap; }
 
 /* Settings panel */
@@ -595,11 +600,14 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 
 .hidden { display: none !important; }
 
-/* ---------------- Alter role tab ---------------- */
-#form-alter_user.op-form.active {
+/* ---------------- Role form (shared Create/Alter) ---------------- */
+/* Full-width so the detail sections (scope rows + labels) aren't cramped; the identity
+   inputs are capped separately in .role-identity. */
+#role-form.op-form.active {
   display: block;
   max-width: none;
 }
+.role-identity { max-width: 420px; margin-bottom: 0.5rem; }
 
 .alter-search { display: flex; gap: 0.5rem; align-items: center; }
 .alter-search input[type="search"] { flex: 1; }

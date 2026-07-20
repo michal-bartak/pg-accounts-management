@@ -115,11 +115,16 @@ popup groups clusters by comment content (compared as JSON by value) and saves v
 `set_comment`. Edit state: `alterAdd`/`alterRevoke`, `alterAttrAdd`/`alterAttrRemove` are
 `Map<key, Set<clusterId>>`; `describeScope` / `scopeLabelsHtml` produce all labels.
 
-**Create role** uses the same privilege scope editor (no plain parent field): pending
-grants in `createParents: Map<role, Set<clusterId>>`; the shared scope dialog runs in
-`ctx.mode === 'create'` with universe `createUniverse()` (sidebar selection). Run emits
-one `create_role` per selected cluster carrying only that cluster's scoped parents
-(`buildCreateRequests` → `executeAlterRequests`).
+**Create and Alter share one `#role-form`** rendered by `renderAlterDetail` over
+`alterDetails` + the `alter*` edit maps. Mode = `isCreateMode()` (`currentOp`). Create =
+editing a not-yet-existing role with an empty synthetic baseline (`synthCreateBaseline()`
+from `resolveSelectedClusters()`; `reconcilePendingWithUniverse()` on selection change);
+Alter = search → `pickUser` → `reloadDetails`. Identity (login/full name/email) is a
+static `#role-identity` block (login readonly in edit). Run: create =
+`buildCreateRoleRequests` (one `create_role` per cluster, empty `parent_role`) **concat**
+`buildAlterRequests()`; identity persists via `create_role` args (create) or `set_comment`
+merged JSON (edit, `identityCommentJSON`). One shared `confirmScopeDialog`/`buildScopeTargets`
+(no create fork).
 
 ## Versioning & packaging
 
