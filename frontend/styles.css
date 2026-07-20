@@ -371,17 +371,6 @@ tr:last-child td { border-bottom: none; }
 
 .run-bar { display: flex; gap: 0.5rem; margin: 1.25rem 0; flex-wrap: wrap; }
 
-/* Cluster groups editor */
-/* Cluster groups use the Clusters table look; add/edit happens in #group-dialog. */
-.group-swatch {
-  display: inline-block;
-  width: 1.4rem;
-  height: 1.4rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  vertical-align: middle;
-}
-
 /* Settings panel */
 .settings-meta {
   margin-bottom: 1.25rem;
@@ -799,6 +788,18 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 .search-dialog-body .alter-results { margin-top: 0.75rem; max-height: 50vh; overflow-y: auto; }
 .search-dialog-body menu,
 .comments-dialog-body menu {
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* Cluster groups: right-aligned toolbar button + list popup */
+#btn-manage-groups { margin-left: auto; }
+.groups-dialog-body { padding: 1.25rem; display: block; min-width: 420px; }
+.groups-dialog-body .settings-section-head { margin-top: 0; }
+.groups-dialog-body menu {
   margin: 1rem 0 0;
   padding: 0;
   display: flex;

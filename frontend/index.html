@@ -87,6 +87,7 @@
         <button type="button" id="btn-add-cluster" class="primary">Add cluster</button>
         <button type="button" id="btn-import-env">Import from PG* env</button>
         <button type="button" id="btn-test-clusters">Test connections</button>
+        <button type="button" id="btn-manage-groups">Cluster groups</button>
       </div>
       <div class="table-wrap">
         <table id="clusters-table">
@@ -122,24 +123,6 @@
               <option value="light">Light</option>
             </select>
           </label>
-        </div>
-
-        <div class="settings-section-head">
-          <h2>Cluster groups <button type="button" class="q-hint" tabindex="0" aria-label="Colour and a &quot;require confirmation&quot; gate per group. Deleting a group in use by a cluster is blocked." data-hint="Colour and a &quot;require confirmation&quot; gate per group. Deleting a group in use by a cluster is blocked.">?</button></h2>
-          <button type="button" id="btn-add-group">Add group</button>
-        </div>
-        <div class="table-wrap">
-          <table id="groups-table">
-            <thead>
-              <tr>
-                <th>Colour</th>
-                <th>Group</th>
-                <th>Confirm</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
         </div>
 
         <div class="settings-section-head">
@@ -263,6 +246,30 @@
         <button type="button" value="cancel">Cancel</button>
       </menu>
     </form>
+  </dialog>
+
+  <dialog id="groups-dialog">
+    <div class="groups-dialog-body">
+      <div class="settings-section-head">
+        <h2>Cluster groups <button type="button" class="q-hint" tabindex="0" aria-label="A &quot;require confirmation&quot; gate and a colour per group. Deleting a group in use by a cluster is blocked." data-hint="A &quot;require confirmation&quot; gate and a colour per group. Deleting a group in use by a cluster is blocked.">?</button></h2>
+        <button type="button" id="btn-add-group" autofocus>Add group</button>
+      </div>
+      <div class="table-wrap">
+        <table id="groups-table">
+          <thead>
+            <tr>
+              <th>Group</th>
+              <th>Confirm</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <menu>
+        <button type="button" id="groups-dialog-close" class="primary">Close</button>
+      </menu>
+    </div>
   </dialog>
 
   <dialog id="group-dialog">

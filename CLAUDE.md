@@ -28,8 +28,10 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   single bound `RunOperation`. Exceptions with **no template** (hardcoded SQL in
   `pg.ExecuteOperation`): `set_config` (`ALTER ROLE … SET x = '…'`) and `reset_config`
   (`ALTER ROLE … RESET x`) for role GUCs.
-- **Categories = cluster groups**, editable in Settings (label + base `color` +
-  `confirm`); CRUD via `AddCategory/UpdateCategory/DeleteCategory` (id is a slug of the
+- **Categories = cluster groups**, edited from the **Clusters** tab (a right-aligned
+  *Cluster groups* toolbar button opens the `#groups-dialog` list popup; *Add group*
+  opens the `#group-dialog` form — label + base `color` + `confirm`); CRUD via
+  `AddCategory/UpdateCategory/DeleteCategory` (id is a slug of the
   label, immutable; delete blocked while a cluster uses it). Group colours are applied
   by a generated `<style id="cat-colors">` keyed on `data-cat`; there are no hardcoded
   production/uat colours.
@@ -114,8 +116,10 @@ op-tabs right-aligned in the same bar (shown only while Operations is active; to
 the `.tab` click handler). Alter role replaced the individual remove/grant/revoke/
 password tabs. The left sidebar is **Target selection** only (no connection or
 confirm-production controls); "Or pick clusters" is a collapse/expand toggle (collapsed
-by default; the expanded `.cluster-list` flexes to fill the sidebar). Settings hosts the
-**Cluster groups** editor (colour + confirm) plus DB templates + batch.
+by default; the expanded `.cluster-list` flexes to fill the sidebar). The Clusters
+toolbar hosts the right-aligned **Cluster groups** button (`btn-manage-groups` →
+`#groups-dialog` list popup → `#group-dialog` add/edit form; edited like clusters, no
+Save button, so it lives here rather than Settings). Settings hosts DB templates + batch.
 
 Feature descriptions are not shown inline — they live behind a **`?` help badge**
 (`.q-hint`; markup via `hintBadge(text)` in JS, or hand-written next to a static heading).
@@ -124,7 +128,7 @@ popover (`.q-hint-pop`) that is positioned in JS (centred, viewport-clamped, fli
 when it would overflow) so `overflow:hidden` panels never clip it. One delegated
 mouseover/focusin handler drives it, so JS-rendered badges (e.g. the Alter-role sections)
 work without per-element wiring. Used on Privileges/Attributes/Settings (Alter role),
-Cluster groups (Settings), and the Find-role / Comments dialogs.
+and the Cluster-groups / Find-role / Comments dialogs.
 
 **Alter role flow** (all in [frontend/app.js](frontend/app.js), styles in
 [frontend/styles.css](frontend/styles.css)):

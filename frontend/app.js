@@ -232,13 +232,12 @@ function renderGroupsTable() {
   if (!tbody) return;
   tbody.innerHTML = '';
   if (!state?.categories?.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="hint">No groups defined.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" class="hint">No groups defined.</td></tr>';
     return;
   }
   for (const c of state.categories) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><span class="group-swatch" style="background:${escapeAttr(c.color || DEFAULT_CAT_COLOR)}"></span></td>
       <td><span class="badge" data-cat="${escapeAttr(c.id)}">${escapeHtml(c.label)}</span></td>
       <td>${c.confirm ? 'Yes' : '—'}</td>
       <td>
@@ -1808,7 +1807,15 @@ document.getElementById('btn-toggle-clusters')?.addEventListener('click', (ev) =
   if (caret) caret.textContent = expanded ? '▾' : '▸';
 });
 
-// Cluster groups editor (table + popup dialog, mirrors the Clusters tab)
+// Cluster groups editor: a popup (list) reached from the Clusters toolbar, with a
+// second popup for add/edit — mirrors how clusters are managed.
+document.getElementById('btn-manage-groups')?.addEventListener('click', () => {
+  renderGroupsTable();
+  document.getElementById('groups-dialog').showModal();
+});
+document.getElementById('groups-dialog-close')?.addEventListener('click', () => {
+  document.getElementById('groups-dialog').close();
+});
 document.getElementById('btn-add-group')?.addEventListener('click', () => openGroupDialog(null));
 
 document.getElementById('group-form')?.addEventListener('submit', async (ev) => {
