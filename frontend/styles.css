@@ -466,6 +466,13 @@ tr:last-child td { border-bottom: none; }
   margin-top: 0.2rem;
 }
 
+/* Execution is a short enum — size it to content instead of the full width. */
+#db-functions-editor select[data-field="execution"] {
+  width: auto;
+  min-width: 12rem;
+  max-width: 100%;
+}
+
 #db-functions-editor input,
 #db-functions-editor textarea.call-template {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
