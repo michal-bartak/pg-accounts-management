@@ -41,8 +41,13 @@
               <label>Login name <input name="loginName" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
               <label>Full name <input name="fullName" autocapitalize="words" autocomplete="name" /></label>
               <label>Email <input name="email" type="email" autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
-              <label>Parent role <input name="parentRole" autocapitalize="none" autocomplete="off" spellcheck="false" title="Optional with ${array_concat:parent_role,...}; empty uses fixed groups only" /></label>
-              <div id="create-parent-picker" class="parent-picker"></div>
+              <div class="alter-section" id="create-privs-section">
+                <div class="alter-privs-label">Privileges <button type="button" class="q-hint" tabindex="0" aria-label="Parent roles to grant, scoped per cluster or group. Add a privilege, then use the edit icon to choose its clusters. Select targets first." data-hint="Parent roles to grant, scoped per cluster or group. Add a privilege, then use the edit icon to choose its clusters. Select targets first.">?</button></div>
+                <div class="scope-rows" id="create-privs"></div>
+                <div class="alter-add-priv">
+                  <button type="button" class="small" id="btn-create-add-priv">Add privilege…</button>
+                </div>
+              </div>
             </form>
 
             <div id="form-alter_user" class="op-form">

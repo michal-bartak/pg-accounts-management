@@ -115,6 +115,12 @@ popup groups clusters by comment content (compared as JSON by value) and saves v
 `set_comment`. Edit state: `alterAdd`/`alterRevoke`, `alterAttrAdd`/`alterAttrRemove` are
 `Map<key, Set<clusterId>>`; `describeScope` / `scopeLabelsHtml` produce all labels.
 
+**Create role** uses the same privilege scope editor (no plain parent field): pending
+grants in `createParents: Map<role, Set<clusterId>>`; the shared scope dialog runs in
+`ctx.mode === 'create'` with universe `createUniverse()` (sidebar selection). Run emits
+one `create_role` per selected cluster carrying only that cluster's scoped parents
+(`buildCreateRequests` → `executeAlterRequests`).
+
 ## Versioning & packaging
 
 - App semver: [`VERSION`](VERSION) — git tags `v$(cat VERSION)` (see [`RELEASING.md`](RELEASING.md)).

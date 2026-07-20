@@ -41,6 +41,8 @@ let alterAttrRemove = new Map();
 let alterConfigSet = new Map();
 /** @type {Map<string, Set<string>>} setting name -> clusterIds to RESET */
 let alterConfigReset = new Map();
+/** @type {Map<string, Set<string>>} Create role: parent role -> clusterIds to grant it on */
+let createParents = new Map();
 
 // Editable role attributes (pg_roles flag -> ALTER ROLE enable/disable keywords).
 const ROLE_ATTRIBUTES = [
@@ -428,7 +430,7 @@ function renderAll() {
   renderClusterCheckboxes();
   renderGroupsTable();
   renderDBFunctionsEditor();
-  renderCreateParentPicker();
+  renderCreatePrivs();
   updateTargetPreview();
 }
 
@@ -449,6 +451,8 @@ function getAuth() {
 async function updateTargetPreview() {
   const app = backend();
   const preview = document.getElementById('target-preview');
+  // Create-role privilege scope labels are relative to the selected clusters.
+  renderCreatePrivs();
   if (!app || !state) {
     preview.textContent = '';
     return;
@@ -558,66 +562,57 @@ function parseRoleList(value) {
     .filter(Boolean);
 }
 
-/** Chips under the Create-role Parent field: click to toggle a preconfigured group
- *  into/out of the (comma-separated) field. Several can be added. */
-function renderCreateParentPicker() {
-  const box = document.getElementById('create-parent-picker');
+/** Create-role privilege universe = the clusters covered by the sidebar target selection. */
+function createUniverse() {
+  return resolveSelectedClusters().map((c) => ({
+    clusterId: c.id,
+    category: c.category,
+    alias: c.alias,
+  }));
+}
+
+/** One Create-role privilege row: role name, scope labels, edit (✎) / remove (×). */
+function createPrivRowHtml(role, ids) {
+  const k = escapeAttr(role);
+  const labels = scopeLabelsHtml(describeScope(ids, createUniverse())) || '<span class="hint">no clusters</span>';
+  const edit = `<button type="button" class="chip-extend" data-act="cp-scope" data-key="${k}" title="Edit clusters">✎</button>`;
+  const x = `<button type="button" class="chip-x" data-act="cp-remove" data-key="${k}" title="Remove">×</button>`;
+  return `<div class="scope-row is-added">
+    <span class="scope-row-name">${escapeHtml(role)}</span>
+    <span class="scope-row-labels">${labels}</span>
+    <span class="scope-row-actions">${edit}${x}</span>
+  </div>`;
+}
+
+/** Render the Create-role Privileges section from `createParents`. */
+function renderCreatePrivs() {
+  const box = document.getElementById('create-privs');
   if (!box) return;
-  const roles = preconfiguredParentRoles();
-  if (!roles.length) {
-    box.innerHTML = '';
-    return;
-  }
-  const input = document.querySelector('#form-create_role input[name="parentRole"]');
-  const chosen = new Set(parseRoleList(input?.value));
-  box.innerHTML =
-    '<span class="picker-label">Add preconfigured:</span>' +
-    roles
-      .map(
-        (r) =>
-          `<button type="button" class="pick-chip${chosen.has(r) ? ' active' : ''}" data-role="${escapeAttr(r)}">${escapeHtml(r)}</button>`
-      )
-      .join('');
+  const roles = [...createParents.keys()].sort();
+  box.innerHTML = roles.length
+    ? roles.map((r) => createPrivRowHtml(r, createParents.get(r) || new Set())).join('')
+    : '<p class="hint">No privileges — the role is created with the template’s base groups only.</p>';
 }
 
-/** Toggle a preconfigured group in the Create-role Parent field. */
-function toggleCreateParent(role) {
-  const input = document.querySelector('#form-create_role input[name="parentRole"]');
-  if (!input) return;
-  const list = parseRoleList(input.value);
-  const idx = list.indexOf(role);
-  if (idx === -1) list.push(role);
-  else list.splice(idx, 1);
-  input.value = list.join(', ');
-  renderCreateParentPicker();
-}
-
-function buildRunRequest() {
-  const req = {
-    operation: currentOp,
-    categoryIds: getSelectedCategories(),
-    clusterIds: getSelectedClusterIDs(),
-    auth: getAuth(),
-    confirmProduction: true, // human gate is the production confirm dialog
-  };
-
-  const form = document.getElementById(`form-${currentOp}`);
-  const fd = new FormData(form);
-
-  if (currentOp === 'create_role') {
-    req.createRole = {
-      loginName: fd.get('loginName')?.toString().trim() || '',
-      fullName: fd.get('fullName')?.toString().trim() || '',
-      email: fd.get('email')?.toString().trim() || '',
-      parentRole: fd.get('parentRole')?.toString().trim() || '',
+/** Build one create_role request per selected cluster, each with the parents scoped to it. */
+function buildCreateRequests(base) {
+  return resolveSelectedClusters().map((c) => {
+    const parents = [...createParents.entries()]
+      .filter(([, ids]) => ids.has(c.id))
+      .map(([role]) => role);
+    return {
+      op: 'create_role',
+      clusterId: c.id,
+      params: {
+        createRole: {
+          loginName: base.loginName,
+          fullName: base.fullName,
+          email: base.email,
+          parentRole: parents.join(', '),
+        },
+      },
     };
-  }
-  return req;
-}
-
-function hasProductionTargets() {
-  // "Production" = any selected target in a group flagged require-confirmation.
-  return resolveSelectedClusters().some((c) => categoryConfirm(c.category));
+  });
 }
 
 async function runOperation() {
@@ -632,44 +627,21 @@ async function runOperation() {
   if (!validateActiveOpForm()) {
     return;
   }
-  if (getSelectedCategories().length === 0 && getSelectedClusterIDs().length === 0) {
+  const clusters = resolveSelectedClusters();
+  if (!clusters.length) {
     showToast('Select at least one category or cluster', 'error');
     return;
   }
 
-  if (currentOp === 'remove_role') {
-    const ok = await askConfirm(
-      'Remove role',
-      'Remove this login on all selected clusters? This cannot be undone from the app.'
-    );
-    if (!ok) {
-      return;
-    }
-  }
-  if (hasProductionTargets()) {
-    const ok = await askConfirm(
-      'Production',
-      'This run includes PRODUCTION clusters. Continue?'
-    );
-    if (!ok) {
-      return;
-    }
-  }
+  const fd = new FormData(document.getElementById('form-create_role'));
+  const base = {
+    loginName: fd.get('loginName')?.toString().trim() || '',
+    fullName: fd.get('fullName')?.toString().trim() || '',
+    email: fd.get('email')?.toString().trim() || '',
+  };
 
-  const req = buildRunRequest();
-
-  try {
-    const results = await app.RunOperation(req);
-    renderResults(results);
-    const failed = results.filter((r) => r.status !== 'ok').length;
-    if (failed) {
-      showToast(`Completed with ${failed} error(s)`, 'error');
-    } else {
-      showToast('All clusters succeeded', 'success');
-    }
-  } catch (e) {
-    showToast(String(e), 'error');
-  }
+  // One create_role per selected cluster, each carrying the parents scoped to it.
+  await executeAlterRequests(buildCreateRequests(base), 'Role created');
 }
 
 /** Update the inline Status cell for a cluster row on the Clusters page. */
@@ -1354,7 +1326,16 @@ function openScopeDialog(ctx) {
   cvalueLabel.classList.add('hidden');
   document.getElementById('scope-preconfigured')?.classList.add('hidden');
 
-  if (!ctx) {
+  if (ctx && ctx.mode === 'create' && !ctx.key) {
+    title.textContent = 'Add privilege';
+    roleLabel.classList.remove('hidden');
+    roleInput.value = '';
+    renderScopePreconfigured();
+    ok.textContent = 'Add';
+  } else if (ctx && ctx.mode === 'create') {
+    title.textContent = `Edit "${ctx.key}" clusters`;
+    ok.textContent = 'Apply';
+  } else if (!ctx) {
     title.textContent = 'Add privilege';
     roleLabel.classList.remove('hidden');
     roleInput.value = '';
@@ -1381,7 +1362,7 @@ function openScopeDialog(ctx) {
   }
   buildScopeTargets(ctx);
   dlg.showModal();
-  if (!ctx) roleInput.focus();
+  if (!ctx || (ctx.mode === 'create' && !ctx.key)) roleInput.focus();
   else if (ctx.kind === 'config' && ctx.isNew) document.getElementById('scope-cname').focus();
 }
 
@@ -1409,6 +1390,9 @@ function renderScopePreconfigured() {
 /** Desired-state set currently reflected for a ctx: (current − pendingRevoke) ∪ pendingAdd. */
 function scopeDesired(ctx) {
   if (!ctx) return new Set();
+  if (ctx.mode === 'create') {
+    return new Set(ctx.key ? createParents.get(ctx.key) || [] : []);
+  }
   if (ctx.kind === 'config') {
     if (ctx.isNew) return new Set();
     const { name, value } = cfgParse(ctx.key);
@@ -1431,8 +1415,9 @@ function buildScopeTargets(ctx) {
   const box = document.getElementById('scope-targets');
   const desired = scopeDesired(ctx);
 
+  const universe = ctx && ctx.mode === 'create' ? createUniverse() : alterDetails;
   const byCat = new Map();
-  for (const d of alterDetails) {
+  for (const d of universe) {
     if (!byCat.has(d.category)) byCat.set(d.category, []);
     byCat.get(d.category).push(d);
   }
@@ -1462,6 +1447,39 @@ function confirmScopeDialog() {
 
   if (ctx && ctx.kind === 'config') {
     confirmConfigScope(ctx, desired);
+    return;
+  }
+
+  // Create-role privileges: write to createParents (no current state to diff against).
+  if (ctx && ctx.mode === 'create') {
+    if (ctx.key) {
+      if (desired.size) createParents.set(ctx.key, desired);
+      else createParents.delete(ctx.key);
+    } else {
+      const roles = [];
+      const typed = document.getElementById('scope-role').value.trim();
+      if (typed) {
+        if (!ROLE_NAME_RE.test(typed)) {
+          showToast('Invalid role name: use letters, digits, underscore', 'error');
+          return;
+        }
+        roles.push(typed);
+      }
+      for (const chip of document.querySelectorAll('#scope-preconfigured .pick-chip.active')) {
+        if (!roles.includes(chip.dataset.role)) roles.push(chip.dataset.role);
+      }
+      if (!roles.length) {
+        showToast('Enter a role name or pick at least one preconfigured group', 'error');
+        return;
+      }
+      for (const r of roles) {
+        const merged = new Set(createParents.get(r) || []);
+        for (const id of desired) merged.add(id);
+        createParents.set(r, merged);
+      }
+    }
+    document.getElementById('scope-dialog').close();
+    renderCreatePrivs();
     return;
   }
 
@@ -1910,13 +1928,23 @@ document.getElementById('btn-test-cluster').addEventListener('click', async () =
 document.getElementById('btn-run').addEventListener('click', runOperation);
 document.getElementById('btn-test-clusters').addEventListener('click', testAllClusters);
 
-document.getElementById('create-parent-picker')?.addEventListener('click', (ev) => {
-  const chip = ev.target.closest('.pick-chip');
-  if (chip) toggleCreateParent(chip.dataset.role);
+// Create-role Privileges: add opens the scope dialog in create mode; row actions edit/remove.
+document.getElementById('btn-create-add-priv')?.addEventListener('click', () => {
+  if (!resolveSelectedClusters().length) {
+    showToast('Select at least one category or cluster first', 'error');
+    return;
+  }
+  openScopeDialog({ mode: 'create' });
 });
-document
-  .querySelector('#form-create_role input[name="parentRole"]')
-  ?.addEventListener('input', renderCreateParentPicker);
+document.getElementById('create-privs')?.addEventListener('click', (ev) => {
+  const btn = ev.target.closest('[data-act]');
+  if (!btn) return;
+  if (btn.dataset.act === 'cp-scope') openScopeDialog({ mode: 'create', key: btn.dataset.key });
+  else if (btn.dataset.act === 'cp-remove') {
+    createParents.delete(btn.dataset.key);
+    renderCreatePrivs();
+  }
+});
 document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
 
 document.getElementById('btn-toggle-clusters')?.addEventListener('click', (ev) => {
