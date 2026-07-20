@@ -369,9 +369,22 @@ tr:last-child td { border-bottom: none; }
   font-size: var(--fs-label);
 }
 
-/* Shared identity block (login / full name / email), sits above #alter-detail. */
-.role-identity { display: grid; gap: 0.75rem; }
-.role-identity #role-identity-note:empty { display: none; }
+/* Shared identity block (login / full name / email), sits above #alter-detail.
+   Login on its own row (half width); full name + email share the next row. */
+.role-identity {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    "login ."
+    "full  email"
+    "note  note";
+  gap: 0.75rem;
+}
+.ri-login { grid-area: login; }
+.ri-full { grid-area: full; }
+.ri-email { grid-area: email; }
+.ri-note { grid-area: note; }
+.role-identity .ri-note:empty { display: none; }
 #role-login[readonly] { opacity: 0.7; cursor: default; }
 
 .run-bar { display: flex; gap: 0.5rem; margin: 1.25rem 0; flex-wrap: wrap; }
