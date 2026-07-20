@@ -1176,22 +1176,30 @@ function loadRoleIdentityValues() {
 function renderAlterDetail(errors = []) {
   const root = document.getElementById('alter-detail');
   const identity = document.getElementById('role-identity');
+  const present = document.getElementById('role-present');
   const hint = document.getElementById('alter-current-hint');
   const login = document.getElementById('role-login');
   const create = isCreateMode();
 
-  // Identity block + empty-state hint visibility (values set on load, not here).
+  // Identity block + "Present on" (edit only, above the form) + empty-state hint.
   if (create) {
     identity.classList.remove('hidden');
     hint.classList.add('hidden');
     if (login) login.readOnly = false;
+    present.classList.add('hidden');
+    present.innerHTML = '';
   } else if (alterSelected && alterDetails.length) {
     identity.classList.remove('hidden');
     hint.classList.add('hidden');
     if (login) login.readOnly = true;
+    const presentLabels = scopeLabelsHtml(describeScope(new Set(alterDetails.map((d) => d.clusterId))));
+    present.innerHTML = `<span class="alter-meta-label">Present on</span><span class="alter-cluster-badges">${presentLabels}</span>`;
+    present.classList.remove('hidden');
   } else {
     identity.classList.add('hidden');
     hint.classList.remove('hidden');
+    present.classList.add('hidden');
+    present.innerHTML = '';
   }
 
   if (!create && !alterSelected) {
@@ -1210,10 +1218,9 @@ function renderAlterDetail(errors = []) {
   }
 
   const id = identityConsensus();
-  const presentLabels = scopeLabelsHtml(describeScope(new Set(alterDetails.map((d) => d.clusterId))));
 
-  // Edit-only header: login heading, present-on, and raw-comment info + Comments dialog.
-  // (Full name / email live in the editable #role-identity block above, both modes.)
+  // Edit-only: raw-comment info + the Comments dialog button. (Present-on renders above the
+  // form in #role-present; full name / email live in the editable #role-identity block.)
   let editHead = '';
   if (!create) {
     let commentRow;
@@ -1226,14 +1233,7 @@ function renderAlterDetail(errors = []) {
     }
     const commentsBtn = `<button type="button" class="small" id="btn-alter-comments">${id.commentVaries ? 'Comments differ — view / edit' : 'View / edit comments'}</button>`;
     editHead = `
-    <div class="alter-detail-head">
-      <h3>Editing <strong>${escapeHtml(alterSelected)}</strong></h3>
-    </div>
     ${renderDetailErrors(errors)}
-    <div class="alter-present">
-      <span class="alter-meta-label">Present on</span>
-      <span class="alter-cluster-badges">${presentLabels}</span>
-    </div>
     <div class="alter-identity">
       ${commentRow}
       <div class="alter-identity-actions">${commentsBtn}</div>
