@@ -35,14 +35,14 @@ Cross-platform **PostgreSQL role maintenance** desktop app: manage clusters, bat
 
 Example template: [`config.example.yaml`](config.example.yaml). Implemented in `internal/config/` (`paths.go`, `store.go`).
 
-**YAML keys:** `version`, `categories`, `clusters`, `db_functions.<op>.call`, `db_functions.<op>.execution`, `batch.max_concurrency` (default 5). Legacy `name`/`params` migrated on load.
+**YAML keys:** `version`, `categories`, `clusters`, `db_functions.<op>.call`, `db_functions.<op>.execution`, `batch.max_concurrency` (default 5), `ui.theme`, `parent_roles` (preconfigured parent groups — bare identifiers, offered as pick-list choices when granting privileges; Create-role `parent_role` accepts a comma-separated list). Legacy `name`/`params` migrated on load.
 
 ## Wails API (`app.go` → `window.go.main.App`)
 
 - `GetConfig`, `GetConfigPath`, `ReloadConfig`, `GetAppVersion`
 - `AddCluster`, `UpdateCluster`, `DeleteCluster`
 - `ImportFromEnvironment` — reads `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`
-- `SaveDBFunctions`, `SaveBatchSettings`, `SaveUISettings`
+- `SaveDBFunctions`, `SaveBatchSettings`, `SaveUISettings`, `SaveParentRoles`
 - `TestConnection`, `PreviewTargets`, `RunOperation`
 - **Introspection (reads, for Alter role):** `SearchRoles`, `LoadRoleDetails` — scan the
   **selected** clusters concurrently (`internal/pg/introspect.go` + `batch.Runner`),

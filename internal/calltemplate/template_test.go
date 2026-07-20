@@ -37,6 +37,26 @@ func TestBuildQueryFromTemplate_arrayOrNullWithParent(t *testing.T) {
 	}
 }
 
+func TestBuildQueryFromTemplate_arrayOrNullMultipleParents(t *testing.T) {
+	call := "fn(ARRAY['gr_a'] || ${parent_role})"
+	q, vals, err := BuildQueryFromTemplate(call, map[string]string{"parent_role": "gr_x, gr_y ,gr_z"}, "create_role")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(q, "::text[]") {
+		t.Fatalf("query: %s", q)
+	}
+	var got []string
+	for _, v := range vals {
+		if arr, ok := v.([]string); ok {
+			got = arr
+		}
+	}
+	if len(got) != 3 || got[0] != "gr_x" || got[1] != "gr_y" || got[2] != "gr_z" {
+		t.Fatalf("expected three trimmed parents, got %v", got)
+	}
+}
+
 func TestBuildQueryFromTemplate_arrayOrNullEmptyParent(t *testing.T) {
 	call := "fn(ARRAY['gr_a', 'gr_b'] || ${parent_role})"
 	q, vals, err := BuildQueryFromTemplate(call, map[string]string{"parent_role": ""}, "create_role")

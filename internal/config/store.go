@@ -4,12 +4,17 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/michalbartak/dbaccounts/internal/model"
 	"gopkg.in/yaml.v3"
 )
+
+// parentRoleRE bounds a preconfigured parent group to a bare SQL identifier, matching
+// what the grant path accepts (unquoted role names).
+var parentRoleRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 var ErrNotFound = errors.New("config not found")
 
@@ -110,6 +115,7 @@ func (s *Store) Load() error {
 		cfg.Batch.MaxConcurrency = 5
 	}
 	cfg.UI.Theme = model.NormalizeTheme(cfg.UI.Theme)
+	cfg.ParentRoles = sanitizeParentRoles(cfg.ParentRoles)
 	migrateDBFunctions(&cfg.DBFunctions)
 	s.cfg = cfg
 	return nil
@@ -149,6 +155,15 @@ func (s *Store) UpdateBatch(batch model.BatchSettings) error {
 
 func (s *Store) UpdateUI(ui model.UISettings) error {
 	s.cfg.UI = model.UISettings{Theme: model.NormalizeTheme(ui.Theme)}
+	return s.Save()
+}
+
+func (s *Store) UpdateParentRoles(roles []string) error {
+	cleaned, err := validateParentRoles(roles)
+	if err != nil {
+		return err
+	}
+	s.cfg.ParentRoles = cleaned
 	return s.Save()
 }
 
@@ -316,6 +331,44 @@ func slugify(label string) string {
 		}
 	}
 	return strings.Trim(b.String(), "_")
+}
+
+// validateParentRoles trims, drops empties, dedupes (order-preserving) and rejects any
+// entry that is not a bare identifier.
+func validateParentRoles(roles []string) ([]string, error) {
+	seen := make(map[string]bool, len(roles))
+	var out []string
+	for _, r := range roles {
+		r = strings.TrimSpace(r)
+		if r == "" {
+			continue
+		}
+		if !parentRoleRE.MatchString(r) {
+			return nil, fmt.Errorf("invalid parent group %q: use letters, digits, underscore", r)
+		}
+		if seen[r] {
+			continue
+		}
+		seen[r] = true
+		out = append(out, r)
+	}
+	return out, nil
+}
+
+// sanitizeParentRoles trims/drops empties/dedupes without failing (used on load, to
+// tolerate hand-edited config).
+func sanitizeParentRoles(roles []string) []string {
+	seen := make(map[string]bool, len(roles))
+	var out []string
+	for _, r := range roles {
+		r = strings.TrimSpace(r)
+		if r == "" || seen[r] {
+			continue
+		}
+		seen[r] = true
+		out = append(out, r)
+	}
+	return out
 }
 
 // normalizeColor keeps a #rrggbb hex or returns "" (frontend falls back to a default).

@@ -185,6 +185,8 @@ async function loadConfig() {
     document.getElementById('config-path').textContent = await app.GetConfigPath();
     setThemeButtons(state?.ui?.theme || 'system');
     applyTheme(state?.ui?.theme || 'system');
+    const parentRolesEl = document.getElementById('parent-roles');
+    if (parentRolesEl) parentRolesEl.value = (state?.parentRoles || []).join(', ');
     renderAll();
   } catch (e) {
     showToast(String(e), 'error');
@@ -426,6 +428,7 @@ function renderAll() {
   renderClusterCheckboxes();
   renderGroupsTable();
   renderDBFunctionsEditor();
+  renderCreateParentPicker();
   updateTargetPreview();
 }
 
@@ -540,6 +543,53 @@ async function onClusterAction(ev) {
       showToast(String(e), 'error');
     }
   }
+}
+
+/** Preconfigured parent groups defined in Settings. */
+function preconfiguredParentRoles() {
+  return state?.parentRoles || [];
+}
+
+/** Split a comma-separated parent-role field into trimmed, non-empty names. */
+function parseRoleList(value) {
+  return String(value || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** Chips under the Create-role Parent field: click to toggle a preconfigured group
+ *  into/out of the (comma-separated) field. Several can be added. */
+function renderCreateParentPicker() {
+  const box = document.getElementById('create-parent-picker');
+  if (!box) return;
+  const roles = preconfiguredParentRoles();
+  if (!roles.length) {
+    box.innerHTML = '';
+    return;
+  }
+  const input = document.querySelector('#form-create_role input[name="parentRole"]');
+  const chosen = new Set(parseRoleList(input?.value));
+  box.innerHTML =
+    '<span class="picker-label">Add preconfigured:</span>' +
+    roles
+      .map(
+        (r) =>
+          `<button type="button" class="pick-chip${chosen.has(r) ? ' active' : ''}" data-role="${escapeAttr(r)}">${escapeHtml(r)}</button>`
+      )
+      .join('');
+}
+
+/** Toggle a preconfigured group in the Create-role Parent field. */
+function toggleCreateParent(role) {
+  const input = document.querySelector('#form-create_role input[name="parentRole"]');
+  if (!input) return;
+  const list = parseRoleList(input.value);
+  const idx = list.indexOf(role);
+  if (idx === -1) list.push(role);
+  else list.splice(idx, 1);
+  input.value = list.join(', ');
+  renderCreateParentPicker();
 }
 
 function buildRunRequest() {
@@ -709,6 +759,7 @@ async function saveSettings() {
     await app.SaveUISettings({
       theme: currentThemePref(),
     });
+    await app.SaveParentRoles(parseRoleList(document.getElementById('parent-roles')?.value));
     await loadConfig();
     showToast('Settings saved', 'success');
   } catch (e) {
@@ -1301,11 +1352,13 @@ function openScopeDialog(ctx) {
   roleLabel.classList.add('hidden');
   cnameLabel.classList.add('hidden');
   cvalueLabel.classList.add('hidden');
+  document.getElementById('scope-preconfigured')?.classList.add('hidden');
 
   if (!ctx) {
     title.textContent = 'Add privilege';
     roleLabel.classList.remove('hidden');
     roleInput.value = '';
+    renderScopePreconfigured();
     ok.textContent = 'Add';
   } else if (ctx.kind === 'config' && ctx.isNew) {
     title.textContent = 'Add setting';
@@ -1330,6 +1383,28 @@ function openScopeDialog(ctx) {
   dlg.showModal();
   if (!ctx) roleInput.focus();
   else if (ctx.kind === 'config' && ctx.isNew) document.getElementById('scope-cname').focus();
+}
+
+/** Preconfigured-group checkboxes shown when adding a new privilege. */
+function renderScopePreconfigured() {
+  const box = document.getElementById('scope-preconfigured');
+  if (!box) return;
+  const roles = preconfiguredParentRoles();
+  if (!roles.length) {
+    box.innerHTML = '';
+    box.classList.add('hidden');
+    return;
+  }
+  box.innerHTML =
+    '<span class="picker-label">Preconfigured groups</span><div class="pp-list">' +
+    roles
+      .map(
+        (r) =>
+          `<label class="pp-item"><input type="checkbox" class="pp-check" data-role="${escapeAttr(r)}" /> ${escapeHtml(r)}</label>`
+      )
+      .join('') +
+    '</div>';
+  box.classList.remove('hidden');
 }
 
 /** Desired-state set currently reflected for a ctx: (current − pendingRevoke) ∪ pendingAdd. */
@@ -1391,12 +1466,41 @@ function confirmScopeDialog() {
     return;
   }
 
-  const key = ctx ? ctx.key : document.getElementById('scope-role').value.trim();
-  if (!ctx && !ROLE_NAME_RE.test(key)) {
-    showToast('Invalid role name: use letters, digits, underscore', 'error');
+  // New privilege: one or more roles at once (typed name + any picked preconfigured groups).
+  if (!ctx) {
+    const roles = [];
+    const typed = document.getElementById('scope-role').value.trim();
+    if (typed) {
+      if (!ROLE_NAME_RE.test(typed)) {
+        showToast('Invalid role name: use letters, digits, underscore', 'error');
+        return;
+      }
+      roles.push(typed);
+    }
+    for (const cb of document.querySelectorAll('#scope-preconfigured .pp-check:checked')) {
+      if (!roles.includes(cb.dataset.role)) roles.push(cb.dataset.role);
+    }
+    if (!roles.length) {
+      showToast('Enter a role name or pick at least one preconfigured group', 'error');
+      return;
+    }
+    for (const key of roles) {
+      const cur = clusterIdsWith(key);
+      const grant = setMinus(desired, cur);
+      const revoke = setMinus(cur, desired);
+      if (grant.size) alterAdd.set(key, grant);
+      else alterAdd.delete(key);
+      if (revoke.size) alterRevoke.set(key, revoke);
+      else alterRevoke.delete(key);
+    }
+    document.getElementById('scope-dialog').close();
+    renderAlterDetail();
     return;
   }
-  const isAttr = !!ctx && ctx.kind === 'attr';
+
+  // Edit an existing privilege/attribute (single key).
+  const key = ctx.key;
+  const isAttr = ctx.kind === 'attr';
   const addMap = isAttr ? alterAttrAdd : alterAdd;
   const revMap = isAttr ? alterAttrRemove : alterRevoke;
   const cur = isAttr ? clusterIdsWithAttr(key) : clusterIdsWith(key);
@@ -1806,6 +1910,14 @@ document.getElementById('btn-test-cluster').addEventListener('click', async () =
 
 document.getElementById('btn-run').addEventListener('click', runOperation);
 document.getElementById('btn-test-clusters').addEventListener('click', testAllClusters);
+
+document.getElementById('create-parent-picker')?.addEventListener('click', (ev) => {
+  const chip = ev.target.closest('.pick-chip');
+  if (chip) toggleCreateParent(chip.dataset.role);
+});
+document
+  .querySelector('#form-create_role input[name="parentRole"]')
+  ?.addEventListener('input', renderCreateParentPicker);
 document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
 
 document.getElementById('btn-toggle-clusters')?.addEventListener('click', (ev) => {

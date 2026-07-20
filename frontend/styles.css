@@ -842,6 +842,24 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 .scope-cluster .hint { margin: 0; }
 #scope-form menu { margin: 0.5rem 0 0; padding: 0; display: flex; justify-content: flex-end; gap: 0.5rem; }
 
+/* Preconfigured parent groups: Settings input + pickers (Create-role chips / scope checkboxes) */
+.parent-roles-input { width: min(32rem, 100%); }
+.parent-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-top: 0.5rem; }
+.parent-picker:empty { display: none; }
+.picker-label { font-size: var(--fs-xs); color: var(--muted); }
+.pick-chip {
+  min-height: 0;
+  padding: 0.2rem 0.6rem;
+  font-size: var(--fs-sm);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+}
+.pick-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.scope-preconfigured .picker-label { display: block; margin-bottom: 0.3rem; }
+.scope-preconfigured .pp-list { display: grid; gap: 0.2rem; max-height: 24vh; overflow-y: auto; }
+.pp-item { display: flex; align-items: center; gap: 0.4rem; font-size: var(--fs-label); }
+
 /* Comments dialog */
 #comments-list { display: grid; gap: 0.9rem; max-height: 55vh; overflow-y: auto; }
 .comment-version { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem 0.75rem; }

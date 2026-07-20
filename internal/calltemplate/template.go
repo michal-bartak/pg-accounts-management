@@ -170,14 +170,27 @@ func preprocessArrayOrNull(call string, args map[string]string, operation string
 			err = fmt.Errorf("missing value for ${%s}", field)
 			return match
 		}
-		if strings.TrimSpace(v) == "" {
+		parts := splitList(v)
+		if len(parts) == 0 {
 			return fixed + " || NULL"
 		}
 		*n++
-		*values = append(*values, []string{strings.TrimSpace(v)})
+		*values = append(*values, parts)
 		return fmt.Sprintf("%s || $%d::text[]", fixed, *n)
 	})
 	return call, err
+}
+
+// splitList splits a comma-separated value into trimmed, non-empty items — lets a single
+// parent_role placeholder carry several preconfigured parent groups at once.
+func splitList(v string) []string {
+	var out []string
+	for _, part := range strings.Split(v, ",") {
+		if p := strings.TrimSpace(part); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func buildArrayConcatValue(fieldValue string, literals []string) []string {

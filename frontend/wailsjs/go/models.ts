@@ -275,6 +275,7 @@ export namespace model {
 	    dbFunctions: DBFunctions;
 	    batch: BatchSettings;
 	    ui: UISettings;
+	    parentRoles: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -288,6 +289,7 @@ export namespace model {
 	        this.dbFunctions = this.convertValues(source["dbFunctions"], DBFunctions);
 	        this.batch = this.convertValues(source["batch"], BatchSettings);
 	        this.ui = this.convertValues(source["ui"], UISettings);
+	        this.parentRoles = source["parentRoles"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

@@ -60,3 +60,10 @@ batch:
 # ui.theme: light | dark | system (follow OS appearance)
 ui:
   theme: system
+
+# parent_roles: preconfigured parent groups offered as pick-list choices when granting
+# privileges (Create role / Alter role). Bare identifiers; several can be granted at once.
+parent_roles:
+  - gr_devs_ro
+  - gr_reporting
+  - gr_admins

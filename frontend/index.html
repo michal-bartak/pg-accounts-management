@@ -42,6 +42,7 @@
               <label>Full name <input name="fullName" autocapitalize="words" autocomplete="name" /></label>
               <label>Email <input name="email" type="email" autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
               <label>Parent role <input name="parentRole" autocapitalize="none" autocomplete="off" spellcheck="false" title="Optional with ${array_concat:parent_role,...}; empty uses fixed groups only" /></label>
+              <div id="create-parent-picker" class="parent-picker"></div>
             </form>
 
             <div id="form-alter_user" class="op-form">
@@ -126,6 +127,13 @@
           </div>
         </div>
 
+        <div class="settings-row">
+          <div class="settings-field">
+            <span class="settings-field-label">Preconfigured parent groups <button type="button" class="q-hint" tabindex="0" aria-label="Comma-separated role names, offered as pick-list choices when granting privileges in Create role and Alter role." data-hint="Comma-separated role names, offered as pick-list choices when granting privileges in Create role and Alter role.">?</button></span>
+            <input id="parent-roles" type="text" class="parent-roles-input" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="e.g. gr_devs_ro, gr_reporting, gr_admins" />
+          </div>
+        </div>
+
         <div class="settings-section-head">
           <h2>DB command templates</h2>
           <button type="button" id="btn-template-help">Template syntax help</button>
@@ -186,6 +194,7 @@
       <label id="scope-role-label">Role name
         <input name="role" id="scope-role" autocapitalize="none" autocomplete="off" spellcheck="false" />
       </label>
+      <div id="scope-preconfigured" class="scope-preconfigured hidden"></div>
       <label id="scope-cname-label" class="hidden">Setting name
         <input name="cname" id="scope-cname" placeholder="e.g. log_statement" autocapitalize="none" autocomplete="off" spellcheck="false" />
       </label>

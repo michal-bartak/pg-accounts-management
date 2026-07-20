@@ -30,6 +30,8 @@ export function SaveBatchSettings(arg1:model.BatchSettings):Promise<void>;
 
 export function SaveDBFunctions(arg1:model.DBFunctions):Promise<void>;
 
+export function SaveParentRoles(arg1:Array<string>):Promise<void>;
+
 export function SaveUISettings(arg1:model.UISettings):Promise<void>;
 
 export function SearchRoles(arg1:model.RoleSearchRequest):Promise<Array<model.RoleMatch>>;
