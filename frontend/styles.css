@@ -3,6 +3,10 @@
   --bg: #181a20;
   --surface: #22252e;
   --border: #343844;
+  /* Text-field fill/border — offset from both page and popup surfaces so inputs read
+     consistently on either (unlike --bg, which matches the page). */
+  --field: #2f333c;
+  --field-border: #464c5d;
   --text: #e8eaef;
   --muted: #9aa3b5;
   --primary: #4f8cff;
@@ -31,6 +35,8 @@
   --bg: #f0f2f6;
   --surface: #ffffff;
   --border: #d4d9e3;
+  --field: #f9fafa;
+  --field-border: #cbd2de;
   --text: #1a1d24;
   --muted: #5c6578;
   --primary: #3a73e8;
@@ -63,9 +69,9 @@ select,
 textarea {
   min-height: var(--control-h);
   padding: var(--control-pad-y) var(--control-pad-x);
-  border: 1px solid var(--border);
+  border: 1px solid var(--field-border);
   border-radius: var(--radius);
-  background: var(--bg);
+  background: var(--field);
   color: var(--text);
 }
 textarea { min-height: 5rem; line-height: 1.4; }
