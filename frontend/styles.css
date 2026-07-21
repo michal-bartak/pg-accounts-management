@@ -1,5 +1,6 @@
 :root,
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg: #181a20;
   --surface: #22252e;
   --border: #343844;
@@ -32,6 +33,7 @@
 }
 
 [data-theme="light"] {
+  color-scheme: light;
   --bg: #f0f2f6;
   --surface: #ffffff;
   --border: #d4d9e3;
@@ -73,6 +75,18 @@ textarea {
   border-radius: var(--radius);
   background: var(--field);
   color: var(--text);
+}
+
+/* Checkboxes/radios: one size everywhere, themed accent (color-scheme handles the
+   unchecked background per light/dark). */
+input[type="checkbox"],
+input[type="radio"] {
+  width: 1.15rem;
+  height: 1.15rem;
+  min-width: 1.15rem;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
 }
 textarea { min-height: 5rem; line-height: 1.4; }
 
@@ -305,15 +319,7 @@ tr:last-child td { border-bottom: none; }
 
 /* Checked-state group tint is generated per group into #cat-colors. */
 
-.checkbox-group input[type="checkbox"] {
-  width: 1.25rem;
-  height: 1.25rem;
-  min-width: 1.25rem;
-  margin: 0;
-  flex-shrink: 0;
-  accent-color: var(--primary);
-  cursor: pointer;
-}
+.checkbox-group input[type="checkbox"] { flex-shrink: 0; }
 
 .checkbox-group .target-cluster-text {
   flex: 1;
@@ -342,14 +348,6 @@ tr:last-child td { border-bottom: none; }
   gap: 0.55rem;
   padding: 0.5rem 0;
   font-size: var(--fs-base);
-  cursor: pointer;
-}
-
-.ops-sidebar label.inline input[type="checkbox"] {
-  width: 1.15rem;
-  height: 1.15rem;
-  margin: 0;
-  accent-color: var(--primary);
   cursor: pointer;
 }
 
