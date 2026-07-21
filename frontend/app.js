@@ -1413,6 +1413,7 @@ function openScopeDialog(ctx) {
   roleLabel.classList.add('hidden');
   cnameLabel.classList.add('hidden');
   cvalueLabel.classList.add('hidden');
+  document.getElementById('scope-cname').readOnly = false;
   document.getElementById('scope-preconfigured')?.classList.add('hidden');
 
   if (!ctx) {
@@ -1429,8 +1430,15 @@ function openScopeDialog(ctx) {
     document.getElementById('scope-cvalue').value = '';
     ok.textContent = 'Add';
   } else if (ctx.kind === 'config') {
-    const { name } = cfgParse(ctx.key);
-    title.textContent = `Set "${name}" on clusters`;
+    // Edit an existing setting: value editable, name fixed (read-only).
+    const { name, value } = cfgParse(ctx.key);
+    title.textContent = `Edit "${name}"`;
+    cnameLabel.classList.remove('hidden');
+    cvalueLabel.classList.remove('hidden');
+    const cname = document.getElementById('scope-cname');
+    cname.value = name;
+    cname.readOnly = true;
+    document.getElementById('scope-cvalue').value = value;
     ok.textContent = 'Apply';
   } else if (ctx.kind === 'attr') {
     const a = ROLE_ATTRIBUTES.find((x) => x.key === ctx.key);
@@ -1444,6 +1452,7 @@ function openScopeDialog(ctx) {
   dlg.showModal();
   if (!ctx) roleInput.focus();
   else if (ctx.kind === 'config' && ctx.isNew) document.getElementById('scope-cname').focus();
+  else if (ctx.kind === 'config') document.getElementById('scope-cvalue').focus();
 }
 
 /** Preconfigured-group checkboxes shown when adding a new privilege. */
@@ -1580,19 +1589,25 @@ function confirmScopeDialog() {
 /** Apply the scope dialog for a role SETTING (name=value): SET on desired clusters,
  *  RESET on clusters that had this value but are no longer desired. */
 function confirmConfigScope(ctx, desired) {
-  let name, value;
+  let name;
+  let origValue = null; // the value of the row being edited (its baseline clusters)
   if (ctx.isNew) {
     name = document.getElementById('scope-cname').value.trim();
-    value = document.getElementById('scope-cvalue').value;
     if (!/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/.test(name)) {
       showToast('Invalid setting name (letters, digits, underscore, optional dot)', 'error');
       return;
     }
   } else {
-    ({ name, value } = cfgParse(ctx.key));
+    ({ name, value: origValue } = cfgParse(ctx.key));
   }
+  // The value comes from the (editable) input in both add and edit modes; the name is
+  // fixed when editing.
+  const value = document.getElementById('scope-cvalue').value;
   const key = cfgKey(name, value);
-  const cur = clusterIdsWithConfig(name, value);
+  const curNew = clusterIdsWithConfig(name, value); // clusters already at this value
+  // Reset baseline: the edited row's clusters (its original value), or — when adding —
+  // the clusters that already carry this exact value.
+  const baseline = ctx.isNew ? curNew : clusterIdsWithConfig(name, origValue);
   const set = new Set(alterConfigSet.get(key) || []);
   const reset = new Set(alterConfigReset.get(name) || []);
 
@@ -1605,12 +1620,12 @@ function confirmConfigScope(ctx, desired) {
     }
   };
   for (const cid of desired) {
-    if (cur.has(cid)) set.delete(cid); // already this value → no SET needed
+    if (curNew.has(cid)) set.delete(cid); // already this value → no SET needed
     else set.add(cid);
     reset.delete(cid);
     clearOtherSets(cid);
   }
-  for (const cid of cur) {
+  for (const cid of baseline) {
     if (!desired.has(cid)) {
       reset.add(cid);
       set.delete(cid);
