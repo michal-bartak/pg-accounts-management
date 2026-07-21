@@ -340,7 +340,7 @@ function renderClustersTable() {
   const tbody = document.querySelector('#clusters-table tbody');
   tbody.innerHTML = '';
   if (!state?.clusters?.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="hint">No clusters configured.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="hint">No clusters configured.</td></tr>';
     return;
   }
   for (const c of state.clusters) {
@@ -351,7 +351,6 @@ function renderClustersTable() {
       <td>${c.port}</td>
       <td>${escapeHtml(c.database)}</td>
       <td><span class="badge" data-cat="${escapeAttr(c.category)}">${escapeHtml(categoryLabel(c.category))}</span></td>
-      <td>${escapeHtml(c.sslmode || 'prefer')}</td>
       <td class="cluster-status" data-status-for="${escapeAttr(c.id)}"></td>
       <td>
         <button class="small" data-action="edit" data-id="${c.id}">Edit</button>

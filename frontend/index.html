@@ -98,7 +98,6 @@
               <th>Port</th>
               <th>Database</th>
               <th>Category</th>
-              <th>SSL</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
@@ -235,10 +234,11 @@
       <h2 id="cluster-dialog-title">Add cluster</h2>
       <input type="hidden" name="id" />
       <label>Alias <input name="alias" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
-      <label>Host <input name="host" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
-      <label>Port <input name="port" type="number" value="5432" /></label>
+      <div class="form-row">
+        <label>Host <input name="host" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
+        <label class="port">Port <input name="port" type="number" value="5432" /></label>
+      </div>
       <label>Database <input name="database" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
-      <label>Category <select name="category" required></select></label>
       <label>SSL mode
         <select name="sslMode">
           <option value="prefer">prefer</option>
@@ -249,6 +249,8 @@
         </select>
       </label>
       <label>Connect user (optional) <input name="connectUser" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="Uses PGUSER if empty" /></label>
+      <hr class="form-sep" />
+      <label>Category <select name="category" required></select></label>
       <menu>
         <button type="button" id="btn-test-cluster">Test connection</button>
         <button type="submit" value="save" class="primary">Save</button>
