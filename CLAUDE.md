@@ -125,9 +125,9 @@ identifier-style **whitelisted keyword** (`SUPERUSER`/`NOSUPERUSER`, `CREATEROLE
 Extend all of: `calltemplate.AllowedPlaceholders` + `placeholderKindForField`;
 `commands` op const + `BuildArgs` + `ValidateRequest`; `model.DBFunctions` +
 `*Params` + `RunRequest`; `config.store.DefaultConfig` + `dbfunctions.go`
-migrate/validate lists; the Settings editor entries in `frontend/app.js`
-(`renderDBFunctionsEditor` + `readDBFunctionsFromEditor`); example config; and tests in
-`calltemplate`/`commands`/`config`.
+migrate/validate lists; the `DB_FUNCTIONS` table in `frontend/app.js` (drives the compact
+command list + the `#fn-dialog` popup, incl. its allowed-placeholder chips) and
+`readDBFunctionsFromEditor`; example config; and tests in `calltemplate`/`commands`/`config`.
 
 ## Frontend (`frontend/`)
 
@@ -152,7 +152,10 @@ confirm-production controls); "Or pick clusters" is a collapse/expand toggle (co
 by default; the expanded `.cluster-list` flexes to fill the sidebar). The Clusters
 toolbar hosts the right-aligned **Cluster groups** button (`btn-manage-groups` →
 `#groups-dialog` list popup → `#group-dialog` add/edit form; edited like clusters, no
-Save button, so it lives here rather than Settings). Settings hosts DB templates + batch.
+Save button, so it lives here rather than Settings). Settings hosts DB templates (a
+compact list of command names; clicking one opens the `#fn-dialog` popup with its
+execution type, call template, and clickable placeholder chips — staged in `dbFnDraft`,
+persisted on **Save settings**) + batch.
 
 Feature descriptions are not shown inline — they live behind a **`?` help badge**
 (`.q-hint`; markup via `hintBadge(text)` in JS, or hand-written next to a static heading).

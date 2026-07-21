@@ -298,6 +298,30 @@
     </form>
   </dialog>
 
+  <dialog id="fn-dialog">
+    <form method="dialog" id="fn-form" autocapitalize="none">
+      <h2 id="fn-dialog-title">Command template</h2>
+      <label>Execution
+        <select id="fn-execution">
+          <option value="function">Function call</option>
+          <option value="statement">SQL statement</option>
+          <option value="block">PL/pgSQL block</option>
+        </select>
+      </label>
+      <label>Call template
+        <textarea id="fn-call" rows="4" class="call-template" autocapitalize="none" autocomplete="off" spellcheck="false"></textarea>
+      </label>
+      <div class="fn-placeholders">
+        <span class="picker-label">Placeholders (click to insert):</span>
+        <span id="fn-placeholder-list"></span>
+      </div>
+      <menu>
+        <button type="button" id="fn-dialog-done" class="primary">Done</button>
+        <button type="button" id="fn-dialog-cancel">Cancel</button>
+      </menu>
+    </form>
+  </dialog>
+
   <div id="toast" class="toast hidden"></div>
 
   <script src="app.js"></script>

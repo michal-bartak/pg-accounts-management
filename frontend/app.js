@@ -399,54 +399,72 @@ function renderClusterCheckboxes() {
   }
 }
 
+// DB command templates: op key → [title, state property, allowed placeholders].
+const DB_FUNCTIONS = [
+  ['create_role', 'Create role', 'createRole', ['loginname', 'fullname', 'email', 'parent_role']],
+  ['remove_role', 'Remove role', 'removeRole', ['loginname', 'rolename']],
+  ['grant_parents', 'Grant parents', 'grantParents', ['loginname', 'parent_roles']],
+  ['revoke_parents', 'Revoke parents', 'revokeParents', ['loginname', 'parent_roles']],
+  ['change_password', 'Change password', 'changePassword', ['loginname', 'new_password']],
+  ['set_comment', 'Set comment', 'setComment', ['loginname', 'comment']],
+  ['set_attribute', 'Set attribute', 'setAttribute', ['loginname', 'attribute']],
+];
+const EXECUTION_LABELS = { function: 'Function call', statement: 'SQL statement', block: 'PL/pgSQL block' };
+
+/** In-memory edits for the command templates, staged until "Save settings". */
+let dbFnDraft = {};
+/** @type {string|null} op currently open in the template dialog */
+let fnDialogKey = null;
+
+/** Compact list of command names; click a row to edit it in a popup. Rebuilds the draft
+ *  from the saved config each render. */
 function renderDBFunctionsEditor() {
   const root = document.getElementById('db-functions-editor');
-  root.innerHTML = '';
+  if (!root) return;
   const fns = state?.dbFunctions;
-  if (!fns) return;
-
-  const entries = [
-    ['create_role', 'Create role', fns.createRole],
-    ['remove_role', 'Remove role', fns.removeRole],
-    ['grant_parents', 'Grant parents', fns.grantParents],
-    ['revoke_parents', 'Revoke parents', fns.revokeParents],
-    ['change_password', 'Change password', fns.changePassword],
-    ['set_comment', 'Set comment', fns.setComment],
-    ['set_attribute', 'Set attribute', fns.setAttribute],
-  ];
-
-  const executionOptions = [
-    ['function', 'Function call'],
-    ['statement', 'SQL statement'],
-    ['block', 'PL/pgSQL block'],
-  ];
-
-  for (const [key, title, fn] of entries) {
-    const block = document.createElement('div');
-    block.className = 'fn-block';
-    block.dataset.fnKey = key;
-    const call = fn?.call || fn?.Call || '';
-    const execution = fn?.execution || fn?.Execution || 'function';
-    const execSelect = executionOptions
-      .map(
-        ([val, label]) =>
-          `<option value="${val}"${execution === val ? ' selected' : ''}>${escapeHtml(label)}</option>`
-      )
-      .join('');
-    block.innerHTML = `
-      <strong>${escapeHtml(title)}</strong>
-      <label>Execution
-        <select data-field="execution">${execSelect}</select>
-      </label>
-      <label>Call template
-        <textarea data-field="call" rows="4" class="call-template" placeholder="e.g. your_schema.fn(\${loginname}, …)">${escapeHtml(call)}</textarea>
-      </label>`;
-    root.appendChild(block);
+  dbFnDraft = {};
+  root.innerHTML = '';
+  for (const [key, title, prop] of DB_FUNCTIONS) {
+    const fn = fns?.[prop];
+    dbFnDraft[key] = {
+      call: fn?.call || fn?.Call || '',
+      execution: fn?.execution || fn?.Execution || 'function',
+    };
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'fn-row';
+    row.dataset.fnKey = key;
+    row.innerHTML = `<span class="fn-row-name">${escapeHtml(title)}</span>
+      <span class="fn-row-exec">${escapeHtml(EXECUTION_LABELS[dbFnDraft[key].execution] || dbFnDraft[key].execution)}</span>`;
+    root.appendChild(row);
   }
-
   document.getElementById('batch-concurrency').value = String(state?.batch?.maxConcurrency || 5);
-  const editor = document.getElementById('db-functions-editor');
-  if (editor) configureInputCapitalization(editor);
+}
+
+/** Open the template popup for one operation. */
+function openFnDialog(key) {
+  const meta = DB_FUNCTIONS.find((e) => e[0] === key);
+  if (!meta) return;
+  fnDialogKey = key;
+  const draft = dbFnDraft[key] || { call: '', execution: 'function' };
+  document.getElementById('fn-dialog-title').textContent = meta[1];
+  document.getElementById('fn-execution').value = draft.execution;
+  document.getElementById('fn-call').value = draft.call;
+  document.getElementById('fn-placeholder-list').innerHTML = meta[3]
+    .map((p) => `<button type="button" class="ph-chip" data-ph="${escapeAttr(p)}">$\{${escapeHtml(p)}}</button>`)
+    .join('');
+  document.getElementById('fn-dialog').showModal();
+  document.getElementById('fn-call').focus();
+}
+
+/** Refresh one command row's execution badge from the draft (without rebuilding the list,
+ *  which would reset the draft from saved config). */
+function renderDBFunctionsRow(key) {
+  const row = document.querySelector(`#db-functions-editor .fn-row[data-fn-key="${key}"]`);
+  const d = dbFnDraft[key];
+  if (!row || !d) return;
+  const execEl = row.querySelector('.fn-row-exec');
+  if (execEl) execEl.textContent = EXECUTION_LABELS[d.execution] || d.execution;
 }
 
 function renderResults(rows) {
@@ -742,33 +760,11 @@ async function testAllClusters() {
 }
 
 function readDBFunctionsFromEditor() {
-  const blocks = document.querySelectorAll('#db-functions-editor .fn-block');
-  const out = {
-    createRole: { name: '', params: [] },
-    removeRole: { name: '', params: [] },
-    grantParents: { name: '', params: [] },
-    revokeParents: { name: '', params: [] },
-    changePassword: { name: '', params: [] },
-    setComment: { name: '', params: [] },
-    setAttribute: { name: '', params: [] },
-  };
-  const map = {
-    create_role: 'createRole',
-    remove_role: 'removeRole',
-    grant_parents: 'grantParents',
-    revoke_parents: 'revokeParents',
-    change_password: 'changePassword',
-    set_comment: 'setComment',
-    set_attribute: 'setAttribute',
-  };
-  blocks.forEach((block) => {
-    const key = block.dataset.fnKey;
-    const prop = map[key];
-    if (!prop) return;
-    const call = block.querySelector('[data-field="call"]')?.value?.trim() || '';
-    const execution = block.querySelector('[data-field="execution"]')?.value?.trim() || 'function';
-    out[prop] = { call, execution };
-  });
+  const out = {};
+  for (const [key, , prop] of DB_FUNCTIONS) {
+    const d = dbFnDraft[key] || { call: '', execution: 'function' };
+    out[prop] = { call: (d.call || '').trim(), execution: d.execution || 'function' };
+  }
   return out;
 }
 
@@ -2264,6 +2260,40 @@ document.getElementById('btn-template-help')?.addEventListener('click', () => {
 
 document.getElementById('template-help-close')?.addEventListener('click', () => {
   document.getElementById('template-help-dialog')?.close();
+});
+
+// DB command templates: click a name to edit its type + template in a popup.
+document.getElementById('db-functions-editor')?.addEventListener('click', (ev) => {
+  const row = ev.target.closest('.fn-row');
+  if (row) openFnDialog(row.dataset.fnKey);
+});
+document.getElementById('fn-dialog-done')?.addEventListener('click', () => {
+  if (fnDialogKey && dbFnDraft[fnDialogKey]) {
+    dbFnDraft[fnDialogKey] = {
+      call: document.getElementById('fn-call').value,
+      execution: document.getElementById('fn-execution').value,
+    };
+  }
+  document.getElementById('fn-dialog').close();
+  renderDBFunctionsRow(fnDialogKey);
+  fnDialogKey = null;
+});
+document.getElementById('fn-dialog-cancel')?.addEventListener('click', () => {
+  document.getElementById('fn-dialog').close();
+  fnDialogKey = null;
+});
+// Insert a ${placeholder} at the cursor in the call template.
+document.getElementById('fn-placeholder-list')?.addEventListener('click', (ev) => {
+  const chip = ev.target.closest('.ph-chip');
+  if (!chip) return;
+  const ta = document.getElementById('fn-call');
+  const token = '${' + chip.dataset.ph + '}';
+  const start = ta.selectionStart ?? ta.value.length;
+  const end = ta.selectionEnd ?? ta.value.length;
+  ta.value = ta.value.slice(0, start) + token + ta.value.slice(end);
+  ta.focus();
+  const caret = start + token.length;
+  ta.setSelectionRange(caret, caret);
 });
 
 window.addEventListener('DOMContentLoaded', () => {

@@ -494,48 +494,48 @@ tr:last-child td { border-bottom: none; }
   font-size: var(--fs-h2);
 }
 
+/* Compact command list — one clickable row per operation. */
 #db-functions-editor {
-  width: 100%;
+  display: grid;
+  gap: 0.35rem;
+  max-width: 32rem;
 }
-
-#db-functions-editor .fn-block {
+.fn-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: var(--control-h);
+  padding: 0.4rem 0.7rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1rem;
-  margin-bottom: 0.75rem;
-  width: 100%;
+  cursor: pointer;
+  text-align: left;
 }
+.fn-row:hover { border-color: var(--muted); }
+.fn-row-name { font-size: var(--fs-base); }
+.fn-row-exec { font-size: var(--fs-xs); color: var(--muted); }
 
-#db-functions-editor label {
-  display: block;
-  margin: 0.4rem 0;
-  font-size: var(--fs-label);
-}
-
-#db-functions-editor input,
-#db-functions-editor textarea.call-template,
-#db-functions-editor select {
-  width: 100%;
-  margin-top: 0.2rem;
-}
-
-/* Execution is a short enum — size it to content instead of the full width. */
-#db-functions-editor select[data-field="execution"] {
-  width: auto;
-  min-width: 12rem;
-  max-width: 100%;
-}
-
-#db-functions-editor input,
-#db-functions-editor textarea.call-template {
+/* Template popup */
+#fn-form { padding: 1.25rem; display: grid; gap: 0.65rem; min-width: min(30rem, 84vw); }
+#fn-form h2 { margin: 0; }
+#fn-form label { display: flex; flex-direction: column; gap: 0.2rem; font-size: var(--fs-label); }
+#fn-execution { width: auto; min-width: 12rem; }
+#fn-call { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-sm); resize: vertical; }
+.fn-placeholders { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.ph-chip {
+  min-height: 0;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
+  background: var(--field);
+  color: var(--text);
 }
-
-#db-functions-editor textarea.call-template {
-  resize: vertical;
-}
+.ph-chip:hover { border-color: var(--muted); }
+#fn-form menu { display: flex; gap: 0.5rem; justify-content: flex-end; margin: 0.5rem 0 0; padding: 0; }
 
 #batch-concurrency { width: 5rem; }
 
