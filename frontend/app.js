@@ -1345,9 +1345,9 @@ function scopeRowHtml(kind, key, name, curSet, addSet, revSet) {
   const revLabels = revSet.size ? scopeLabelsHtml(describeScope(revSet), 'chip-scope-strike') : '';
   const labels = keptLabels + addLabels + revLabels || emptyNote;
 
-  // All three actions always render; the ones that don't apply are disabled (greyed,
-  // inert to the mouse) rather than hidden, so the row layout stays stable.
-  const editBtn = `<button type="button" class="chip-extend" data-kind="${kind}" data-act="scope" data-key="${k}" title="Edit clusters">✎</button>`;
+  // All three actions always render as square buttons beside the row; the ones that don't
+  // apply are disabled (greyed, inert to the mouse) rather than hidden, so layout is stable.
+  const editBtn = `<button type="button" class="scope-act" data-kind="${kind}" data-act="scope" data-key="${k}" title="Edit clusters">✎</button>`;
 
   const verbRemove = kind === 'attr' ? 'Disable everywhere' : kind === 'config' ? 'Reset everywhere' : 'Revoke everywhere';
   let xAct = 'revoke';
@@ -1359,16 +1359,18 @@ function scopeRowHtml(kind, key, name, curSet, addSet, revSet) {
   // × only acts while a grant remains (kept) or a pending add exists; once everything
   // is revoked/cancelled it has nothing left to do, so it goes inactive.
   const xOn = kept.size > 0 || addSet.size > 0;
-  const xBtn = `<button type="button" class="chip-x" data-kind="${kind}" data-act="${xAct}" data-key="${k}" title="${escapeAttr(xTitle)}"${xOn ? '' : ' disabled'}>×</button>`;
+  const xBtn = `<button type="button" class="scope-act" data-kind="${kind}" data-act="${xAct}" data-key="${k}" title="${escapeAttr(xTitle)}"${xOn ? '' : ' disabled'}>×</button>`;
 
-  const resetBtn = `<button type="button" class="chip-restore" data-kind="${kind}" data-act="reset" data-key="${k}" title="Discard pending changes"${pending ? '' : ' disabled'}>↺</button>`;
+  const resetBtn = `<button type="button" class="scope-act" data-kind="${kind}" data-act="reset" data-key="${k}" title="Discard pending changes"${pending ? '' : ' disabled'}>↺</button>`;
 
   const fullyRemoved = kept.size === 0 && addSet.size === 0 && revSet.size > 0;
   const stateCls = fullyRemoved ? 'is-removed' : isNew && addSet.size ? 'is-added' : pending ? 'is-extending' : '';
-  return `<div class="scope-row ${stateCls}">
-    <span class="scope-row-name">${escapeHtml(name)}</span>
-    <span class="scope-row-labels">${labels}</span>
-    <span class="scope-row-actions">${editBtn}${xBtn}${resetBtn}</span>
+  return `<div class="scope-line">
+    <div class="scope-row ${stateCls}">
+      <span class="scope-row-name">${escapeHtml(name)}</span>
+      <span class="scope-row-labels">${labels}</span>
+    </div>
+    <div class="scope-row-actions">${editBtn}${xBtn}${resetBtn}</div>
   </div>`;
 }
 
