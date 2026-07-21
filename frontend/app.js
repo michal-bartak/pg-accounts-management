@@ -2021,9 +2021,12 @@ function flashTestOk(btn) {
   clusterTestTimers.push(
     setTimeout(() => {
       btn.textContent = original;
-      btn.classList.add('test-fade'); // enable transition, then remove green → fades back
+      // Enable the transition while still green, flush styles so that state is committed,
+      // then drop green so the colour actually animates (changing both at once would snap).
+      btn.classList.add('test-fade');
+      void btn.offsetWidth; // force reflow to commit the green + transition state
       btn.classList.remove('test-ok');
-      clusterTestTimers.push(setTimeout(() => btn.classList.remove('test-fade'), 1000));
+      clusterTestTimers.push(setTimeout(() => btn.classList.remove('test-fade'), 1100));
     }, 1000)
   );
 }
