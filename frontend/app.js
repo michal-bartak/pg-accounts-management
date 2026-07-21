@@ -545,6 +545,7 @@ function openClusterDialog(cluster) {
   clusterTestTimers.forEach(clearTimeout);
   clusterTestTimers = [];
   testBtn.classList.remove('test-ok', 'test-fade');
+  testBtn.style.minWidth = '';
   if (testBtn.dataset.label) testBtn.textContent = testBtn.dataset.label;
   dlg.showModal();
 }
@@ -2013,6 +2014,7 @@ function flashTestOk(btn) {
   clusterTestTimers.forEach(clearTimeout);
   clusterTestTimers = [];
   const original = btn.dataset.label || (btn.dataset.label = btn.textContent);
+  btn.style.minWidth = `${btn.getBoundingClientRect().width}px`; // hold width while text is "OK"
   btn.classList.remove('test-fade');
   btn.classList.add('test-ok'); // instant green
   btn.textContent = 'OK';
