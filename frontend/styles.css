@@ -77,9 +77,7 @@ textarea {
   color: var(--text);
 }
 
-/* Checkboxes/radios: one size everywhere, themed accent (color-scheme handles the
-   unchecked background per light/dark). */
-input[type="checkbox"],
+/* Radios: one size everywhere, themed accent. */
 input[type="radio"] {
   width: 1.15rem;
   height: 1.15rem;
@@ -88,6 +86,39 @@ input[type="radio"] {
   accent-color: var(--primary);
   cursor: pointer;
 }
+
+/* Custom checkbox — field border when unchecked, primary (same blue as buttons) when
+   checked, with a white tick. One size everywhere. */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  min-width: 1.15rem;
+  margin: 0;
+  border: 1px solid var(--field-border);
+  border-radius: 5px;
+  background: var(--field);
+  cursor: pointer;
+  display: inline-grid;
+  place-content: center;
+  vertical-align: middle;
+}
+input[type="checkbox"]::after {
+  content: "";
+  width: 0.32rem;
+  height: 0.58rem;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  margin-top: -2px;
+  opacity: 0;
+}
+input[type="checkbox"]:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+input[type="checkbox"]:checked::after { opacity: 1; }
 textarea { min-height: 5rem; line-height: 1.4; }
 
 html, body { height: 100%; }
@@ -235,14 +266,14 @@ tr:last-child td { border-bottom: none; }
 .q-hint {
   width: 16px; height: 16px; min-height: 0; padding: 0; line-height: 1;
   flex: 0 0 auto; border-radius: 50%; font-size: 0.72rem; cursor: help;
-  color: var(--muted); background: var(--bg); border: 1px solid var(--border);
+  color: #fff; background: var(--primary); border: 1px solid var(--primary);
   display: inline-flex; align-items: center; justify-content: center;
   vertical-align: middle; position: relative; top: -1px;
 }
 /* Focus looks identical to hover — no jarring OS "selected" ring on the badge. */
 .q-hint:hover,
 .q-hint:focus,
-.q-hint:focus-visible { color: var(--text); border-color: var(--muted); outline: none; }
+.q-hint:focus-visible { color: #fff; background: var(--primary-hover); border-color: var(--primary-hover); outline: none; }
 .q-hint-pop {
   position: fixed; max-width: 280px;
   background: var(--surface); color: var(--text);
@@ -271,7 +302,7 @@ tr:last-child td { border-bottom: none; }
   background: transparent; border: none; color: var(--text);
   font-size: var(--fs-label); cursor: pointer;
 }
-.clusters-toggle .caret { color: var(--muted); }
+.clusters-toggle .caret { color: var(--muted); font-size: 1.05rem; line-height: 1; }
 .cluster-list:not(.hidden) { flex: 1 1 auto; min-height: 4rem; max-height: none; }
 .ops-main { display: flex; flex-direction: column; min-height: 0; }
 /* Small inset so focus outlines aren't clipped by the scroll container edges. */
