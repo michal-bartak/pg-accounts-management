@@ -683,11 +683,15 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
   color: var(--danger);
   text-decoration: line-through;
 }
-/* Square action buttons (✎ / × / ↺) that sit beside a scope row, matching its height. */
+/* Square action buttons (✎ / × / ↺) that sit beside a scope row, matching its height.
+   Explicit width == height (var(--control-h)) — an aspect-ratio derived from a stretched
+   flex height doesn't resolve reliably in WKWebView. .scope-row shares the same min-height. */
 .scope-act {
+  width: var(--control-h);
+  height: var(--control-h);
   min-height: 0;
+  flex: 0 0 auto;
   padding: 0;
-  aspect-ratio: 1 / 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -783,6 +787,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  min-height: var(--control-h);
   padding: 0.3rem 0.5rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
