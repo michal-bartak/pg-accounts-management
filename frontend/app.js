@@ -1219,24 +1219,26 @@ function renderAlterDetail(errors = []) {
 
   const id = identityConsensus();
 
-  // Edit-only: raw-comment info + the Comments dialog button. (Present-on renders above the
-  // form in #role-present; full name / email live in the editable #role-identity block.)
+  // Edit-only Comment section: a read-only text box when the comment is consistent,
+  // otherwise printed info. (Present-on renders above the form in #role-present; full
+  // name / email live in the editable #role-identity block.)
   let editHead = '';
   if (!create) {
-    let commentRow;
+    let commentBody;
     if (id.commentVaries) {
-      commentRow = `<div class="alter-identity-row">Comment <em>varies across clusters</em></div>`;
+      commentBody = `<p class="hint">Comments differ across clusters — use the button below to view and reconcile them.</p>`;
     } else if (id.hasComment) {
-      commentRow = `<div class="alter-identity-row">Comment <code>${escapeHtml(id.comment)}</code></div>`;
+      commentBody = `<textarea class="comment-view" rows="2" readonly>${escapeHtml(id.comment)}</textarea>`;
     } else {
-      commentRow = `<div class="alter-identity-row">Comment <em>none</em></div>`;
+      commentBody = `<p class="hint">No comment.</p>`;
     }
     const commentsBtn = `<button type="button" class="small" id="btn-alter-comments">${id.commentVaries ? 'Comments differ — view / edit' : 'View / edit comments'}</button>`;
     editHead = `
     ${renderDetailErrors(errors)}
-    <div class="alter-identity">
-      ${commentRow}
-      <div class="alter-identity-actions">${commentsBtn}</div>
+    <div class="alter-section">
+      <div class="alter-privs-label">Comment</div>
+      <div class="alter-identity">${commentBody}</div>
+      <div class="alter-add-priv">${commentsBtn}</div>
     </div>`;
   }
 

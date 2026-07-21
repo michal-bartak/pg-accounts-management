@@ -739,16 +739,16 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
   color: var(--muted);
 }
 .alter-identity {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  padding: 0.6rem 0.8rem;
-  margin-bottom: 1rem;
+  background: transparent;
   font-size: var(--fs-base);
 }
-.alter-identity-row { margin: 0.15rem 0; }
-.alter-identity-row em { color: var(--muted); }
-.alter-identity-row code { color: var(--muted); word-break: break-word; }
+.alter-identity .hint { margin: 0; }
+.comment-view {
+  width: 100%;
+  resize: vertical;
+  font-family: var(--font);
+  color: var(--muted);
+}
 
 .alter-section {
   border-top: 1px solid var(--border);
@@ -797,9 +797,9 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
   padding: 0.3rem 0.5rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--field);
 }
-.scope-row-name { font-weight: 600; font-size: var(--fs-base); min-width: 9rem; }
+.scope-row-name { font-size: var(--fs-base); min-width: 9rem; }
 .scope-row-labels {
   display: flex;
   flex-wrap: wrap;
@@ -820,8 +820,6 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 .alter-password input[type="password"] { min-width: 260px; }
 .alter-password label.inline { display: flex; align-items: center; gap: 0.35rem; }
 
-/* Alter dialogs */
-.alter-identity-actions { margin-top: 0.5rem; }
 
 .search-dialog-body,
 .comments-dialog-body { padding: 1.25rem; display: block; }
