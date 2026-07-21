@@ -1179,7 +1179,7 @@ function loadRoleIdentityValues() {
   }
   login.value = alterSelected || '';
   const fns = [...new Set(alterDetails.map((d) => d.fullName).filter(Boolean))];
-  const emails = [...new Set(alterDetails.map((d) => parseCommentField(d.comment, 'email')).filter(Boolean))];
+  const emails = [...new Set(alterDetails.map((d) => parseCommentField(d.comment, 'e_mail')).filter(Boolean))];
   fullname.value = fns.length === 1 ? fns[0] : '';
   email.value = emails.length === 1 ? emails[0] : '';
   const varies = [];
@@ -1730,7 +1730,7 @@ async function saveCommentVersion(idx) {
   renderCommentsDialog();
 }
 
-/** Merge full_name/email into a role comment's JSON, preserving other keys. Returns the
+/** Merge full_name/e_mail into a role comment's JSON, preserving other keys. Returns the
  *  new comment string, or null to skip (existing comment is free text — leave it alone). */
 function identityCommentJSON(existingComment, fullName, email) {
   const t = (existingComment || '').trim();
@@ -1746,8 +1746,8 @@ function identityCommentJSON(existingComment, fullName, email) {
   }
   if (fullName) obj.full_name = fullName;
   else delete obj.full_name;
-  if (email) obj.email = email;
-  else delete obj.email;
+  if (email) obj.e_mail = email;
+  else delete obj.e_mail;
   return Object.keys(obj).length ? JSON.stringify(sortKeysDeep(obj)) : '';
 }
 

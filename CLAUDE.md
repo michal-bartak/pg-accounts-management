@@ -62,7 +62,7 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   first (sequential `executeAlterRequests`), then the grant/attr/setting/password ops.
   Identity persists differently by mode: **create** passes full name/email to `create_role`;
   **edit** emits `set_comment` per cluster with a merged comment JSON
-  (`identityCommentJSON` sets `full_name`/`email`, preserving other keys; skips free-text
+  (`identityCommentJSON` sets `full_name`/`e_mail`, preserving other keys; skips free-text
   comments). `buildAlterRequests` is shared; the Comments dialog still edits raw comments.
 - Frontend is **vanilla JS** reached through `window.go.main.App` (`backend()` in
   [frontend/app.js](frontend/app.js)). No framework. `frontend/wailsjs/` is
