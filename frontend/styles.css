@@ -597,6 +597,11 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 #cluster-form .form-sep { width: 100%; border: none; border-top: 1px solid var(--border); margin: 0.4rem 0; }
 /* Test connection sits on the left; Save / Cancel stay on the right. */
 #cluster-form menu #btn-test-cluster { margin-right: auto; }
+/* Success flash: instant green + "OK", then fade back to the resting style over ~1s. */
+#btn-test-cluster.test-ok { background: var(--ok); border-color: var(--ok); color: #fff; }
+#btn-test-cluster.test-fade { transition: background 1s ease, border-color 1s ease, color 1s ease; }
+/* Test-connection error printed below the buttons. */
+#cluster-form .form-error { margin: 0.5rem 0 0; color: var(--danger); font-size: var(--fs-sm); }
 #group-form label.inline { flex-direction: row; align-items: center; gap: 0.5rem; }
 #group-form input[type="color"] { width: 3rem; min-height: 0; height: 2rem; padding: 0; cursor: pointer; }
 

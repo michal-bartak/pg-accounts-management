@@ -91,7 +91,9 @@ Config/clusters/groups: `GetConfig`, `GetConfigPath`, `ReloadConfig`, `AddCluste
 `UpdateCluster`, `DeleteCluster`, `AddCategory`, `UpdateCategory`, `DeleteCategory`,
 `ImportFromEnvironment`, `SaveDBFunctions`, `SaveBatchSettings`, `SaveUISettings`,
 `SaveParentRoles`, `GetAppVersion`.
-Run/test: `TestConnection`, `PreviewTargets`, `RunOperation`.
+Run/test: `TestConnection` (by saved cluster id), `TestConnectionInput` (ad-hoc
+`ClusterInput`+`Auth`, used by the cluster editor to test on-screen values),
+`PreviewTargets`, `RunOperation`.
 Introspection (Alter role): `SearchRoles(RoleSearchRequest)`,
 `LoadRoleDetails(RoleDetailsRequest)`.
 

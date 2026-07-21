@@ -38,6 +38,8 @@ export function SearchRoles(arg1:model.RoleSearchRequest):Promise<Array<model.Ro
 
 export function TestConnection(arg1:model.TestConnectionRequest):Promise<void>;
 
+export function TestConnectionInput(arg1:model.ClusterInput,arg2:model.AuthContext):Promise<void>;
+
 export function UpdateCategory(arg1:string,arg2:model.CategoryInput):Promise<model.Category>;
 
 export function UpdateCluster(arg1:string,arg2:model.ClusterInput):Promise<model.Cluster>;

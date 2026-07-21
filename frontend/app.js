@@ -537,6 +537,15 @@ function openClusterDialog(cluster) {
   form.category.value = cluster?.category || 'uat';
   form.sslMode.value = cluster?.sslmode || 'prefer';
   form.connectUser.value = cluster?.connectUser || '';
+  // Reset any leftover test result.
+  const errEl = document.getElementById('cluster-test-error');
+  errEl.classList.add('hidden');
+  errEl.textContent = '';
+  const testBtn = document.getElementById('btn-test-cluster');
+  clusterTestTimers.forEach(clearTimeout);
+  clusterTestTimers = [];
+  testBtn.classList.remove('test-ok', 'test-fade');
+  if (testBtn.dataset.label) testBtn.textContent = testBtn.dataset.label;
   dlg.showModal();
 }
 
@@ -1998,26 +2007,42 @@ document.getElementById('cluster-form').addEventListener('click', (ev) => {
   }
 });
 
+let clusterTestTimers = [];
+/** Flash the Test-connection button green with "OK", then fade back over ~1s. */
+function flashTestOk(btn) {
+  clusterTestTimers.forEach(clearTimeout);
+  clusterTestTimers = [];
+  const original = btn.dataset.label || (btn.dataset.label = btn.textContent);
+  btn.classList.remove('test-fade');
+  btn.classList.add('test-ok'); // instant green
+  btn.textContent = 'OK';
+  clusterTestTimers.push(
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.classList.add('test-fade'); // enable transition, then remove green → fades back
+      btn.classList.remove('test-ok');
+      clusterTestTimers.push(setTimeout(() => btn.classList.remove('test-fade'), 1000));
+    }, 1000)
+  );
+}
+
 document.getElementById('btn-test-cluster').addEventListener('click', async () => {
   const app = backend();
   const form = document.getElementById('cluster-form');
-  const password = prompt('Password (leave empty if not required, e.g. trust auth):') ?? '';
-  const auth = {
-    user: form.connectUser.value.trim() || '',
-    password,
-  };
+  const errEl = document.getElementById('cluster-test-error');
+  errEl.classList.add('hidden');
+  errEl.textContent = '';
 
-  if (form.id.value) {
-    try {
-      await app.TestConnection({ clusterId: form.id.value, auth });
-      showToast('Connection OK', 'success');
-    } catch (e) {
-      showToast(String(e), 'error');
-    }
-    return;
+  const input = clusterInputFromForm(form);
+  const auth = { user: input.connectUser, password: '' };
+  try {
+    // Test the on-screen values (works for unsaved/new clusters too).
+    await app.TestConnectionInput(input, auth);
+    flashTestOk(document.getElementById('btn-test-cluster'));
+  } catch (e) {
+    errEl.textContent = String(e);
+    errEl.classList.remove('hidden');
   }
-
-  showToast('Save the cluster first, then test connection.', 'error');
 });
 
 document.getElementById('btn-run').addEventListener('click', runOperation);

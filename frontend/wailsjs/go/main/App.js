@@ -74,6 +74,10 @@ export function TestConnection(arg1) {
   return window['go']['main']['App']['TestConnection'](arg1);
 }
 
+export function TestConnectionInput(arg1, arg2) {
+  return window['go']['main']['App']['TestConnectionInput'](arg1, arg2);
+}
+
 export function UpdateCategory(arg1, arg2) {
   return window['go']['main']['App']['UpdateCategory'](arg1, arg2);
 }

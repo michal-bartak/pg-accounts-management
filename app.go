@@ -111,6 +111,35 @@ func (a *App) TestConnection(req model.TestConnectionRequest) error {
 	return pg.TestConnection(cluster, req.Auth)
 }
 
+// TestConnectionInput tests the connection using ad-hoc form values (host/port/…) rather
+// than a saved cluster, so the cluster editor validates exactly what's on screen.
+func (a *App) TestConnectionInput(in model.ClusterInput, auth model.AuthContext) error {
+	if in.Host == "" {
+		return fmt.Errorf("host is required")
+	}
+	if in.Database == "" {
+		return fmt.Errorf("database is required")
+	}
+	port := in.Port
+	if port <= 0 {
+		port = 5432
+	}
+	sslMode := in.SSLMode
+	if sslMode == "" {
+		sslMode = "prefer"
+	}
+	cluster := model.Cluster{
+		Alias:       in.Alias,
+		Host:        in.Host,
+		Port:        port,
+		Database:    in.Database,
+		Category:    in.Category,
+		SSLMode:     sslMode,
+		ConnectUser: in.ConnectUser,
+	}
+	return pg.TestConnection(cluster, auth)
+}
+
 func (a *App) RunOperation(req model.RunRequest) ([]model.ClusterResult, error) {
 	return a.batch.Run(req)
 }
