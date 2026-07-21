@@ -208,6 +208,7 @@ button.primary {
 button.primary:hover { background: var(--primary-hover); }
 button.danger { border-color: var(--danger); color: var(--danger); }
 button.small { min-height: 0; padding: 0.25rem 0.5rem; font-size: var(--fs-sm); }
+button:disabled { opacity: 0.4; cursor: default; }
 
 select {
   appearance: none;

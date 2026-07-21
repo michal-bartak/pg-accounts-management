@@ -289,14 +289,22 @@ function renderGroupsTable() {
     tbody.innerHTML = '<tr><td colspan="3" class="hint">No groups defined.</td></tr>';
     return;
   }
+  // Pre-check usage so a group in use can't be deleted (Delete disabled, no failed attempt).
+  const usage = {};
+  for (const cl of state?.clusters || []) usage[cl.category] = (usage[cl.category] || 0) + 1;
+
   for (const c of state.categories) {
+    const used = usage[c.id] || 0;
+    const del = used
+      ? `<button class="small danger" data-action="delete" data-id="${escapeAttr(c.id)}" disabled title="In use by ${used} cluster${used === 1 ? '' : 's'}">Delete</button>`
+      : `<button class="small danger" data-action="delete" data-id="${escapeAttr(c.id)}">Delete</button>`;
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><span class="badge" data-cat="${escapeAttr(c.id)}">${escapeHtml(c.label)}</span></td>
       <td>${c.confirm ? 'Yes' : '—'}</td>
       <td>
         <button class="small" data-action="edit" data-id="${escapeAttr(c.id)}">Edit</button>
-        <button class="small danger" data-action="delete" data-id="${escapeAttr(c.id)}">Delete</button>
+        ${del}
       </td>`;
     tbody.appendChild(tr);
   }
