@@ -57,7 +57,9 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   the configured **`ui.comment_default_view`** — `fields`|`raw`, `preferredCommentView()`);
   `assembleComment`/`assembleCommentFrom` serialize it (empty value drops the key; preserves
   unknown keys); `parseCommentObject` is the shared reader; `switchEditorMode` round-trips
-  Fields↔Raw. A non-JSON comment saves as plain text with a toast warning. The backend
+  Fields↔Raw. The **Fields** toggle is disabled whenever the raw text is non-empty and not a
+  JSON object (`commentFieldsBlocked`) — Fields can't represent plain text, so switching would
+  drop it; edit such comments in Raw. A non-JSON comment saves as plain text with a toast warning. The backend
   `set_comment` op stays an opaque quoted literal; `pg.ParseFullName` (`full_name`) is kept
   only for search-result display. When comments **vary** across clusters the inline editor is
   hidden and reconciliation moves to the **Comments dialog**, whose per-version boxes reuse the

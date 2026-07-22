@@ -1393,25 +1393,25 @@ function renderCommentEditor() {
   const notice = document.getElementById('rce-notice');
   if (!fieldsBox || !raw || !notice) return;
   const e = commentEditor;
-  document
-    .querySelectorAll('#rce-mode .seg-btn')
-    .forEach((b) => b.classList.toggle('active', b.dataset.mode === e.mode));
+  const blockFields = commentFieldsBlocked(e); // non-JSON text → Fields would drop it
+  document.querySelectorAll('#rce-mode .seg-btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.mode === e.mode);
+    if (b.dataset.mode === 'fields') {
+      b.disabled = blockFields;
+      b.title = blockFields ? 'Comment is plain text (not JSON) — edit it in Raw' : '';
+    }
+  });
 
-  const plainTextLoaded = !e.isObject && !!e.raw.trim();
-  const fieldsDisabled = e.varies || (plainTextLoaded && !isCreateMode());
+  const fieldsDisabled = e.varies;
   fieldsBox.classList.toggle('hidden', e.mode !== 'fields');
   raw.classList.toggle('hidden', e.mode !== 'raw');
   raw.value = e.raw;
 
   fieldsBox.innerHTML = commentFieldInputsHtml(e, null, fieldsDisabled);
 
-  if (e.varies) {
-    notice.textContent = 'Comments differ across clusters — reconcile via "View / edit comments" below.';
-  } else if (e.mode === 'fields' && plainTextLoaded) {
-    notice.textContent = 'This comment is plain text — switch to Raw to edit it.';
-  } else {
-    notice.textContent = '';
-  }
+  notice.textContent = e.varies
+    ? 'Comments differ across clusters — reconcile via "View / edit comments" below.'
+    : '';
 }
 
 /** The comment an editor model currently represents (may be plain text in raw mode). */
@@ -1430,9 +1430,19 @@ function assembleComment() {
   return assembleCommentFrom(commentEditor);
 }
 
+/** Fields mode can't represent non-JSON text, so switching to it would drop the content.
+ *  Blocked when the raw text is non-empty and not a JSON object (empty/JSON are fine). Only
+ *  meaningful in raw mode — in fields mode the content is already a JSON object / empty. */
+function commentFieldsBlocked(e) {
+  if (e.mode !== 'raw') return false;
+  const t = (e.raw || '').trim();
+  return !!t && !parseCommentObject(e.raw).isObject;
+}
+
 /** Switch an editor model between Fields<->Raw without losing data (mutates e). */
 function switchEditorMode(e, mode) {
   if (mode === e.mode) return;
+  if (mode === 'fields' && commentFieldsBlocked(e)) return; // guard: never drop non-JSON text
   if (mode === 'raw') {
     e.raw = assembleCommentFrom(e); // serialize field state so nothing is lost
   } else {
@@ -1978,20 +1988,19 @@ function renderCommentsDialog() {
     .map((v, i) => {
       const e = commentVersionEditors[i];
       const labels = scopeLabelsHtml(describeScope(new Set(v.ids)));
-      const plainText = !e.isObject && !!e.raw.trim();
-      const fieldsDisabled = plainText; // plain text: edit in Raw (don't silently convert)
-      const notice = e.mode === 'fields' && plainText ? 'This comment is plain text — switch to Raw to edit it.' : '';
+      const blockFields = commentFieldsBlocked(e); // non-JSON text → Fields would drop it
+      const fieldsTitle = blockFields ? ' title="Comment is plain text (not JSON) — edit it in Raw"' : '';
       return `<div class="comment-version">
         <div class="comment-scope">${labels || '<span class="hint">no clusters</span>'}</div>
         <div class="rce-toolbar">
           <div class="segmented rce-mode" data-cv-mode="${i}" role="group" aria-label="Comment editing mode">
-            <button type="button" class="seg-btn ${e.mode === 'fields' ? 'active' : ''}" data-mode="fields">Fields</button>
+            <button type="button" class="seg-btn ${e.mode === 'fields' ? 'active' : ''}" data-mode="fields"${blockFields ? ' disabled' : ''}${fieldsTitle}>Fields</button>
             <button type="button" class="seg-btn ${e.mode === 'raw' ? 'active' : ''}" data-mode="raw">Raw</button>
           </div>
         </div>
-        <div class="rce-fields${e.mode !== 'fields' ? ' hidden' : ''}" data-cv-fields="${i}">${commentFieldInputsHtml(e, i, fieldsDisabled)}</div>
+        <div class="rce-fields${e.mode !== 'fields' ? ' hidden' : ''}" data-cv-fields="${i}">${commentFieldInputsHtml(e, i, false)}</div>
         <textarea class="rce-raw comment-edit${e.mode !== 'raw' ? ' hidden' : ''}" data-cv-raw="${i}" rows="4" autocapitalize="none" spellcheck="false">${escapeHtml(e.raw)}</textarea>
-        <p class="hint rce-notice">${notice}</p>
+        <p class="hint rce-notice"></p>
       </div>`;
     })
     .join('');
@@ -2515,7 +2524,16 @@ document.getElementById('alter-detail')?.addEventListener('input', (ev) => {
 document.getElementById('role-comment-editor')?.addEventListener('input', (ev) => {
   const t = ev.target;
   if (t.dataset && t.dataset.cfKey) commentEditor.values[t.dataset.cfKey] = t.value;
-  else if (t.id === 'rce-raw') commentEditor.raw = t.value;
+  else if (t.id === 'rce-raw') {
+    commentEditor.raw = t.value;
+    // Live-disable Fields when the raw text stops being a JSON object (would drop content).
+    const fieldsBtn = document.querySelector('#rce-mode .seg-btn[data-mode="fields"]');
+    if (fieldsBtn) {
+      const block = commentFieldsBlocked(commentEditor);
+      fieldsBtn.disabled = block;
+      fieldsBtn.title = block ? 'Comment is plain text (not JSON) — edit it in Raw' : '';
+    }
+  }
 });
 document.getElementById('rce-mode')?.addEventListener('click', (ev) => {
   const btn = ev.target.closest('.seg-btn');
@@ -2567,7 +2585,15 @@ document.getElementById('comments-list')?.addEventListener('input', (ev) => {
   const idx = t.dataset.cvIdx != null ? Number(t.dataset.cvIdx) : (t.dataset.cvRaw != null ? Number(t.dataset.cvRaw) : null);
   if (idx == null || !commentVersionEditors[idx]) return;
   if (t.dataset.cfKey) commentVersionEditors[idx].values[t.dataset.cfKey] = t.value;
-  else if (t.dataset.cvRaw != null) commentVersionEditors[idx].raw = t.value;
+  else if (t.dataset.cvRaw != null) {
+    commentVersionEditors[idx].raw = t.value;
+    const fieldsBtn = document.querySelector(`[data-cv-mode="${idx}"] .seg-btn[data-mode="fields"]`);
+    if (fieldsBtn) {
+      const block = commentFieldsBlocked(commentVersionEditors[idx]);
+      fieldsBtn.disabled = block;
+      fieldsBtn.title = block ? 'Comment is plain text (not JSON) — edit it in Raw' : '';
+    }
+  }
 });
 
 document.getElementById('ui-theme')?.addEventListener('click', (ev) => {
