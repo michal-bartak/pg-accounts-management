@@ -76,6 +76,33 @@ func TestBuild_statement_setAttribute(t *testing.T) {
 	}
 }
 
+func TestBuild_statement_setAttribute_multipleKeywords(t *testing.T) {
+	sql, _, _, err := Build(
+		"ALTER ROLE ${loginname} WITH ${attribute}",
+		map[string]string{"loginname": "jdoe", "attribute": "NOSUPERUSER NOLOGIN CREATEDB"},
+		"set_attribute",
+		model.ExecutionStatement,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sql != "ALTER ROLE jdoe WITH NOSUPERUSER NOLOGIN CREATEDB" {
+		t.Fatalf("got: %s", sql)
+	}
+}
+
+func TestBuild_statement_setAttribute_rejectsBadToken(t *testing.T) {
+	_, _, _, err := Build(
+		"ALTER ROLE ${loginname} WITH ${attribute}",
+		map[string]string{"loginname": "jdoe", "attribute": "SUPERUSER; DROP"},
+		"set_attribute",
+		model.ExecutionStatement,
+	)
+	if err == nil {
+		t.Fatal("expected error for a non-identifier attribute token")
+	}
+}
+
 func TestBuild_statement_rolenameAlias(t *testing.T) {
 	sql, _, _, err := Build(
 		"DROP ROLE ${rolename}",

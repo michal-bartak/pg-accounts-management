@@ -43,7 +43,8 @@ Example template: [`config.example.yaml`](config.example.yaml). Implemented in `
 - `AddCluster`, `UpdateCluster`, `DeleteCluster`
 - `ImportFromEnvironment` — reads `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`
 - `SaveDBFunctions`, `SaveBatchSettings`, `SaveUISettings`, `SaveParentRoles`
-- `TestConnection`, `PreviewTargets`, `RunOperation`
+- `TestConnection`, `PreviewTargets`, `RunRoleBatch` (per-cluster transactional batch — the
+  create/update/remove path), `RunOperation` (legacy single-op, unused by the UI)
 - **Introspection (reads, for Alter role):** `SearchRoles`, `LoadRoleDetails` — scan the
   **selected** clusters concurrently (`internal/pg/introspect.go` + `batch.Runner`),
   collecting per-cluster errors instead of failing.
@@ -127,12 +128,15 @@ arbitrary JSON, no forced keys): Fields↔Raw toggle, Fields edits string values
 come from Settings-managed `Config.CommentFields` (`comment_fields`, default full_name/e_mail,
 `SaveCommentFields`); empty comments default to `ui.comment_default_view` (`preferredCommentView`);
 `editorFromComment`/`assembleComment(From)`/`switchEditorMode`/`parseCommentObject` are the core
-helpers. Run: create = `buildCreateRoleRequests` (one `create_role` per cluster, empty
-`parent_role`) **concat** `buildAlterRequests()`; the comment persists via `set_comment` in
-both modes (`assembleComment` diffed per cluster; create's `create_role` gets
-`${fullname}`/`${email}` from the editor, follow-up `set_comment` authoritative). When comments
-vary the inline editor hides and the Comments dialog reconciles per cluster (per-version
-Fields/Raw editors, `commentVersionEditors`). One shared
+helpers. Run: both modes build per-cluster ordered op lists and send ONE
+`App.RunRoleBatch(RoleBatchRequest)` (`executeRoleBatch`); the backend (`batch.runClusterTx`) runs
+each cluster's ops in a **single transaction** (commit/rollback, one result per cluster, bounded
+concurrency). `buildAlterClusterOps` orders grant→revoke→password→**set_attribute (all keywords
+combined)**→set_config→reset_config→set_comment; create prepends `create_role`
+(`buildCreateClusterOps`). Comment persists via `set_comment` (per-cluster `commentOverrides` wins,
+else `assembleComment`; create's `create_role` gets `${fullname}`/`${email}` from the editor,
+follow-up `set_comment` authoritative). When comments vary the inline editor hides and the Comments
+dialog reconciles per cluster (`commentVersionEditors`). One shared
 `confirmScopeDialog`/`buildScopeTargets` (no create fork).
 
 ## Versioning & packaging

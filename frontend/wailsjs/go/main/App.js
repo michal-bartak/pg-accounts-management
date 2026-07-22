@@ -50,6 +50,10 @@ export function RunOperation(arg1) {
   return window['go']['main']['App']['RunOperation'](arg1);
 }
 
+export function RunRoleBatch(arg1) {
+  return window['go']['main']['App']['RunRoleBatch'](arg1);
+}
+
 export function SaveBatchSettings(arg1) {
   return window['go']['main']['App']['SaveBatchSettings'](arg1);
 }

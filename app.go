@@ -148,6 +148,12 @@ func (a *App) RunOperation(req model.RunRequest) ([]model.ClusterResult, error) 
 	return a.batch.Run(req)
 }
 
+// RunRoleBatch applies, per cluster, an ordered list of operations inside a single transaction
+// (all-or-nothing per cluster). Used by the role Create/Alter forms.
+func (a *App) RunRoleBatch(req model.RoleBatchRequest) ([]model.ClusterResult, error) {
+	return a.batch.RunRoleBatch(req)
+}
+
 // SearchRoles scans the selected clusters/categories for roles matching the term
 // (role name or comment). Per-cluster failures are returned as RoleMatch entries
 // with Error set.

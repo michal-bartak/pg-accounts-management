@@ -26,6 +26,8 @@ export function ReloadConfig():Promise<model.Config>;
 
 export function RunOperation(arg1:model.RunRequest):Promise<Array<model.ClusterResult>>;
 
+export function RunRoleBatch(arg1:model.RoleBatchRequest):Promise<Array<model.ClusterResult>>;
+
 export function SaveBatchSettings(arg1:model.BatchSettings):Promise<void>;
 
 export function SaveCommentFields(arg1:Array<model.CommentField>):Promise<void>;

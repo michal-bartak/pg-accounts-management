@@ -13,8 +13,9 @@ var pgParamRE = regexp.MustCompile(`\$[0-9]+`)
 type fieldKind int
 
 const (
-	fieldIdentifier fieldKind = iota
-	fieldIdentifierList // comma-separated role names (GRANT a, b TO …)
+	fieldIdentifier     fieldKind = iota
+	fieldIdentifierList           // comma-separated role names (GRANT a, b TO …)
+	fieldKeywordList              // space-separated keywords (ALTER ROLE … WITH SUPERUSER NOLOGIN)
 	fieldLiteral
 	fieldBind // function mode only
 )
@@ -160,8 +161,8 @@ func placeholderKindForField(operation, field string) (fieldKind, error) {
 		case "loginname":
 			return fieldIdentifier, nil
 		case "attribute":
-			// Keyword (SUPERUSER / NOLOGIN / …): embedded unquoted, whitelisted upstream.
-			return fieldIdentifier, nil
+			// One or more keywords (SUPERUSER NOLOGIN …): embedded unquoted, whitelisted upstream.
+			return fieldKeywordList, nil
 		}
 	case "create_role":
 		switch field {
@@ -213,6 +214,22 @@ func quoteSQLIdentifierList(value string) (string, error) {
 	return strings.Join(quoted, ", "), nil
 }
 
+// quoteSQLKeywordList renders a whitespace-separated keyword list (e.g. role attributes) as a
+// single space-joined clause. Each token must be a bare identifier; the keyword whitelist is
+// enforced upstream in commands.ValidateOperation.
+func quoteSQLKeywordList(value string) (string, error) {
+	kws := strings.Fields(value)
+	if len(kws) == 0 {
+		return "", fmt.Errorf("at least one keyword is required")
+	}
+	for _, kw := range kws {
+		if !roleLiteralRE.MatchString(kw) {
+			return "", fmt.Errorf("invalid keyword %q: use letters, digits, underscore", kw)
+		}
+	}
+	return strings.Join(kws, " "), nil
+}
+
 func buildEmbedded(call string, args map[string]string, operation string) (string, error) {
 	var b strings.Builder
 	last := 0
@@ -243,6 +260,12 @@ func buildEmbedded(call string, args map[string]string, operation string) (strin
 			b.WriteString(quoted)
 		case fieldIdentifierList:
 			quoted, err := quoteSQLIdentifierList(v)
+			if err != nil {
+				return "", err
+			}
+			b.WriteString(quoted)
+		case fieldKeywordList:
+			quoted, err := quoteSQLKeywordList(v)
 			if err != nil {
 				return "", err
 			}

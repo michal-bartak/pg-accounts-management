@@ -192,21 +192,43 @@ type ResetConfigParams struct {
 	ConfigName string `json:"configName"`
 }
 
+// OperationSpec is a single operation and its parameters, with no cluster targeting.
+// Exactly one of the *Params pointers is non-nil, matching Operation.
+type OperationSpec struct {
+	Operation      string                `json:"operation"`
+	CreateRole     *CreateRoleParams     `json:"createRole,omitempty"`
+	RemoveRole     *RemoveRoleParams     `json:"removeRole,omitempty"`
+	GrantParents   *GrantParentsParams   `json:"grantParents,omitempty"`
+	RevokeParents  *RevokeParentsParams  `json:"revokeParents,omitempty"`
+	ChangePassword *ChangePasswordParams `json:"changePassword,omitempty"`
+	SetComment     *SetCommentParams     `json:"setComment,omitempty"`
+	SetAttribute   *SetAttributeParams   `json:"setAttribute,omitempty"`
+	SetConfig      *SetConfigParams      `json:"setConfig,omitempty"`
+	ResetConfig    *ResetConfigParams    `json:"resetConfig,omitempty"`
+}
+
+// RunRequest targets clusters with a single operation. OperationSpec is embedded so the JSON
+// wire shape is unchanged (operation + param pointers promote to the top level).
 type RunRequest struct {
-	Operation         string                `json:"operation"`
-	CategoryIDs       []string              `json:"categoryIds"`
-	ClusterIDs        []string              `json:"clusterIds"`
-	Auth              AuthContext           `json:"auth"`
-	CreateRole        *CreateRoleParams     `json:"createRole,omitempty"`
-	RemoveRole        *RemoveRoleParams     `json:"removeRole,omitempty"`
-	GrantParents      *GrantParentsParams   `json:"grantParents,omitempty"`
-	RevokeParents     *RevokeParentsParams  `json:"revokeParents,omitempty"`
-	ChangePassword    *ChangePasswordParams `json:"changePassword,omitempty"`
-	SetComment        *SetCommentParams     `json:"setComment,omitempty"`
-	SetAttribute      *SetAttributeParams   `json:"setAttribute,omitempty"`
-	SetConfig         *SetConfigParams      `json:"setConfig,omitempty"`
-	ResetConfig       *ResetConfigParams    `json:"resetConfig,omitempty"`
-	ConfirmProduction bool                  `json:"confirmProduction"`
+	OperationSpec
+	CategoryIDs       []string    `json:"categoryIds"`
+	ClusterIDs        []string    `json:"clusterIds"`
+	Auth              AuthContext `json:"auth"`
+	ConfirmProduction bool        `json:"confirmProduction"`
+}
+
+// ClusterOps is one cluster's ordered operation list (e.g. create_role, then
+// grants/attributes/configs/comment), run as a single transaction on that cluster.
+type ClusterOps struct {
+	ClusterID  string          `json:"clusterId"`
+	Operations []OperationSpec `json:"operations"`
+}
+
+// RoleBatchRequest applies, per cluster, an ordered list of operations inside one transaction.
+type RoleBatchRequest struct {
+	Clusters          []ClusterOps `json:"clusters"`
+	Auth              AuthContext  `json:"auth"`
+	ConfirmProduction bool         `json:"confirmProduction"`
 }
 
 type ClusterResult struct {

@@ -39,13 +39,13 @@ var allowedAttributeKeywords = map[string]bool{
 	"BYPASSRLS": true, "NOBYPASSRLS": true,
 }
 
-func BuildArgs(cfg model.Config, req model.RunRequest) (model.DBFunction, map[string]string, error) {
-	switch req.Operation {
+func BuildArgs(cfg model.Config, op model.OperationSpec) (model.DBFunction, map[string]string, error) {
+	switch op.Operation {
 	case OpCreateRole:
-		if req.CreateRole == nil {
+		if op.CreateRole == nil {
 			return model.DBFunction{}, nil, fmt.Errorf("create role parameters missing")
 		}
-		p := req.CreateRole
+		p := op.CreateRole
 		return cfg.DBFunctions.CreateRole, map[string]string{
 			"loginname":   p.LoginName,
 			"fullname":    p.FullName,
@@ -53,77 +53,142 @@ func BuildArgs(cfg model.Config, req model.RunRequest) (model.DBFunction, map[st
 			"parent_role": p.ParentRole,
 		}, nil
 	case OpRemoveRole:
-		if req.RemoveRole == nil {
+		if op.RemoveRole == nil {
 			return model.DBFunction{}, nil, fmt.Errorf("remove role parameters missing")
 		}
-		login := req.RemoveRole.LoginName
+		login := op.RemoveRole.LoginName
 		return cfg.DBFunctions.RemoveRole, map[string]string{
 			"loginname": login,
 			"rolename":  login,
 		}, nil
 	case OpGrantParents:
-		if req.GrantParents == nil {
+		if op.GrantParents == nil {
 			return model.DBFunction{}, nil, fmt.Errorf("grant parents parameters missing")
 		}
 		return cfg.DBFunctions.GrantParents, map[string]string{
-			"loginname":    req.GrantParents.LoginName,
-			"parent_roles": req.GrantParents.ParentRoles,
+			"loginname":    op.GrantParents.LoginName,
+			"parent_roles": op.GrantParents.ParentRoles,
 		}, nil
 	case OpRevokeParents:
-		if req.RevokeParents == nil {
+		if op.RevokeParents == nil {
 			return model.DBFunction{}, nil, fmt.Errorf("revoke parents parameters missing")
 		}
 		return cfg.DBFunctions.RevokeParents, map[string]string{
-			"loginname":    req.RevokeParents.LoginName,
-			"parent_roles": req.RevokeParents.ParentRoles,
+			"loginname":    op.RevokeParents.LoginName,
+			"parent_roles": op.RevokeParents.ParentRoles,
 		}, nil
 	case OpChangePassword:
-		if req.ChangePassword == nil {
+		if op.ChangePassword == nil {
 			return model.DBFunction{}, nil, fmt.Errorf("change password parameters missing")
 		}
 		return cfg.DBFunctions.ChangePassword, map[string]string{
-			"loginname":    req.ChangePassword.LoginName,
-			"new_password": req.ChangePassword.NewPassword,
+			"loginname":    op.ChangePassword.LoginName,
+			"new_password": op.ChangePassword.NewPassword,
 		}, nil
 	case OpSetComment:
-		if req.SetComment == nil {
+		if op.SetComment == nil {
 			return model.DBFunction{}, nil, fmt.Errorf("set comment parameters missing")
 		}
 		return cfg.DBFunctions.SetComment, map[string]string{
-			"loginname": req.SetComment.LoginName,
-			"comment":   req.SetComment.Comment,
+			"loginname": op.SetComment.LoginName,
+			"comment":   op.SetComment.Comment,
 		}, nil
 	case OpSetAttribute:
-		if req.SetAttribute == nil {
+		if op.SetAttribute == nil {
 			return model.DBFunction{}, nil, fmt.Errorf("set attribute parameters missing")
 		}
 		return cfg.DBFunctions.SetAttribute, map[string]string{
-			"loginname": req.SetAttribute.LoginName,
-			"attribute": req.SetAttribute.Attribute,
+			"loginname": op.SetAttribute.LoginName,
+			"attribute": op.SetAttribute.Attribute,
 		}, nil
 	case OpSetConfig:
-		if req.SetConfig == nil {
+		if op.SetConfig == nil {
 			return model.DBFunction{}, nil, fmt.Errorf("set config parameters missing")
 		}
 		// Built directly in pg.ExecuteOperation (no template); empty DBFunction.
 		return model.DBFunction{}, map[string]string{
-			"loginname":    req.SetConfig.LoginName,
-			"config_name":  req.SetConfig.ConfigName,
-			"config_value": req.SetConfig.ConfigValue,
+			"loginname":    op.SetConfig.LoginName,
+			"config_name":  op.SetConfig.ConfigName,
+			"config_value": op.SetConfig.ConfigValue,
 		}, nil
 	case OpResetConfig:
-		if req.ResetConfig == nil {
+		if op.ResetConfig == nil {
 			return model.DBFunction{}, nil, fmt.Errorf("reset config parameters missing")
 		}
 		return model.DBFunction{}, map[string]string{
-			"loginname":   req.ResetConfig.LoginName,
-			"config_name": req.ResetConfig.ConfigName,
+			"loginname":   op.ResetConfig.LoginName,
+			"config_name": op.ResetConfig.ConfigName,
 		}, nil
 	default:
-		return model.DBFunction{}, nil, fmt.Errorf("unknown operation: %s", req.Operation)
+		return model.DBFunction{}, nil, fmt.Errorf("unknown operation: %s", op.Operation)
 	}
 }
 
+// ValidateOperation checks one operation's params (login present, attribute/config well-formed).
+// It does NOT check cluster targeting — that is a request/batch-level concern.
+func ValidateOperation(cfg model.Config, op model.OperationSpec) error {
+	switch op.Operation {
+	case OpCreateRole:
+		if op.CreateRole == nil || strings.TrimSpace(op.CreateRole.LoginName) == "" {
+			return fmt.Errorf("login name is required")
+		}
+		// parent_role optional when using ${array_concat:parent_role,...} (empty → fixed groups only)
+	case OpRemoveRole:
+		if op.RemoveRole == nil || strings.TrimSpace(op.RemoveRole.LoginName) == "" {
+			return fmt.Errorf("login name is required")
+		}
+	case OpGrantParents:
+		if op.GrantParents == nil || strings.TrimSpace(op.GrantParents.LoginName) == "" {
+			return fmt.Errorf("login name is required")
+		}
+	case OpRevokeParents:
+		if op.RevokeParents == nil || strings.TrimSpace(op.RevokeParents.LoginName) == "" {
+			return fmt.Errorf("login name is required")
+		}
+	case OpChangePassword:
+		if op.ChangePassword == nil || strings.TrimSpace(op.ChangePassword.LoginName) == "" {
+			return fmt.Errorf("login name is required")
+		}
+	case OpSetComment:
+		if op.SetComment == nil || strings.TrimSpace(op.SetComment.LoginName) == "" {
+			return fmt.Errorf("login name is required")
+		}
+	case OpSetAttribute:
+		if op.SetAttribute == nil || strings.TrimSpace(op.SetAttribute.LoginName) == "" {
+			return fmt.Errorf("login name is required")
+		}
+		// The attribute value may be a space-separated list of keywords (e.g. "NOSUPERUSER
+		// NOLOGIN"), emitted as one ALTER ROLE ... WITH ...; validate each token.
+		kws := strings.Fields(op.SetAttribute.Attribute)
+		if len(kws) == 0 {
+			return fmt.Errorf("at least one role attribute is required")
+		}
+		for _, kw := range kws {
+			if !allowedAttributeKeywords[strings.ToUpper(kw)] {
+				return fmt.Errorf("unsupported role attribute: %q", kw)
+			}
+		}
+	case OpSetConfig:
+		if op.SetConfig == nil || strings.TrimSpace(op.SetConfig.LoginName) == "" {
+			return fmt.Errorf("login name is required")
+		}
+		if !ValidConfigName(op.SetConfig.ConfigName) {
+			return fmt.Errorf("invalid setting name: %q", op.SetConfig.ConfigName)
+		}
+	case OpResetConfig:
+		if op.ResetConfig == nil || strings.TrimSpace(op.ResetConfig.LoginName) == "" {
+			return fmt.Errorf("login name is required")
+		}
+		if !ValidConfigName(op.ResetConfig.ConfigName) {
+			return fmt.Errorf("invalid setting name: %q", op.ResetConfig.ConfigName)
+		}
+	default:
+		return fmt.Errorf("unknown operation: %s", op.Operation)
+	}
+	return nil
+}
+
+// ValidateRequest validates a single-operation, cluster-targeted request.
 func ValidateRequest(cfg model.Config, req model.RunRequest) error {
 	if req.Operation == "" {
 		return fmt.Errorf("operation is required")
@@ -131,55 +196,27 @@ func ValidateRequest(cfg model.Config, req model.RunRequest) error {
 	if len(req.CategoryIDs) == 0 && len(req.ClusterIDs) == 0 {
 		return fmt.Errorf("select at least one category or cluster")
 	}
-	switch req.Operation {
-	case OpCreateRole:
-		if req.CreateRole == nil || strings.TrimSpace(req.CreateRole.LoginName) == "" {
-			return fmt.Errorf("login name is required")
+	return ValidateOperation(cfg, req.OperationSpec)
+}
+
+// ValidateRoleBatch validates a per-cluster batch request: at least one cluster, each with at
+// least one operation, and every operation well-formed.
+func ValidateRoleBatch(cfg model.Config, req model.RoleBatchRequest) error {
+	if len(req.Clusters) == 0 {
+		return fmt.Errorf("select at least one cluster")
+	}
+	for _, co := range req.Clusters {
+		if len(co.Operations) == 0 {
+			return fmt.Errorf("cluster %q has no operations", co.ClusterID)
 		}
-		// parent_role optional when using ${array_concat:parent_role,...} (empty → fixed groups only)
-	case OpRemoveRole:
-		if req.RemoveRole == nil || strings.TrimSpace(req.RemoveRole.LoginName) == "" {
-			return fmt.Errorf("login name is required")
+		for _, op := range co.Operations {
+			if op.Operation == "" {
+				return fmt.Errorf("operation is required")
+			}
+			if err := ValidateOperation(cfg, op); err != nil {
+				return err
+			}
 		}
-	case OpGrantParents:
-		if req.GrantParents == nil || strings.TrimSpace(req.GrantParents.LoginName) == "" {
-			return fmt.Errorf("login name is required")
-		}
-	case OpRevokeParents:
-		if req.RevokeParents == nil || strings.TrimSpace(req.RevokeParents.LoginName) == "" {
-			return fmt.Errorf("login name is required")
-		}
-	case OpChangePassword:
-		if req.ChangePassword == nil || strings.TrimSpace(req.ChangePassword.LoginName) == "" {
-			return fmt.Errorf("login name is required")
-		}
-	case OpSetComment:
-		if req.SetComment == nil || strings.TrimSpace(req.SetComment.LoginName) == "" {
-			return fmt.Errorf("login name is required")
-		}
-	case OpSetAttribute:
-		if req.SetAttribute == nil || strings.TrimSpace(req.SetAttribute.LoginName) == "" {
-			return fmt.Errorf("login name is required")
-		}
-		if !allowedAttributeKeywords[strings.ToUpper(strings.TrimSpace(req.SetAttribute.Attribute))] {
-			return fmt.Errorf("unsupported role attribute: %q", req.SetAttribute.Attribute)
-		}
-	case OpSetConfig:
-		if req.SetConfig == nil || strings.TrimSpace(req.SetConfig.LoginName) == "" {
-			return fmt.Errorf("login name is required")
-		}
-		if !ValidConfigName(req.SetConfig.ConfigName) {
-			return fmt.Errorf("invalid setting name: %q", req.SetConfig.ConfigName)
-		}
-	case OpResetConfig:
-		if req.ResetConfig == nil || strings.TrimSpace(req.ResetConfig.LoginName) == "" {
-			return fmt.Errorf("login name is required")
-		}
-		if !ValidConfigName(req.ResetConfig.ConfigName) {
-			return fmt.Errorf("invalid setting name: %q", req.ResetConfig.ConfigName)
-		}
-	default:
-		return fmt.Errorf("unknown operation: %s", req.Operation)
 	}
 	return nil
 }

@@ -15,10 +15,9 @@ func testConfig() model.Config {
 
 func baseRunRequest(op string) model.RunRequest {
 	return model.RunRequest{
-		Operation:   op,
-		CategoryIDs: []string{"uat"},
-		ClusterIDs:  nil,
-		Auth:        model.AuthContext{User: "admin"},
+		OperationSpec: model.OperationSpec{Operation: op},
+		CategoryIDs:   []string{"uat"},
+		Auth:          model.AuthContext{User: "admin"},
 	}
 }
 
@@ -102,68 +101,104 @@ func TestValidateRequest_requiresTargets(t *testing.T) {
 	}
 }
 
+func TestValidateOperation_setAttribute_multiKeyword(t *testing.T) {
+	cfg := testConfig()
+	ok := model.OperationSpec{
+		Operation:    OpSetAttribute,
+		SetAttribute: &model.SetAttributeParams{LoginName: "jdoe", Attribute: "NOSUPERUSER NOLOGIN"},
+	}
+	if err := ValidateOperation(cfg, ok); err != nil {
+		t.Fatalf("multi-keyword attribute rejected: %v", err)
+	}
+	bad := model.OperationSpec{
+		Operation:    OpSetAttribute,
+		SetAttribute: &model.SetAttributeParams{LoginName: "jdoe", Attribute: "SUPERUSER BOGUS"},
+	}
+	if err := ValidateOperation(cfg, bad); err == nil {
+		t.Fatal("expected an unknown keyword to be rejected")
+	}
+	empty := model.OperationSpec{
+		Operation:    OpSetAttribute,
+		SetAttribute: &model.SetAttributeParams{LoginName: "jdoe", Attribute: "   "},
+	}
+	if err := ValidateOperation(cfg, empty); err == nil {
+		t.Fatal("expected empty attribute to be rejected")
+	}
+}
+
+func TestValidateRoleBatch(t *testing.T) {
+	cfg := testConfig()
+	good := model.RoleBatchRequest{
+		Clusters: []model.ClusterOps{
+			{ClusterID: "c1", Operations: []model.OperationSpec{
+				{Operation: OpCreateRole, CreateRole: &model.CreateRoleParams{LoginName: "jdoe"}},
+				{Operation: OpSetComment, SetComment: &model.SetCommentParams{LoginName: "jdoe", Comment: "{}"}},
+			}},
+		},
+	}
+	if err := ValidateRoleBatch(cfg, good); err != nil {
+		t.Fatalf("valid batch rejected: %v", err)
+	}
+	if err := ValidateRoleBatch(cfg, model.RoleBatchRequest{}); err == nil {
+		t.Fatal("expected empty cluster list to be rejected")
+	}
+	emptyOps := model.RoleBatchRequest{Clusters: []model.ClusterOps{{ClusterID: "c1"}}}
+	if err := ValidateRoleBatch(cfg, emptyOps); err == nil {
+		t.Fatal("expected a cluster with no operations to be rejected")
+	}
+	badOp := model.RoleBatchRequest{
+		Clusters: []model.ClusterOps{{ClusterID: "c1", Operations: []model.OperationSpec{
+			{Operation: OpCreateRole, CreateRole: &model.CreateRoleParams{LoginName: ""}},
+		}}},
+	}
+	if err := ValidateRoleBatch(cfg, badOp); err == nil {
+		t.Fatal("expected a bad operation to propagate")
+	}
+}
+
 func TestBuildArgs_allOperations(t *testing.T) {
 	cfg := testConfig()
 
 	tests := []struct {
 		op   string
-		req  model.RunRequest
+		spec model.OperationSpec
 		want map[string]string
 	}{
 		{
 			op: OpCreateRole,
-			req: func() model.RunRequest {
-				r := baseRunRequest(OpCreateRole)
-				r.CreateRole = &model.CreateRoleParams{
-					LoginName: "u1", FullName: "Name", Email: "e@x.com", ParentRole: "gr_p",
-				}
-				return r
-			}(),
+			spec: model.OperationSpec{
+				Operation:  OpCreateRole,
+				CreateRole: &model.CreateRoleParams{LoginName: "u1", FullName: "Name", Email: "e@x.com", ParentRole: "gr_p"},
+			},
 			want: map[string]string{
 				"loginname": "u1", "fullname": "Name", "email": "e@x.com", "parent_role": "gr_p",
 			},
 		},
 		{
-			op: OpRemoveRole,
-			req: func() model.RunRequest {
-				r := baseRunRequest(OpRemoveRole)
-				r.RemoveRole = &model.RemoveRoleParams{LoginName: "u1"}
-				return r
-			}(),
+			op:   OpRemoveRole,
+			spec: model.OperationSpec{Operation: OpRemoveRole, RemoveRole: &model.RemoveRoleParams{LoginName: "u1"}},
 			want: map[string]string{"loginname": "u1", "rolename": "u1"},
 		},
 		{
-			op: OpGrantParents,
-			req: func() model.RunRequest {
-				r := baseRunRequest(OpGrantParents)
-				r.GrantParents = &model.GrantParentsParams{LoginName: "u1", ParentRoles: "a,b"}
-				return r
-			}(),
+			op:   OpGrantParents,
+			spec: model.OperationSpec{Operation: OpGrantParents, GrantParents: &model.GrantParentsParams{LoginName: "u1", ParentRoles: "a,b"}},
 			want: map[string]string{"loginname": "u1", "parent_roles": "a,b"},
 		},
 		{
-			op: OpRevokeParents,
-			req: func() model.RunRequest {
-				r := baseRunRequest(OpRevokeParents)
-				r.RevokeParents = &model.RevokeParentsParams{LoginName: "u1", ParentRoles: "gr_x"}
-				return r
-			}(),
+			op:   OpRevokeParents,
+			spec: model.OperationSpec{Operation: OpRevokeParents, RevokeParents: &model.RevokeParentsParams{LoginName: "u1", ParentRoles: "gr_x"}},
 			want: map[string]string{"loginname": "u1", "parent_roles": "gr_x"},
 		},
 		{
-			op: OpChangePassword,
-			req: func() model.RunRequest {
-				r := baseRunRequest(OpChangePassword)
-				r.ChangePassword = &model.ChangePasswordParams{LoginName: "u1", NewPassword: "pw"}
-				return r
-			}(),
+			op:   OpChangePassword,
+			spec: model.OperationSpec{Operation: OpChangePassword, ChangePassword: &model.ChangePasswordParams{LoginName: "u1", NewPassword: "pw"}},
 			want: map[string]string{"loginname": "u1", "new_password": "pw"},
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.op, func(t *testing.T) {
-			fn, args, err := BuildArgs(cfg, tc.req)
+			fn, args, err := BuildArgs(cfg, tc.spec)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -186,20 +221,16 @@ func TestBuildQuery_allOperations(t *testing.T) {
 	tests := []struct {
 		name       string
 		operation  string
-		buildReq   func() model.RunRequest
+		spec       model.OperationSpec
 		wantSubstr []string
 		minBinds   int
 	}{
 		{
 			name:      "create_role",
 			operation: OpCreateRole,
-			buildReq: func() model.RunRequest {
-				return model.RunRequest{
-					Operation: OpCreateRole,
-					CreateRole: &model.CreateRoleParams{
-						LoginName: "jdoe", FullName: "John", Email: "j@x.com", ParentRole: "gr_extra",
-					},
-				}
+			spec: model.OperationSpec{
+				Operation:  OpCreateRole,
+				CreateRole: &model.CreateRoleParams{LoginName: "jdoe", FullName: "John", Email: "j@x.com", ParentRole: "gr_extra"},
 			},
 			wantSubstr: []string{
 				"SELECT admin_access.create_role(",
@@ -212,54 +243,31 @@ func TestBuildQuery_allOperations(t *testing.T) {
 		{
 			name:      "create_role_empty_parent",
 			operation: OpCreateRole,
-			buildReq: func() model.RunRequest {
-				return model.RunRequest{
-					Operation: OpCreateRole,
-					CreateRole: &model.CreateRoleParams{
-						LoginName: "jdoe", FullName: "John", Email: "j@x.com", ParentRole: "",
-					},
-				}
+			spec: model.OperationSpec{
+				Operation:  OpCreateRole,
+				CreateRole: &model.CreateRoleParams{LoginName: "jdoe", FullName: "John", Email: "j@x.com", ParentRole: ""},
 			},
 			wantSubstr: []string{"|| NULL"},
 			minBinds:   3,
 		},
 		{
-			name:      "remove_role",
-			operation: OpRemoveRole,
-			buildReq: func() model.RunRequest {
-				return model.RunRequest{
-					Operation:  OpRemoveRole,
-					RemoveRole: &model.RemoveRoleParams{LoginName: "jdoe"},
-				}
-			},
+			name:       "remove_role",
+			operation:  OpRemoveRole,
+			spec:       model.OperationSpec{Operation: OpRemoveRole, RemoveRole: &model.RemoveRoleParams{LoginName: "jdoe"}},
 			wantSubstr: []string{"SELECT your_schema.remove_app_role($1)"},
 			minBinds:   1,
 		},
 		{
-			name:      "grant_parents",
-			operation: OpGrantParents,
-			buildReq: func() model.RunRequest {
-				return model.RunRequest{
-					Operation: OpGrantParents,
-					GrantParents: &model.GrantParentsParams{
-						LoginName: "jdoe", ParentRoles: "gr_a,gr_b",
-					},
-				}
-			},
+			name:       "grant_parents",
+			operation:  OpGrantParents,
+			spec:       model.OperationSpec{Operation: OpGrantParents, GrantParents: &model.GrantParentsParams{LoginName: "jdoe", ParentRoles: "gr_a,gr_b"}},
 			wantSubstr: []string{"SELECT your_schema.grant_role_parents($1, $2)"},
 			minBinds:   2,
 		},
 		{
-			name:      "change_password",
-			operation: OpChangePassword,
-			buildReq: func() model.RunRequest {
-				return model.RunRequest{
-					Operation: OpChangePassword,
-					ChangePassword: &model.ChangePasswordParams{
-						LoginName: "jdoe", NewPassword: "s3cret",
-					},
-				}
-			},
+			name:       "change_password",
+			operation:  OpChangePassword,
+			spec:       model.OperationSpec{Operation: OpChangePassword, ChangePassword: &model.ChangePasswordParams{LoginName: "jdoe", NewPassword: "s3cret"}},
 			wantSubstr: []string{"SELECT your_schema.change_role_password($1, $2)"},
 			minBinds:   2,
 		},
@@ -267,8 +275,7 @@ func TestBuildQuery_allOperations(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			req := tc.buildReq()
-			fn, args, err := BuildArgs(cfg, req)
+			fn, args, err := BuildArgs(cfg, tc.spec)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -297,11 +304,10 @@ func TestBuild_removeRole_statementMode(t *testing.T) {
 		Call:      "DROP ROLE ${loginname}",
 		Execution: model.ExecutionStatement,
 	}
-	req := model.RunRequest{
+	fn, args, err := BuildArgs(cfg, model.OperationSpec{
 		Operation:  OpRemoveRole,
 		RemoveRole: &model.RemoveRoleParams{LoginName: "jdoe"},
-	}
-	fn, args, err := BuildArgs(cfg, req)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,12 +322,9 @@ func TestBuild_removeRole_statementMode(t *testing.T) {
 
 func TestBuild_revokeParents_statementMode(t *testing.T) {
 	cfg := testConfig()
-	fn, args, err := BuildArgs(cfg, model.RunRequest{
-		Operation: OpRevokeParents,
-		RevokeParents: &model.RevokeParentsParams{
-			LoginName:   "test",
-			ParentRoles: "Gr_devs_all_ro",
-		},
+	fn, args, err := BuildArgs(cfg, model.OperationSpec{
+		Operation:     OpRevokeParents,
+		RevokeParents: &model.RevokeParentsParams{LoginName: "test", ParentRoles: "Gr_devs_all_ro"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -341,14 +344,10 @@ func TestBuild_grantParents_statementMode(t *testing.T) {
 		Call:      "GRANT ${parent_roles} TO ${loginname}",
 		Execution: model.ExecutionStatement,
 	}
-	req := model.RunRequest{
-		Operation: OpGrantParents,
-		GrantParents: &model.GrantParentsParams{
-			LoginName:   "test",
-			ParentRoles: "Gr_devs_all_ro",
-		},
-	}
-	fn, args, err := BuildArgs(cfg, req)
+	fn, args, err := BuildArgs(cfg, model.OperationSpec{
+		Operation:    OpGrantParents,
+		GrantParents: &model.GrantParentsParams{LoginName: "test", ParentRoles: "Gr_devs_all_ro"},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -366,11 +365,10 @@ func TestBuildQuery_removeRole_customTemplate(t *testing.T) {
 	cfg.DBFunctions.RemoveRole = model.DBFunction{
 		Call: "admin_access.drop_user(${loginname})",
 	}
-	req := model.RunRequest{
+	fn, args, err := BuildArgs(cfg, model.OperationSpec{
 		Operation:  OpRemoveRole,
 		RemoveRole: &model.RemoveRoleParams{LoginName: "testuser"},
-	}
-	fn, args, err := BuildArgs(cfg, req)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -389,15 +387,21 @@ func TestBuildQuery_removeRole_customTemplate(t *testing.T) {
 func TestValidateRequest_setConfig(t *testing.T) {
 	cfg := testConfig()
 	ok := model.RunRequest{
-		Operation: OpSetConfig, ClusterIDs: []string{"c"},
-		SetConfig: &model.SetConfigParams{LoginName: "t", ConfigName: "log_statement", ConfigValue: "all"},
+		OperationSpec: model.OperationSpec{
+			Operation: OpSetConfig,
+			SetConfig: &model.SetConfigParams{LoginName: "t", ConfigName: "log_statement", ConfigValue: "all"},
+		},
+		ClusterIDs: []string{"c"},
 	}
 	if err := ValidateRequest(cfg, ok); err != nil {
 		t.Fatalf("valid set_config rejected: %v", err)
 	}
 	bad := model.RunRequest{
-		Operation: OpSetConfig, ClusterIDs: []string{"c"},
-		SetConfig: &model.SetConfigParams{LoginName: "t", ConfigName: "bad name;", ConfigValue: "x"},
+		OperationSpec: model.OperationSpec{
+			Operation: OpSetConfig,
+			SetConfig: &model.SetConfigParams{LoginName: "t", ConfigName: "bad name;", ConfigValue: "x"},
+		},
+		ClusterIDs: []string{"c"},
 	}
 	if err := ValidateRequest(cfg, bad); err == nil {
 		t.Fatal("expected invalid setting name to be rejected")
@@ -406,7 +410,7 @@ func TestValidateRequest_setConfig(t *testing.T) {
 		t.Fatal("ValidConfigName wrong")
 	}
 	// set_config/reset_config build empty DBFunction (handled directly in pg).
-	fn, args, err := BuildArgs(cfg, ok)
+	fn, args, err := BuildArgs(cfg, ok.OperationSpec)
 	if err != nil || fn.Call != "" || args["config_name"] != "log_statement" || args["config_value"] != "all" {
 		t.Fatalf("BuildArgs set_config: fn=%q args=%v err=%v", fn.Call, args, err)
 	}

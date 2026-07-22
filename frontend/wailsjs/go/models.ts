@@ -140,6 +140,202 @@ export namespace model {
 	        this.connectUser = source["connectUser"];
 	    }
 	}
+	export class ResetConfigParams {
+	    loginName: string;
+	    configName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ResetConfigParams(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.loginName = source["loginName"];
+	        this.configName = source["configName"];
+	    }
+	}
+	export class SetConfigParams {
+	    loginName: string;
+	    configName: string;
+	    configValue: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SetConfigParams(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.loginName = source["loginName"];
+	        this.configName = source["configName"];
+	        this.configValue = source["configValue"];
+	    }
+	}
+	export class SetAttributeParams {
+	    loginName: string;
+	    attribute: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SetAttributeParams(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.loginName = source["loginName"];
+	        this.attribute = source["attribute"];
+	    }
+	}
+	export class SetCommentParams {
+	    loginName: string;
+	    comment: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SetCommentParams(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.loginName = source["loginName"];
+	        this.comment = source["comment"];
+	    }
+	}
+	export class RevokeParentsParams {
+	    loginName: string;
+	    parentRoles: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RevokeParentsParams(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.loginName = source["loginName"];
+	        this.parentRoles = source["parentRoles"];
+	    }
+	}
+	export class GrantParentsParams {
+	    loginName: string;
+	    parentRoles: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GrantParentsParams(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.loginName = source["loginName"];
+	        this.parentRoles = source["parentRoles"];
+	    }
+	}
+	export class RemoveRoleParams {
+	    loginName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RemoveRoleParams(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.loginName = source["loginName"];
+	    }
+	}
+	export class CreateRoleParams {
+	    loginName: string;
+	    fullName: string;
+	    email: string;
+	    parentRole: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CreateRoleParams(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.loginName = source["loginName"];
+	        this.fullName = source["fullName"];
+	        this.email = source["email"];
+	        this.parentRole = source["parentRole"];
+	    }
+	}
+	export class OperationSpec {
+	    operation: string;
+	    createRole?: CreateRoleParams;
+	    removeRole?: RemoveRoleParams;
+	    grantParents?: GrantParentsParams;
+	    revokeParents?: RevokeParentsParams;
+	    changePassword?: ChangePasswordParams;
+	    setComment?: SetCommentParams;
+	    setAttribute?: SetAttributeParams;
+	    setConfig?: SetConfigParams;
+	    resetConfig?: ResetConfigParams;
+	
+	    static createFrom(source: any = {}) {
+	        return new OperationSpec(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.operation = source["operation"];
+	        this.createRole = this.convertValues(source["createRole"], CreateRoleParams);
+	        this.removeRole = this.convertValues(source["removeRole"], RemoveRoleParams);
+	        this.grantParents = this.convertValues(source["grantParents"], GrantParentsParams);
+	        this.revokeParents = this.convertValues(source["revokeParents"], RevokeParentsParams);
+	        this.changePassword = this.convertValues(source["changePassword"], ChangePasswordParams);
+	        this.setComment = this.convertValues(source["setComment"], SetCommentParams);
+	        this.setAttribute = this.convertValues(source["setAttribute"], SetAttributeParams);
+	        this.setConfig = this.convertValues(source["setConfig"], SetConfigParams);
+	        this.resetConfig = this.convertValues(source["resetConfig"], ResetConfigParams);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ClusterOps {
+	    clusterId: string;
+	    operations: OperationSpec[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ClusterOps(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.clusterId = source["clusterId"];
+	        this.operations = this.convertValues(source["operations"], OperationSpec);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class ClusterResult {
 	    clusterId: string;
 	    alias: string;
@@ -328,24 +524,7 @@ export namespace model {
 		    return a;
 		}
 	}
-	export class CreateRoleParams {
-	    loginName: string;
-	    fullName: string;
-	    email: string;
-	    parentRole: string;
 	
-	    static createFrom(source: any = {}) {
-	        return new CreateRoleParams(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.loginName = source["loginName"];
-	        this.fullName = source["fullName"];
-	        this.email = source["email"];
-	        this.parentRole = source["parentRole"];
-	    }
-	}
 	
 	
 	export class EnvImport {
@@ -366,59 +545,44 @@ export namespace model {
 	        this.user = source["user"];
 	    }
 	}
-	export class GrantParentsParams {
-	    loginName: string;
-	    parentRoles: string;
+	
+	
+	
+	
+	
+	export class RoleBatchRequest {
+	    clusters: ClusterOps[];
+	    auth: AuthContext;
+	    confirmProduction: boolean;
 	
 	    static createFrom(source: any = {}) {
-	        return new GrantParentsParams(source);
+	        return new RoleBatchRequest(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.loginName = source["loginName"];
-	        this.parentRoles = source["parentRoles"];
-	    }
-	}
-	export class RemoveRoleParams {
-	    loginName: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new RemoveRoleParams(source);
+	        this.clusters = this.convertValues(source["clusters"], ClusterOps);
+	        this.auth = this.convertValues(source["auth"], AuthContext);
+	        this.confirmProduction = source["confirmProduction"];
 	    }
 	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.loginName = source["loginName"];
-	    }
-	}
-	export class ResetConfigParams {
-	    loginName: string;
-	    configName: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ResetConfigParams(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.loginName = source["loginName"];
-	        this.configName = source["configName"];
-	    }
-	}
-	export class RevokeParentsParams {
-	    loginName: string;
-	    parentRoles: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new RevokeParentsParams(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.loginName = source["loginName"];
-	        this.parentRoles = source["parentRoles"];
-	    }
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class RoleDetailsRequest {
 	    loginName: string;
@@ -518,55 +682,8 @@ export namespace model {
 		    return a;
 		}
 	}
-	export class SetConfigParams {
-	    loginName: string;
-	    configName: string;
-	    configValue: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new SetConfigParams(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.loginName = source["loginName"];
-	        this.configName = source["configName"];
-	        this.configValue = source["configValue"];
-	    }
-	}
-	export class SetAttributeParams {
-	    loginName: string;
-	    attribute: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new SetAttributeParams(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.loginName = source["loginName"];
-	        this.attribute = source["attribute"];
-	    }
-	}
-	export class SetCommentParams {
-	    loginName: string;
-	    comment: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new SetCommentParams(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.loginName = source["loginName"];
-	        this.comment = source["comment"];
-	    }
-	}
 	export class RunRequest {
 	    operation: string;
-	    categoryIds: string[];
-	    clusterIds: string[];
-	    auth: AuthContext;
 	    createRole?: CreateRoleParams;
 	    removeRole?: RemoveRoleParams;
 	    grantParents?: GrantParentsParams;
@@ -576,6 +693,9 @@ export namespace model {
 	    setAttribute?: SetAttributeParams;
 	    setConfig?: SetConfigParams;
 	    resetConfig?: ResetConfigParams;
+	    categoryIds: string[];
+	    clusterIds: string[];
+	    auth: AuthContext;
 	    confirmProduction: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -585,9 +705,6 @@ export namespace model {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.operation = source["operation"];
-	        this.categoryIds = source["categoryIds"];
-	        this.clusterIds = source["clusterIds"];
-	        this.auth = this.convertValues(source["auth"], AuthContext);
 	        this.createRole = this.convertValues(source["createRole"], CreateRoleParams);
 	        this.removeRole = this.convertValues(source["removeRole"], RemoveRoleParams);
 	        this.grantParents = this.convertValues(source["grantParents"], GrantParentsParams);
@@ -597,6 +714,9 @@ export namespace model {
 	        this.setAttribute = this.convertValues(source["setAttribute"], SetAttributeParams);
 	        this.setConfig = this.convertValues(source["setConfig"], SetConfigParams);
 	        this.resetConfig = this.convertValues(source["resetConfig"], ResetConfigParams);
+	        this.categoryIds = source["categoryIds"];
+	        this.clusterIds = source["clusterIds"];
+	        this.auth = this.convertValues(source["auth"], AuthContext);
 	        this.confirmProduction = source["confirmProduction"];
 	    }
 	

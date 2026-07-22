@@ -765,22 +765,26 @@ function roleIdentityInputs() {
   };
 }
 
-/** Build one create_role per selected cluster: base role + template base groups only
- *  (empty parent_role). Parents/attributes/settings/password/comment layer on via
- *  buildAlterRequests. full_name/e_mail feed the create_role template placeholders as a
+/** Build per-cluster ops for Create: create_role first (empty parent_role → template base
+ *  groups only), then that cluster's alter diff (parents/attributes/settings/password/comment)
+ *  from buildAlterClusterOps. full_name/e_mail feed the create_role placeholders as a
  *  convenience; the follow-up set_comment (from the editor) is authoritative. */
-function buildCreateRoleRequests(base) {
+function buildCreateClusterOps(base) {
+  const alterByCluster = new Map(buildAlterClusterOps().map((c) => [c.clusterId, c.operations]));
   return resolveSelectedClusters().map((c) => ({
-    op: 'create_role',
     clusterId: c.id,
-    params: {
-      createRole: {
-        loginName: base.loginName,
-        fullName: commentEditor.values['full_name'] || '',
-        email: commentEditor.values['e_mail'] || '',
-        parentRole: '',
+    operations: [
+      {
+        operation: 'create_role',
+        createRole: {
+          loginName: base.loginName,
+          fullName: commentEditor.values['full_name'] || '',
+          email: commentEditor.values['e_mail'] || '',
+          parentRole: '',
+        },
       },
-    },
+      ...(alterByCluster.get(c.id) || []),
+    ],
   }));
 }
 
@@ -802,7 +806,7 @@ async function runOperation() {
     showToast('Select at least one category or cluster', 'error');
     return;
   }
-  alterSelected = base.loginName; // buildAlterRequests keys its ops on this login
+  alterSelected = base.loginName; // buildAlterClusterOps keys its ops on this login
 
   // Pre-flight: warn if the role already exists on any selected cluster (create would error).
   try {
@@ -824,10 +828,11 @@ async function runOperation() {
     /* pre-flight is best-effort; per-cluster errors will still surface on run */
   }
 
-  // create_role first (each cluster), then the grant/attr/setting/password/comment diff.
-  const requests = buildCreateRoleRequests(base).concat(buildAlterRequests());
-  warnIfPlainTextComment(requests);
-  const ok = await executeAlterRequests(requests, 'Role created');
+  // Per cluster: create_role first, then the grant/attr/setting/password/comment diff — all
+  // run as one transaction on the backend.
+  const clusterBatch = buildCreateClusterOps(base);
+  warnIfPlainTextComment(clusterBatch);
+  const ok = await executeRoleBatch(clusterBatch, 'Role created');
   if (!ok) return;
   resetEditMaps();
   loadCommentEditor(); // clears the identity inputs (create mode)
@@ -2017,17 +2022,20 @@ function commitCommentsDialog() {
   renderAlterDetail(); // reflect the staged/"edited" state in the differ section
 }
 
-function buildAlterRequests() {
-  /** @type {Array<{op:string, clusterId:string, params:object}>} */
-  const requests = [];
+/** Build per-cluster ordered operation lists for the alter diff. Returns
+ *  [{clusterId, operations:[{operation, <paramKey>:{…}}]}] for clusters with >=1 change.
+ *  The backend runs each cluster's operations as one transaction. */
+function buildAlterClusterOps() {
+  /** @type {Array<{clusterId:string, operations:Array<object>}>} */
+  const out = [];
   // The comment editor owns the consistent case: assemble the desired comment once and emit
   // set_comment per cluster where it actually changes. When comments vary across clusters the
   // inline editor is disabled and per-cluster desired comments come from the Comments dialog
-  // (commentOverrides). In create mode this runs after create_role, making set_comment
-  // authoritative.
+  // (commentOverrides).
   const desiredInline = commentEditor.varies ? null : assembleComment();
 
   for (const d of alterDetails) {
+    const ops = [];
     const parents = d.parents || [];
     const toGrant = [...alterAdd.entries()]
       .filter(([role, ids]) => ids.has(d.clusterId) && !parents.includes(role))
@@ -2036,45 +2044,26 @@ function buildAlterRequests() {
       .filter(([role, ids]) => ids.has(d.clusterId) && parents.includes(role))
       .map(([role]) => role);
     if (toGrant.length) {
-      requests.push({
-        op: 'grant_parents',
-        clusterId: d.clusterId,
-        params: { grantParents: { loginName: alterSelected, parentRoles: toGrant.join(',') } },
-      });
+      ops.push({ operation: 'grant_parents', grantParents: { loginName: alterSelected, parentRoles: toGrant.join(',') } });
     }
     if (toRevoke.length) {
-      requests.push({
-        op: 'revoke_parents',
-        clusterId: d.clusterId,
-        params: { revokeParents: { loginName: alterSelected, parentRoles: toRevoke.join(',') } },
-      });
+      ops.push({ operation: 'revoke_parents', revokeParents: { loginName: alterSelected, parentRoles: toRevoke.join(',') } });
     }
     if (alterDoPassword && alterPassword) {
-      requests.push({
-        op: 'change_password',
-        clusterId: d.clusterId,
-        params: { changePassword: { loginName: alterSelected, newPassword: alterPassword } },
-      });
+      ops.push({ operation: 'change_password', changePassword: { loginName: alterSelected, newPassword: alterPassword } });
     }
 
-    // Attribute enable/disable, one ALTER ROLE per attribute per cluster.
+    // Attributes: combine all enable/disable keywords into ONE ALTER ROLE … WITH … statement.
+    const kws = [];
     for (const a of ROLE_ATTRIBUTES) {
       const on = !!(d.attributes && d.attributes[a.key]);
       const enableIds = alterAttrAdd.get(a.key);
       const disableIds = alterAttrRemove.get(a.key);
-      if (enableIds && enableIds.has(d.clusterId) && !on) {
-        requests.push({
-          op: 'set_attribute',
-          clusterId: d.clusterId,
-          params: { setAttribute: { loginName: alterSelected, attribute: a.on } },
-        });
-      } else if (disableIds && disableIds.has(d.clusterId) && on) {
-        requests.push({
-          op: 'set_attribute',
-          clusterId: d.clusterId,
-          params: { setAttribute: { loginName: alterSelected, attribute: a.off } },
-        });
-      }
+      if (enableIds && enableIds.has(d.clusterId) && !on) kws.push(a.on);
+      else if (disableIds && disableIds.has(d.clusterId) && on) kws.push(a.off);
+    }
+    if (kws.length) {
+      ops.push({ operation: 'set_attribute', setAttribute: { loginName: alterSelected, attribute: kws.join(' ') } });
     }
 
     // Settings: SET name=value where pending & not already that value; RESET where pending.
@@ -2083,41 +2072,33 @@ function buildAlterRequests() {
       if (!ids.has(d.clusterId)) continue;
       const { name, value } = cfgParse(key);
       if (settings[name] !== value) {
-        requests.push({
-          op: 'set_config',
-          clusterId: d.clusterId,
-          params: { setConfig: { loginName: alterSelected, configName: name, configValue: value } },
-        });
+        ops.push({ operation: 'set_config', setConfig: { loginName: alterSelected, configName: name, configValue: value } });
       }
     }
     for (const [name, ids] of alterConfigReset) {
       if (ids.has(d.clusterId) && Object.prototype.hasOwnProperty.call(settings, name)) {
-        requests.push({
-          op: 'reset_config',
-          clusterId: d.clusterId,
-          params: { resetConfig: { loginName: alterSelected, configName: name } },
-        });
+        ops.push({ operation: 'reset_config', resetConfig: { loginName: alterSelected, configName: name } });
       }
     }
 
-    // Comment via set_comment: a staged per-cluster override (varies case, from the Comments
-    // dialog) wins; otherwise the inline editor's assembled comment. Emit only on a real change.
+    // Comment via set_comment: a staged per-cluster override (varies case) wins; otherwise the
+    // inline editor's assembled comment. Emit only on a real change.
     const desiredComment = commentOverrides.has(d.clusterId) ? commentOverrides.get(d.clusterId) : desiredInline;
     if (desiredComment !== null && canonicalComment(desiredComment) !== canonicalComment(d.comment || '')) {
-      requests.push({
-        op: 'set_comment',
-        clusterId: d.clusterId,
-        params: { setComment: { loginName: alterSelected, comment: desiredComment } },
-      });
+      ops.push({ operation: 'set_comment', setComment: { loginName: alterSelected, comment: desiredComment } });
     }
+
+    if (ops.length) out.push({ clusterId: d.clusterId, operations: ops });
   }
-  return requests;
+  return out;
 }
 
-/** Warn if any emitted set_comment stores a non-empty, non-JSON comment (plain text). */
-function warnIfPlainTextComment(requests) {
-  const plain = requests.some(
-    (r) => r.op === 'set_comment' && r.params.setComment.comment && !parseCommentObject(r.params.setComment.comment).isObject
+/** Warn if any staged set_comment stores a non-empty, non-JSON comment (plain text). */
+function warnIfPlainTextComment(clusters) {
+  const plain = clusters.some((c) =>
+    c.operations.some(
+      (op) => op.operation === 'set_comment' && op.setComment.comment && !parseCommentObject(op.setComment.comment).isObject
+    )
   );
   if (plain) showToast('Comment saved as plain text (not JSON)', 'warn');
 }
@@ -2134,14 +2115,14 @@ async function saveAlterations() {
     return;
   }
 
-  const requests = buildAlterRequests();
-  if (!requests.length) {
+  const clusters = buildAlterClusterOps();
+  if (!clusters.length) {
     showToast('No changes to save', 'error');
     return;
   }
-  warnIfPlainTextComment(requests);
+  warnIfPlainTextComment(clusters);
 
-  const ok = await executeAlterRequests(requests, 'Changes saved');
+  const ok = await executeRoleBatch(clusters, 'Changes saved');
   if (!ok) return;
   // Applied — clear pending edits and refresh from the DB.
   resetEditMaps();
@@ -2161,53 +2142,39 @@ async function removeRole() {
     `Remove "${alterSelected}" on all clusters where it exists? This cannot be undone from the app.`
   );
   if (!okConfirm) return;
-  const requests = alterDetails.map((d) => ({
-    op: 'remove_role',
+  const clusters = alterDetails.map((d) => ({
     clusterId: d.clusterId,
-    params: { removeRole: { loginName: alterSelected } },
+    operations: [{ operation: 'remove_role', removeRole: { loginName: alterSelected } }],
   }));
-  const ok = await executeAlterRequests(requests, 'Role removed');
+  const ok = await executeRoleBatch(clusters, 'Role removed');
   if (!ok) return;
   await reloadDetails();
 }
 
 /** Run a list of per-cluster operations, gating production and reporting status.
  *  Returns false when blocked/cancelled before execution. */
-async function executeAlterRequests(requests, successMsg) {
+/** Run a per-cluster batch: each cluster's operations execute as ONE transaction on the backend
+ *  (all-or-nothing per cluster), clusters concurrent, one result row per cluster. */
+async function executeRoleBatch(clusters, successMsg) {
   const app = backend();
-  const targetIds = [...new Set(requests.map((r) => r.clusterId))];
-  const prodInvolved = targetIds.some((id) => categoryConfirm(clusterCategory(id)));
+  if (!app) {
+    showToast('Wails backend not available', 'error');
+    return false;
+  }
+  const prodInvolved = clusters.some((c) => categoryConfirm(clusterCategory(c.clusterId)));
   if (prodInvolved) {
     const ok = await askConfirm('Production', 'This action includes PRODUCTION clusters. Continue?');
     if (!ok) return false;
   }
 
-  const auth = getAuth();
-  const results = [];
-  for (const r of requests) {
-    try {
-      const res = await app.RunOperation({
-        operation: r.op,
-        categoryIds: [],
-        clusterIds: [r.clusterId],
-        auth,
-        confirmProduction: true,
-        ...r.params,
-      });
-      results.push(...res);
-    } catch (e) {
-      const c = state?.clusters?.find((x) => x.id === r.clusterId);
-      results.push({
-        clusterId: r.clusterId,
-        alias: c?.alias || r.clusterId,
-        host: c?.host || '',
-        category: c?.category || '',
-        status: 'error',
-        message: String(e),
-        durationMs: 0,
-      });
-    }
+  let results;
+  try {
+    results = await app.RunRoleBatch({ clusters, auth: getAuth(), confirmProduction: true });
+  } catch (e) {
+    showToast(String(e), 'error');
+    return false;
   }
+  results = results || [];
   renderResults(results);
   const failed = results.filter((r) => r.status !== 'ok').length;
   showToast(failed ? `${successMsg} with ${failed} error(s)` : successMsg, failed ? 'error' : 'success');

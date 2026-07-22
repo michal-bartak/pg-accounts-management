@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/michalbartak/dbaccounts/internal/calltemplate"
 	"github.com/michalbartak/dbaccounts/internal/model"
 )
@@ -16,9 +17,16 @@ var (
 	gucNameRE   = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$`)
 )
 
+// Querier is the subset of pgx used to run an operation. Both *pgx.Conn and pgx.Tx satisfy it,
+// so an operation can run either standalone (autocommit) or inside a per-cluster transaction.
+type Querier interface {
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
+
 // execRoleConfig runs ALTER ROLE <login> SET <name> = '<value>' / RESET <name>.
 // Role name and GUC name are validated as identifiers; the value is a quoted literal.
-func execRoleConfig(ctx context.Context, conn *pgx.Conn, operation string, args map[string]string) (string, error) {
+func execRoleConfig(ctx context.Context, q Querier, operation string, args map[string]string) (string, error) {
 	login := strings.TrimSpace(args["loginname"])
 	name := strings.TrimSpace(args["config_name"])
 	if !roleIdentRE.MatchString(login) {
@@ -34,16 +42,18 @@ func execRoleConfig(ctx context.Context, conn *pgx.Conn, operation string, args 
 		value := strings.ReplaceAll(args["config_value"], "'", "''")
 		sql = fmt.Sprintf("ALTER ROLE %s SET %s = '%s'", login, name, value)
 	}
-	if _, err := conn.Exec(ctx, sql); err != nil {
+	if _, err := q.Exec(ctx, sql); err != nil {
 		return "", err
 	}
 	return "ok", nil
 }
 
-func ExecuteOperation(ctx context.Context, conn *pgx.Conn, fn model.DBFunction, operation string, args map[string]string) (string, error) {
+// ExecuteOperation runs one operation on q (a *pgx.Conn for autocommit, or a pgx.Tx to
+// participate in a per-cluster transaction).
+func ExecuteOperation(ctx context.Context, q Querier, fn model.DBFunction, operation string, args map[string]string) (string, error) {
 	// Role GUC settings are written with hardcoded ALTER ROLE SET/RESET (no template).
 	if operation == "set_config" || operation == "reset_config" {
-		return execRoleConfig(ctx, conn, operation, args)
+		return execRoleConfig(ctx, q, operation, args)
 	}
 
 	call := strings.TrimSpace(fn.Call)
@@ -58,9 +68,9 @@ func ExecuteOperation(ctx context.Context, conn *pgx.Conn, fn model.DBFunction, 
 	}
 
 	if useQuery {
-		return runQuery(ctx, conn, query, values...)
+		return runQuery(ctx, q, query, values...)
 	}
-	tag, err := conn.Exec(ctx, query)
+	tag, err := q.Exec(ctx, query)
 	if err != nil {
 		return "", err
 	}
@@ -75,8 +85,8 @@ func CallFunction(ctx context.Context, conn *pgx.Conn, fn model.DBFunction, oper
 	return ExecuteOperation(ctx, conn, fn, operation, args)
 }
 
-func runQuery(ctx context.Context, conn *pgx.Conn, query string, values ...any) (string, error) {
-	rows, err := conn.Query(ctx, query, values...)
+func runQuery(ctx context.Context, q Querier, query string, values ...any) (string, error) {
+	rows, err := q.Query(ctx, query, values...)
 	if err != nil {
 		return "", err
 	}

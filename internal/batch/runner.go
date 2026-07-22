@@ -62,7 +62,7 @@ func (r *Runner) Run(req model.RunRequest) ([]model.ClusterResult, error) {
 	if commands.RequiresProductionConfirm(cfg.Categories, clusters) && !req.ConfirmProduction {
 		return nil, fmt.Errorf("production clusters selected: confirm production execution")
 	}
-	fn, args, err := commands.BuildArgs(cfg, req)
+	fn, args, err := commands.BuildArgs(cfg, req.OperationSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -249,5 +249,108 @@ func (r *Runner) runOne(cluster model.Cluster, operation string, fn model.DBFunc
 	}
 	res.Status = "ok"
 	res.Message = msg
+	return res
+}
+
+// RunRoleBatch applies, per cluster, an ordered list of operations inside a single transaction
+// (all-or-nothing per cluster). Clusters run concurrently (bounded by max concurrency); a failed
+// cluster rolls back and is reported independently while the others proceed.
+func (r *Runner) RunRoleBatch(req model.RoleBatchRequest) ([]model.ClusterResult, error) {
+	cfg := r.store.Get()
+	if err := commands.ValidateRoleBatch(cfg, req); err != nil {
+		return nil, err
+	}
+
+	type target struct {
+		cluster model.Cluster
+		ops     []model.OperationSpec
+	}
+	targets := make([]target, 0, len(req.Clusters))
+	resolved := make([]model.Cluster, 0, len(req.Clusters))
+	for _, co := range req.Clusters {
+		c, ok := r.store.ClusterByID(co.ClusterID)
+		if !ok {
+			return nil, fmt.Errorf("unknown cluster: %s", co.ClusterID)
+		}
+		targets = append(targets, target{cluster: c, ops: co.Operations})
+		resolved = append(resolved, c)
+	}
+
+	if commands.RequiresProductionConfirm(cfg.Categories, resolved) && !req.ConfirmProduction {
+		return nil, fmt.Errorf("production clusters selected: confirm production execution")
+	}
+
+	results := make([]model.ClusterResult, len(targets))
+	sem := make(chan struct{}, r.maxScanWorkers())
+	var wg sync.WaitGroup
+	for i, t := range targets {
+		wg.Add(1)
+		go func(idx int, cl model.Cluster, ops []model.OperationSpec) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			results[idx] = r.runClusterTx(cfg, cl, ops, req.Auth)
+		}(i, t.cluster, t.ops)
+	}
+	wg.Wait()
+	return results, nil
+}
+
+// runClusterTx runs all of a cluster's operations in one transaction: commit on success,
+// rollback (leaving nothing applied) on the first error, naming the failing operation.
+func (r *Runner) runClusterTx(cfg model.Config, cluster model.Cluster, ops []model.OperationSpec, auth model.AuthContext) model.ClusterResult {
+	start := time.Now()
+	res := model.ClusterResult{
+		ClusterID: cluster.ID,
+		Alias:     cluster.Alias,
+		Host:      cluster.Host,
+		Category:  cluster.Category,
+		Status:    "error",
+	}
+
+	// The timeout spans the whole op list + commit, so scale it with the operation count.
+	timeout := 30*time.Second + time.Duration(len(ops))*10*time.Second
+	if timeout > 120*time.Second {
+		timeout = 120 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	conn, err := pg.Connect(ctx, cluster, auth)
+	if err != nil {
+		res.Message = err.Error()
+		res.DurationMs = time.Since(start).Milliseconds()
+		return res
+	}
+	defer conn.Close(ctx)
+
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		res.Message = "begin transaction: " + err.Error()
+		res.DurationMs = time.Since(start).Milliseconds()
+		return res
+	}
+
+	for i, op := range ops {
+		fn, args, berr := commands.BuildArgs(cfg, op)
+		if berr == nil {
+			_, berr = pg.ExecuteOperation(ctx, tx, fn, op.Operation, args)
+		}
+		if berr != nil {
+			_ = tx.Rollback(ctx)
+			res.Message = fmt.Sprintf("operation %d/%d (%s): %v", i+1, len(ops), op.Operation, berr)
+			res.DurationMs = time.Since(start).Milliseconds()
+			return res
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		res.Message = "commit: " + err.Error()
+		res.DurationMs = time.Since(start).Milliseconds()
+		return res
+	}
+	res.Status = "ok"
+	res.Message = fmt.Sprintf("%d operation(s) committed", len(ops))
+	res.DurationMs = time.Since(start).Milliseconds()
 	return res
 }
