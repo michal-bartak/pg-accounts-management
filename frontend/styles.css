@@ -52,6 +52,13 @@
 
 * { box-sizing: border-box; }
 
+/* Desktop-app feel: no free-text selection of the chrome, but keep real text-entry
+   controls (inputs, textareas, editable regions) selectable. */
+input, textarea, [contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 /* One scrollbar look everywhere (Firefox + WebKit); transparent track so it sits on
    any panel colour, subtle thumb that brightens on hover. */
 * {
@@ -131,6 +138,9 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* Disable stray text selection app-wide (re-enabled for text-entry controls above). */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .app-header, .tabs { flex: none; }
@@ -427,12 +437,33 @@ tr:last-child td { border-bottom: none; }
 
 /* Settings panel */
 .settings-meta {
-  margin-bottom: 1.25rem;
+  margin-top: 1.25rem;
   padding: 0.75rem 1rem;
-  background: var(--surface);
+  background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
+
+.config-path-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.config-path-line .config-path { flex: 1; }
+
+.config-path-copy {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  border-radius: var(--radius);
+}
+.config-path-copy:hover { color: var(--primary); }
 
 .settings-meta-label {
   display: block;

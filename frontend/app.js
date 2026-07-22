@@ -2058,6 +2058,22 @@ document.getElementById('btn-run').addEventListener('click', runOperation);
 document.getElementById('btn-test-clusters').addEventListener('click', testAllClusters);
 document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
 
+const COPY_ICON_SVG = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="1" width="10" height="11" rx="2"/><rect x="1" y="4" width="10" height="11" rx="2"/></svg>';
+const CHECK_ICON_SVG = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,8 6,13 14,3"/></svg>';
+document.getElementById('btn-copy-config-path')?.addEventListener('click', async (ev) => {
+  const btn = ev.currentTarget;
+  const path = document.getElementById('config-path').textContent || '';
+  if (!path) return;
+  try {
+    await navigator.clipboard.writeText(path);
+    btn.innerHTML = CHECK_ICON_SVG;
+    showToast('Config path copied', 'success');
+    setTimeout(() => { btn.innerHTML = COPY_ICON_SVG; }, 1500);
+  } catch (e) {
+    showToast('Copy failed: ' + e, 'error');
+  }
+});
+
 document.getElementById('btn-toggle-clusters')?.addEventListener('click', (ev) => {
   const btn = ev.currentTarget;
   const list = document.getElementById('cluster-checkboxes');
