@@ -41,6 +41,22 @@ let alterAttrRemove = new Map();
 let alterConfigSet = new Map();
 /** @type {Map<string, Set<string>>} setting name -> clusterIds to RESET */
 let alterConfigReset = new Map();
+/** Inline comment editor state (shared by Create/Alter). Rendered FROM and written TO by
+ *  the editor; renderAlterDetail never touches it, so pending edits survive re-renders. */
+let commentEditor = {
+  mode: 'fields', // 'fields' | 'raw'
+  baseObj: {}, // parsed object of the loaded consensus comment (preserves unknown/non-string keys)
+  isObject: false, // did the loaded/raw comment parse as a JSON object?
+  raw: '', // raw textarea text (authoritative in raw mode)
+  shownKeys: [], // ordered keys rendered as value-inputs (configured first, then other keys)
+  labels: {}, // key -> label
+  values: {}, // key -> edited string value (JSON text for read-only non-string keys)
+  readonly: new Set(), // keys whose value isn't a string: shown but only Raw-editable
+  varies: false, // comment differs across clusters (inline editor disabled; use Comments dialog)
+};
+/** @type {Map<string, string>} clusterId -> desired comment, staged from the Comments dialog
+ *  (varies case). Published together with the other edits on "Save changes". */
+let commentOverrides = new Map();
 
 // The role form is shared by Create and Alter. Create = editing a not-yet-existing role
 // across the selected clusters with an empty baseline; Alter = editing an existing role
@@ -57,6 +73,7 @@ function resetEditMaps() {
   alterAttrRemove = new Map();
   alterConfigSet = new Map();
   alterConfigReset = new Map();
+  commentOverrides = new Map();
   alterDoPassword = false;
   alterPassword = '';
 }
@@ -187,6 +204,20 @@ function setThemeButtons(pref) {
   });
 }
 
+/** Currently-selected preferred comment view (from the segmented button group). */
+function currentCommentViewPref() {
+  return document.querySelector('#comment-view-pref .seg-btn.active')?.dataset.pref || state?.ui?.commentDefaultView || 'fields';
+}
+
+/** Reflect a preference in the segmented Preferred-comment-view buttons. */
+function setCommentViewButtons(pref) {
+  document.querySelectorAll('#comment-view-pref .seg-btn').forEach((b) => {
+    const on = b.dataset.pref === pref;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+}
+
 function applyTheme(themePref) {
   const pref = themePref || 'system';
   let resolved = pref;
@@ -227,8 +258,7 @@ async function loadConfig() {
     document.getElementById('config-path').textContent = await app.GetConfigPath();
     setThemeButtons(state?.ui?.theme || 'system');
     applyTheme(state?.ui?.theme || 'system');
-    const parentRolesEl = document.getElementById('parent-roles');
-    if (parentRolesEl) parentRolesEl.value = (state?.parentRoles || []).join(', ');
+    setCommentViewButtons(state?.ui?.commentDefaultView || 'fields');
     renderAll();
   } catch (e) {
     showToast(String(e), 'error');
@@ -272,9 +302,9 @@ function renderCategoryColors() {
       const hex = c.color || DEFAULT_CAT_COLOR;
       const id = (window.CSS && CSS.escape) ? CSS.escape(c.id) : c.id;
       return [
-        `.badge[data-cat="${id}"]{color:${hex};background:${hexToRgba(hex, 0.2)}}`,
-        `.chip-scope.scope-kind-group[data-cat="${id}"]{color:${hex};background:${hexToRgba(hex, 0.16)}}`,
-        `.chip-scope.scope-kind-cluster[data-cat="${id}"]{color:${hex};background:transparent;border-color:${hex}}`,
+        `.badge[data-cat="${id}"]{color:${hex};background:transparent;border-color:${hex}}`,
+        `.chip-scope.scope-kind-group[data-cat="${id}"]{color:${hex};background:transparent;border-color:${hex}}`,
+        `.chip-scope.scope-kind-cluster[data-cat="${id}"]{color:${hex};background:${hexToRgba(hex, 0.16)}}`,
         `.checkbox-group label[data-category="${id}"]:has(input:checked){border-color:${hex};background:${hexToRgba(hex, 0.18)}}`,
       ].join('');
     })
@@ -361,9 +391,10 @@ function renderClustersTable() {
       <td><span class="badge" data-cat="${escapeAttr(c.category)}">${escapeHtml(categoryLabel(c.category))}</span></td>
       <td class="cluster-status" data-status-for="${escapeAttr(c.id)}"></td>
       <td>
-        <button class="small" data-action="edit" data-id="${c.id}">Edit</button>
-        <button class="small" data-action="test" data-id="${c.id}">Test</button>
-        <button class="small danger" data-action="delete" data-id="${c.id}">Delete</button>
+        <div class="row-actions">
+          <button class="scope-act" data-action="edit" data-id="${c.id}" title="Edit cluster" aria-label="Edit cluster">✎</button>
+          <button class="scope-act" data-action="delete" data-id="${c.id}" title="Delete cluster" aria-label="Delete cluster">×</button>
+        </div>
       </td>`;
     tbody.appendChild(tr);
   }
@@ -415,6 +446,111 @@ const EXECUTION_LABELS = { function: 'Function call', statement: 'SQL statement'
 let dbFnDraft = {};
 /** @type {string|null} op currently open in the template dialog */
 let fnDialogKey = null;
+/** In-memory edits for comment fields, staged until "Save settings". */
+/** @type {Array<{key:string, label:string}>} */
+let commentFieldsDraft = [];
+/** In-memory edits for preconfigured parent groups, staged until "Save settings". */
+/** @type {Array<string>} */
+let parentRolesDraft = [];
+
+// --- Shared draggable list editor (comment fields, parent groups) ---
+
+/** One reorderable row: a drag handle, caller-supplied cells, and a remove button. */
+function listRowHtml(idx, innerHtml) {
+  return `
+    <div class="le-row" data-le-idx="${idx}">
+      <span class="le-grip" draggable="true" data-le-idx="${idx}" title="Drag to reorder" aria-label="Drag to reorder">⠿</span>
+      ${innerHtml}
+      <button type="button" class="le-del" data-le-idx="${idx}" title="Remove" aria-label="Remove">×</button>
+    </div>`;
+}
+
+/** Wire drag-to-reorder + remove on a list-editor container. getDraft returns the backing
+ *  array; rerender repaints it. Row indices come from data-le-idx. */
+function wireListEditor(containerId, getDraft, rerender) {
+  const root = document.getElementById(containerId);
+  if (!root) return;
+  let dragIdx = null;
+  root.addEventListener('dragstart', (ev) => {
+    const grip = ev.target.closest('.le-grip');
+    if (!grip) return;
+    dragIdx = Number(grip.dataset.leIdx);
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.dataTransfer.setData('text/plain', String(dragIdx)); // required for DnD to arm in some webviews
+  });
+  root.addEventListener('dragover', (ev) => {
+    if (dragIdx == null) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+  });
+  root.addEventListener('drop', (ev) => {
+    if (dragIdx == null) return;
+    ev.preventDefault();
+    const draft = getDraft();
+    const row = ev.target.closest('.le-row');
+    const [moved] = draft.splice(dragIdx, 1);
+    if (!row) {
+      draft.push(moved); // dropped past the last row → append
+    } else {
+      // Insert at the drop target's ORIGINAL index within the post-removal array: dragging
+      // down lands the row after the target (so first→last works), dragging up before it.
+      draft.splice(Number(row.dataset.leIdx), 0, moved);
+    }
+    dragIdx = null;
+    rerender();
+  });
+  root.addEventListener('dragend', () => {
+    dragIdx = null;
+  });
+  root.addEventListener('click', (ev) => {
+    const del = ev.target.closest('.le-del');
+    if (!del) return;
+    getDraft().splice(Number(del.dataset.leIdx), 1);
+    rerender();
+  });
+}
+
+/** Rebuild the comment-fields draft from saved config, then paint it. */
+function renderCommentFieldsEditor() {
+  const src = state?.commentFields?.length ? state.commentFields : DEFAULT_COMMENT_FIELDS;
+  commentFieldsDraft = src.map((f) => ({ key: f.key || '', label: f.label || '' }));
+  renderCommentFieldsDraft();
+}
+
+/** Paint the comment-fields editor from the current draft (after add/delete/reorder). */
+function renderCommentFieldsDraft() {
+  const root = document.getElementById('comment-fields-editor');
+  if (!root) return;
+  root.innerHTML = commentFieldsDraft
+    .map((f, i) =>
+      listRowHtml(
+        i,
+        `<input class="cf-key" data-idx="${i}" value="${escapeAttr(f.key)}" placeholder="key (e.g. full_name)" autocapitalize="none" autocomplete="off" spellcheck="false" />
+      <input class="cf-label" data-idx="${i}" value="${escapeAttr(f.label)}" placeholder="label (e.g. Full name)" autocomplete="off" />`
+      )
+    )
+    .join('');
+}
+
+/** Rebuild the parent-groups draft from saved config, then paint it. */
+function renderParentRolesEditor() {
+  parentRolesDraft = (state?.parentRoles || []).slice();
+  renderParentRolesDraft();
+}
+
+/** Paint the parent-groups editor from the current draft (after add/delete/reorder). */
+function renderParentRolesDraft() {
+  const root = document.getElementById('parent-roles-editor');
+  if (!root) return;
+  root.innerHTML = parentRolesDraft
+    .map((r, i) =>
+      listRowHtml(
+        i,
+        `<input class="pr-value" data-idx="${i}" value="${escapeAttr(r)}" placeholder="e.g. gr_devs_ro" autocapitalize="none" autocomplete="off" spellcheck="false" />`
+      )
+    )
+    .join('');
+}
 
 /** Compact list of command names; click a row to edit it in a popup. Rebuilds the draft
  *  from the saved config each render. */
@@ -495,6 +631,8 @@ function renderAll() {
   renderClusterCheckboxes();
   renderGroupsTable();
   renderDBFunctionsEditor();
+  renderCommentFieldsEditor();
+  renderParentRolesEditor();
   updateTargetPreview();
 }
 
@@ -611,21 +749,6 @@ async function onClusterAction(ev) {
     }
     return;
   }
-  if (action === 'test') {
-    const password = prompt('Password (leave empty if not required, e.g. trust auth):') ?? '';
-    setClusterStatus(id, 'pending', 'testing…');
-    try {
-      await app.TestConnection({
-        clusterId: id,
-        auth: { user: '', password },
-      });
-      setClusterStatus(id, 'ok', 'connected');
-      showToast('Connection OK', 'success');
-    } catch (e) {
-      setClusterStatus(id, 'error', String(e));
-      showToast(String(e), 'error');
-    }
-  }
 }
 
 /** Preconfigured parent groups defined in Settings. */
@@ -633,32 +756,30 @@ function preconfiguredParentRoles() {
   return state?.parentRoles || [];
 }
 
-/** Split a comma-separated parent-role field into trimmed, non-empty names. */
-function parseRoleList(value) {
-  return String(value || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
 
 /** Create-role privilege universe = the clusters covered by the sidebar target selection. */
-/** Read the shared identity inputs (login / full name / email). */
+/** Read the shared login input. Full name / email now live in the comment editor. */
 function roleIdentityInputs() {
   return {
     loginName: document.getElementById('role-login')?.value.trim() || '',
-    fullName: document.getElementById('role-fullname')?.value.trim() || '',
-    email: document.getElementById('role-email')?.value.trim() || '',
   };
 }
 
 /** Build one create_role per selected cluster: base role + template base groups only
- *  (empty parent_role). Parents/attributes/settings/password layer on via buildAlterRequests. */
+ *  (empty parent_role). Parents/attributes/settings/password/comment layer on via
+ *  buildAlterRequests. full_name/e_mail feed the create_role template placeholders as a
+ *  convenience; the follow-up set_comment (from the editor) is authoritative. */
 function buildCreateRoleRequests(base) {
   return resolveSelectedClusters().map((c) => ({
     op: 'create_role',
     clusterId: c.id,
     params: {
-      createRole: { loginName: base.loginName, fullName: base.fullName, email: base.email, parentRole: '' },
+      createRole: {
+        loginName: base.loginName,
+        fullName: commentEditor.values['full_name'] || '',
+        email: commentEditor.values['e_mail'] || '',
+        parentRole: '',
+      },
     },
   }));
 }
@@ -703,12 +824,13 @@ async function runOperation() {
     /* pre-flight is best-effort; per-cluster errors will still surface on run */
   }
 
-  // create_role first (each cluster), then the grant/attr/setting/password diff.
+  // create_role first (each cluster), then the grant/attr/setting/password/comment diff.
   const requests = buildCreateRoleRequests(base).concat(buildAlterRequests());
+  warnIfPlainTextComment(requests);
   const ok = await executeAlterRequests(requests, 'Role created');
   if (!ok) return;
   resetEditMaps();
-  loadRoleIdentityValues(); // clears the identity inputs (create mode)
+  loadCommentEditor(); // clears the identity inputs (create mode)
   synthCreateBaseline();
   renderAlterDetail();
 }
@@ -777,8 +899,14 @@ async function saveSettings() {
     });
     await app.SaveUISettings({
       theme: currentThemePref(),
+      commentDefaultView: currentCommentViewPref(),
     });
-    await app.SaveParentRoles(parseRoleList(document.getElementById('parent-roles')?.value));
+    await app.SaveParentRoles(parentRolesDraft.map((r) => r.trim()).filter(Boolean));
+    await app.SaveCommentFields(
+      commentFieldsDraft
+        .map((f) => ({ key: f.key.trim(), label: f.label.trim() }))
+        .filter((f) => f.key)
+    );
     await loadConfig();
     showToast('Settings saved', 'success');
   } catch (e) {
@@ -867,6 +995,8 @@ let alterPassword = '';
 let scopeDialogCtx = null;
 /** @type {Array<{text:string, ids:string[]}>} distinct comment values for the popup */
 let commentVersions = [];
+/** @type {Array<object>} one comment-editor model per version (parallel to commentVersions) */
+let commentVersionEditors = [];
 
 function clusterCategory(clusterId) {
   return state?.clusters?.find((c) => c.id === clusterId)?.category || '';
@@ -1013,7 +1143,7 @@ async function reloadDetails() {
   }
   alterDetails = (details || []).filter((d) => d.exists && !d.error);
   const errors = (details || []).filter((d) => d.error);
-  loadRoleIdentityValues();
+  loadCommentEditor();
   renderAlterDetail(errors);
 }
 
@@ -1111,6 +1241,18 @@ function scopeLabelsHtml(parts, extraCls = '') {
 }
 
 /** Canonical form of a comment for comparison: sorted-key JSON when valid, else raw. */
+/** Built-in comment-key mapping, used when config omits comment_fields. */
+const DEFAULT_COMMENT_FIELDS = [
+  { key: 'full_name', label: 'Full name' },
+  { key: 'e_mail', label: 'Email' },
+];
+
+/** Ordered configured comment fields, with the built-in default fallback. */
+function commentFields() {
+  const cf = state?.commentFields;
+  return Array.isArray(cf) && cf.length ? cf : DEFAULT_COMMENT_FIELDS;
+}
+
 function canonicalComment(text) {
   const t = (text || '').trim();
   if (!t || t[0] !== '{') return text || '';
@@ -1146,44 +1288,186 @@ function identityConsensus() {
   };
 }
 
-/** Read a string field from a JSON role comment (e.g. full_name, email); '' if absent. */
-function parseCommentField(comment, key) {
+/** Parse a role comment. isObject=true only for a JSON object (not array/scalar/plain text).
+ *  Single source of truth for reading structured comments. */
+function parseCommentObject(comment) {
   const t = (comment || '').trim();
-  if (!t || t[0] !== '{') return '';
+  if (!t || t[0] !== '{') return { isObject: false, obj: {} };
   try {
-    const m = JSON.parse(t);
-    return typeof m[key] === 'string' ? m[key].trim() : '';
+    const o = JSON.parse(t);
+    if (o && typeof o === 'object' && !Array.isArray(o)) return { isObject: true, obj: o };
   } catch {
-    return '';
+    /* not JSON */
   }
+  return { isObject: false, obj: {} };
 }
 
-/** Populate the static #role-identity inputs. Called on mode entry / role load only —
- *  NOT on every re-render, so pending user edits aren't clobbered. */
-function loadRoleIdentityValues() {
+/** Read a string field from a JSON role comment (e.g. full_name, email); '' if absent. */
+function parseCommentField(comment, key) {
+  const { isObject, obj } = parseCommentObject(comment);
+  return isObject && typeof obj[key] === 'string' ? obj[key].trim() : '';
+}
+
+/** Preferred comment mode for an EMPTY comment (create / no-comment role): 'fields' | 'raw'. */
+function preferredCommentView() {
+  return state?.ui?.commentDefaultView === 'raw' ? 'raw' : 'fields';
+}
+
+/** Consensus comment across the loaded clusters + whether they disagree. */
+function commentConsensus() {
+  const raws = alterDetails.map((d) => d.comment).filter(Boolean);
+  const canon = new Set(raws.map(canonicalComment));
+  return { comment: raws.length ? raws[0] : '', varies: canon.size > 1, hasComment: raws.length >= 1 };
+}
+
+/** Build the editor model from a comment string. Configured fields always render (blank if
+ *  absent); extra string keys render too (labeled by raw key); non-string keys stay in
+ *  baseObj only (Raw-editable). Default mode = Fields for a JSON object, else Raw. */
+function editorFromComment(comment, varies) {
+  const { isObject, obj } = parseCommentObject(comment);
+  const labels = {};
+  const values = {};
+  const shownKeys = [];
+  const seen = new Set();
+  const readonly = new Set(); // keys whose value isn't a string: shown but only Raw-editable
+  const addKey = (key, label) => {
+    if (seen.has(key)) return;
+    seen.add(key);
+    shownKeys.push(key);
+    labels[key] = label;
+    if (isObject && key in obj && typeof obj[key] !== 'string') {
+      // Non-string value (number/bool/array/object): display it (JSON) but read-only, so it's
+      // visible per the design and its type is preserved via baseObj on save.
+      values[key] = JSON.stringify(obj[key]);
+      readonly.add(key);
+    } else {
+      values[key] = isObject && typeof obj[key] === 'string' ? obj[key] : '';
+    }
+  };
+  // Configured fields always render (in order); then every other key present in the comment.
+  for (const f of commentFields()) addKey(f.key, f.label || f.key);
+  if (isObject) for (const k of Object.keys(obj)) addKey(k, k);
+  // Mode: JSON object -> Fields; non-JSON *content* -> Raw; empty -> the configured preference.
+  const hasPlainText = !isObject && !!(comment || '').trim();
+  let mode;
+  if (isObject) mode = 'fields';
+  else if (hasPlainText) mode = 'raw';
+  else mode = preferredCommentView();
+  return {
+    mode,
+    baseObj: isObject ? obj : {},
+    isObject,
+    raw: comment || '',
+    shownKeys,
+    labels,
+    values,
+    readonly,
+    varies,
+  };
+}
+
+function freshEditor() {
+  return editorFromComment('', false);
+}
+
+/** Load #role-login + build the comment editor model. Called on mode entry / role load only
+ *  — NOT on every re-render, so pending user edits aren't clobbered. */
+function loadCommentEditor() {
   const login = document.getElementById('role-login');
-  const fullname = document.getElementById('role-fullname');
-  const email = document.getElementById('role-email');
-  const note = document.getElementById('role-identity-note');
   if (!login) return;
   if (isCreateMode()) {
     login.value = '';
-    fullname.value = '';
-    email.value = '';
-    note.textContent = '';
-    return;
+    commentEditor = freshEditor();
+  } else {
+    login.value = alterSelected || '';
+    const c = commentConsensus();
+    commentEditor = editorFromComment(c.varies ? '' : c.comment, c.varies);
   }
-  login.value = alterSelected || '';
-  const fns = [...new Set(alterDetails.map((d) => d.fullName).filter(Boolean))];
-  const emails = [...new Set(alterDetails.map((d) => parseCommentField(d.comment, 'e_mail')).filter(Boolean))];
-  fullname.value = fns.length === 1 ? fns[0] : '';
-  email.value = emails.length === 1 ? emails[0] : '';
-  const varies = [];
-  if (fns.length > 1) varies.push('full name');
-  if (emails.length > 1) varies.push('email');
-  note.textContent = varies.length
-    ? `Current ${varies.join(' and ')} varies across clusters; a value here applies to all.`
-    : '';
+  renderCommentEditor();
+}
+
+/** Paint the comment editor (toggle state + per-key value inputs + notice) from commentEditor. */
+function renderCommentEditor() {
+  const fieldsBox = document.getElementById('rce-fields');
+  const raw = document.getElementById('rce-raw');
+  const notice = document.getElementById('rce-notice');
+  if (!fieldsBox || !raw || !notice) return;
+  const e = commentEditor;
+  document
+    .querySelectorAll('#rce-mode .seg-btn')
+    .forEach((b) => b.classList.toggle('active', b.dataset.mode === e.mode));
+
+  const plainTextLoaded = !e.isObject && !!e.raw.trim();
+  const fieldsDisabled = e.varies || (plainTextLoaded && !isCreateMode());
+  fieldsBox.classList.toggle('hidden', e.mode !== 'fields');
+  raw.classList.toggle('hidden', e.mode !== 'raw');
+  raw.value = e.raw;
+
+  fieldsBox.innerHTML = commentFieldInputsHtml(e, null, fieldsDisabled);
+
+  if (e.varies) {
+    notice.textContent = 'Comments differ across clusters — reconcile via "View / edit comments" below.';
+  } else if (e.mode === 'fields' && plainTextLoaded) {
+    notice.textContent = 'This comment is plain text — switch to Raw to edit it.';
+  } else {
+    notice.textContent = '';
+  }
+}
+
+/** The comment an editor model currently represents (may be plain text in raw mode). */
+function assembleCommentFrom(e) {
+  if (e.mode === 'raw') return e.raw.trim();
+  const out = { ...e.baseObj };
+  for (const k of e.shownKeys) {
+    if (e.readonly && e.readonly.has(k)) continue; // non-string value: keep baseObj's typed value
+    const v = (e.values[k] || '').trim();
+    if (v) out[k] = v;
+    else delete out[k];
+  }
+  return Object.keys(out).length ? JSON.stringify(sortKeysDeep(out)) : '';
+}
+function assembleComment() {
+  return assembleCommentFrom(commentEditor);
+}
+
+/** Switch an editor model between Fields<->Raw without losing data (mutates e). */
+function switchEditorMode(e, mode) {
+  if (mode === e.mode) return;
+  if (mode === 'raw') {
+    e.raw = assembleCommentFrom(e); // serialize field state so nothing is lost
+  } else {
+    const rebuilt = editorFromComment(e.raw, e.varies);
+    e.baseObj = rebuilt.baseObj;
+    e.isObject = rebuilt.isObject;
+    e.shownKeys = rebuilt.shownKeys;
+    e.labels = rebuilt.labels;
+    e.values = rebuilt.values;
+    e.readonly = rebuilt.readonly;
+  }
+  e.mode = mode;
+}
+function switchCommentMode(mode) {
+  switchEditorMode(commentEditor, mode);
+  renderCommentEditor();
+}
+
+/** Field value inputs for an editor model, namespaced with data-cv-idx for reuse in dialogs.
+ *  Non-string keys (e.readonly) render disabled with a note — visible but edited via Raw. */
+function commentFieldInputsHtml(e, idx, disabled) {
+  const idxAttr = idx == null ? '' : ` data-cv-idx="${idx}"`;
+  return e.shownKeys
+    .map((k) => {
+      const ro = e.readonly && e.readonly.has(k);
+      const note = ro
+        ? ` <button type="button" class="q-hint q-warn" tabindex="0" aria-label="Non-text value — edit in Raw" data-hint="Non-text value — edit in Raw">⚠</button>`
+        : '';
+      return `
+    <label class="rce-field"><span class="rce-field-label">${escapeHtml(e.labels[k] || k)}${note}</span>
+      <input type="text"${idxAttr} data-cf-key="${escapeAttr(k)}" value="${escapeAttr(e.values[k] || '')}"
+        autocapitalize="none" autocomplete="off" spellcheck="false" ${disabled || ro ? 'disabled' : ''} />
+    </label>`;
+    })
+    .join('');
 }
 
 function renderAlterDetail(errors = []) {
@@ -1232,27 +1516,28 @@ function renderAlterDetail(errors = []) {
 
   const id = identityConsensus();
 
-  // Edit-only Comment section: a read-only text box when the comment is consistent,
-  // otherwise printed info. (Present-on renders above the form in #role-present; full
-  // name / email live in the editable #role-identity block.)
+  // The inline comment editor handles the consistent case; hide it when comments vary across
+  // clusters (it can't sensibly edit them all at once) and reconcile via the Comments dialog.
+  const commentEditorEl = document.getElementById('role-comment-editor');
+  if (commentEditorEl) commentEditorEl.classList.toggle('hidden', !create && id.commentVaries);
+
+  // Edit-only: when comments vary, surface a "reconcile per cluster" entry (Comments dialog).
+  // When consistent, the inline editor above is the only comment UI (no redundant section).
   let editHead = '';
   if (!create) {
-    let commentBody;
+    editHead = renderDetailErrors(errors);
     if (id.commentVaries) {
-      commentBody = `<p class="hint">Comments differ across clusters — use the button below to view and reconcile them.</p>`;
-    } else if (id.hasComment) {
-      commentBody = `<textarea class="comment-view" rows="2" readonly>${escapeHtml(id.comment)}</textarea>`;
-    } else {
-      commentBody = `<p class="hint">No comment.</p>`;
-    }
-    const commentsBtn = `<button type="button" class="small" id="btn-alter-comments">${id.commentVaries ? 'Comments differ — view / edit' : 'View / edit comments'}</button>`;
-    editHead = `
-    ${renderDetailErrors(errors)}
+      const staged = alterDetails.some(
+        (d) => commentOverrides.has(d.clusterId) && canonicalComment(commentOverrides.get(d.clusterId)) !== canonicalComment(d.comment || '')
+      );
+      editHead += `
     <div class="alter-section">
       <div class="alter-privs-label">Comment</div>
-      <div class="alter-identity">${commentBody}</div>
-      <div class="alter-add-priv">${commentsBtn}</div>
+      <div class="alter-add-priv">
+        <button type="button" class="small btn-two-line${staged ? ' is-added' : ''}" id="btn-alter-comments">Comments differ across clusters<br>view / edit per cluster</button>
+      </div>
     </div>`;
+    }
   }
 
   const existing = allPrivileges();
@@ -1285,7 +1570,7 @@ function renderAlterDetail(errors = []) {
       <div class="alter-privs-label">Privileges ${hintBadge('Each privilege shows the clusters/groups it is granted on. Use ✎ to add or remove clusters, × to revoke everywhere.')}</div>
       <div class="scope-rows" id="alter-privs">${privHtml}</div>
       <div class="alter-add-priv">
-        <button type="button" class="small" id="btn-alter-add">Add privilege…</button>
+        <button type="button" class="list-add" id="btn-alter-add">Add privilege…</button>
       </div>
     </div>
 
@@ -1298,7 +1583,7 @@ function renderAlterDetail(errors = []) {
       <div class="alter-privs-label">Settings ${hintBadge('Role GUCs (ALTER ROLE … SET/RESET). Use ✎ to set on chosen clusters, × to reset everywhere it has that value.')}</div>
       <div class="scope-rows" id="alter-configs">${cfgHtml}</div>
       <div class="alter-add-priv">
-        <button type="button" class="small" id="btn-alter-add-config">Add setting…</button>
+        <button type="button" class="list-add" id="btn-alter-add-config">Add setting…</button>
       </div>
     </div>
 
@@ -1353,7 +1638,7 @@ function scopeRowHtml(kind, key, name, curSet, addSet, revSet) {
   const k = escapeAttr(key);
   const pending = addSet.size > 0 || revSet.size > 0;
   const kept = setMinus(curSet, revSet);
-  const emptyNote = kind === 'attr' ? '<span class="hint">off</span>' : '<span class="hint">none</span>';
+  const emptyNote = kind === 'attr' ? '<span class="hint scope-off">off</span>' : '<span class="hint">none</span>';
 
   const keptLabels = scopeLabelsHtml(describeScope(kept));
   const addLabels = addSet.size ? scopeLabelsHtml(describeScope(addSet), 'chip-scope-add') : '';
@@ -1447,7 +1732,7 @@ function openScopeDialog(ctx) {
   } else if (ctx.kind === 'config') {
     // Edit an existing setting: value editable, name fixed (read-only).
     const { name, value } = cfgParse(ctx.key);
-    title.textContent = `Edit "${name}"`;
+    title.textContent = name;
     cnameLabel.classList.remove('hidden');
     cvalueLabel.classList.remove('hidden');
     const cname = document.getElementById('scope-cname');
@@ -1457,10 +1742,10 @@ function openScopeDialog(ctx) {
     ok.textContent = 'Apply';
   } else if (ctx.kind === 'attr') {
     const a = ROLE_ATTRIBUTES.find((x) => x.key === ctx.key);
-    title.textContent = `Edit "${a ? a.label : ctx.key}" clusters`;
+    title.textContent = a ? a.label : ctx.key;
     ok.textContent = 'Apply';
   } else {
-    title.textContent = `Edit "${ctx.key}" clusters`;
+    title.textContent = ctx.key;
     ok.textContent = 'Apply';
   }
   buildScopeTargets(ctx);
@@ -1658,101 +1943,80 @@ function confirmConfigScope(ctx, desired) {
 // --- Comments dialog (group clusters by comment, edit per group) ---
 
 function buildCommentVersions() {
-  // Group by canonical value so JSON comments differing only in formatting collapse
-  // into one version. The first raw comment seen for a group is shown/editable.
+  // Group by canonical value so JSON comments differing only in formatting collapse into one
+  // version. Seed each group from any staged override (so reopening shows pending edits),
+  // else from the current DB comment.
   const map = new Map();
   for (const d of alterDetails) {
     const key = canonicalComment(d.comment);
-    if (!map.has(key)) map.set(key, { text: d.comment || '', ids: [] });
+    if (!map.has(key)) {
+      const text = commentOverrides.has(d.clusterId) ? commentOverrides.get(d.clusterId) : d.comment || '';
+      map.set(key, { text, ids: [] });
+    }
     map.get(key).ids.push(d.clusterId);
   }
   commentVersions = [...map.values()];
+  // One 2-mode editor model per version (same Fields/Raw editor as the inline one).
+  commentVersionEditors = commentVersions.map((v) => editorFromComment(v.text, false));
 }
 
 function openCommentsDialog() {
   buildCommentVersions();
   renderCommentsDialog();
-  document.getElementById('comments-dialog').showModal();
+  const dlg = document.getElementById('comments-dialog');
+  dlg.showModal();
+  // showModal() auto-focuses the first focusable element — the header "?" badge — which would
+  // pop its hint open. Move focus to the first editable control (or OK) and clear the hint.
+  const first = dlg.querySelector('#comments-list textarea:not(.hidden), #comments-list input:not([disabled])');
+  (first || document.getElementById('comments-dialog-ok'))?.focus();
+  hideQHint();
 }
 
 function renderCommentsDialog() {
   const box = document.getElementById('comments-list');
   box.innerHTML = commentVersions
     .map((v, i) => {
+      const e = commentVersionEditors[i];
       const labels = scopeLabelsHtml(describeScope(new Set(v.ids)));
+      const plainText = !e.isObject && !!e.raw.trim();
+      const fieldsDisabled = plainText; // plain text: edit in Raw (don't silently convert)
+      const notice = e.mode === 'fields' && plainText ? 'This comment is plain text — switch to Raw to edit it.' : '';
       return `<div class="comment-version">
         <div class="comment-scope">${labels || '<span class="hint">no clusters</span>'}</div>
-        <textarea class="comment-edit" data-idx="${i}" rows="3" autocapitalize="none" spellcheck="false"${i === 0 ? ' autofocus' : ''}>${escapeHtml(v.text)}</textarea>
-        <div class="comment-actions">
-          <button type="button" class="small comment-save" data-idx="${i}">Save to these clusters</button>
+        <div class="rce-toolbar">
+          <div class="segmented rce-mode" data-cv-mode="${i}" role="group" aria-label="Comment editing mode">
+            <button type="button" class="seg-btn ${e.mode === 'fields' ? 'active' : ''}" data-mode="fields">Fields</button>
+            <button type="button" class="seg-btn ${e.mode === 'raw' ? 'active' : ''}" data-mode="raw">Raw</button>
+          </div>
         </div>
+        <div class="rce-fields${e.mode !== 'fields' ? ' hidden' : ''}" data-cv-fields="${i}">${commentFieldInputsHtml(e, i, fieldsDisabled)}</div>
+        <textarea class="rce-raw comment-edit${e.mode !== 'raw' ? ' hidden' : ''}" data-cv-raw="${i}" rows="4" autocapitalize="none" spellcheck="false">${escapeHtml(e.raw)}</textarea>
+        <p class="hint rce-notice">${notice}</p>
       </div>`;
     })
     .join('');
 }
 
-async function saveCommentVersion(idx) {
-  const v = commentVersions[idx];
-  if (!v) return;
-  const ta = document.querySelector(`.comment-edit[data-idx="${idx}"]`);
-  const text = ta ? ta.value : v.text;
-
-  const prod = v.ids.some((cid) => categoryConfirm(clusterCategory(cid)));
-  if (prod) {
-    const ok = await askConfirm('Production', 'This comment update includes PRODUCTION clusters. Continue?');
-    if (!ok) return;
-  }
-
-  const app = backend();
-  try {
-    const res = await app.RunOperation({
-      operation: 'set_comment',
-      categoryIds: [],
-      clusterIds: v.ids,
-      auth: getAuth(),
-      confirmProduction: true,
-      setComment: { loginName: alterSelected, comment: text },
-    });
-    renderResults(res);
-    const failed = res.filter((r) => r.status !== 'ok').length;
-    if (failed) showToast(`Comment saved with ${failed} error(s)`, 'error');
-    else showToast('Comment updated', 'success');
-  } catch (e) {
-    showToast(String(e), 'error');
-    return;
-  }
-  await reloadDetails();
-  buildCommentVersions();
-  renderCommentsDialog();
-}
-
-/** Merge full_name/e_mail into a role comment's JSON, preserving other keys. Returns the
- *  new comment string, or null to skip (existing comment is free text — leave it alone). */
-function identityCommentJSON(existingComment, fullName, email) {
-  const t = (existingComment || '').trim();
-  let obj = {};
-  if (t && t[0] === '{') {
-    try {
-      obj = JSON.parse(t);
-    } catch {
-      obj = {};
-    }
-  } else if (t) {
-    return null; // non-JSON free text: don't clobber via the identity inputs
-  }
-  if (fullName) obj.full_name = fullName;
-  else delete obj.full_name;
-  if (email) obj.e_mail = email;
-  else delete obj.e_mail;
-  return Object.keys(obj).length ? JSON.stringify(sortKeysDeep(obj)) : '';
+/** OK: stage each version's assembled comment into commentOverrides (per cluster) and close.
+ *  Nothing is sent here — the edits publish with the other changes on "Save changes". */
+function commitCommentsDialog() {
+  commentVersions.forEach((v, i) => {
+    const desired = assembleCommentFrom(commentVersionEditors[i]);
+    for (const cid of v.ids) commentOverrides.set(cid, desired);
+  });
+  document.getElementById('comments-dialog').close();
+  renderAlterDetail(); // reflect the staged/"edited" state in the differ section
 }
 
 function buildAlterRequests() {
   /** @type {Array<{op:string, clusterId:string, params:object}>} */
   const requests = [];
-  // Edit mode: full name / email persist through set_comment (comment JSON). Create passes
-  // them to create_role instead, so skip the comment step there.
-  const identity = isCreateMode() ? null : roleIdentityInputs();
+  // The comment editor owns the consistent case: assemble the desired comment once and emit
+  // set_comment per cluster where it actually changes. When comments vary across clusters the
+  // inline editor is disabled and per-cluster desired comments come from the Comments dialog
+  // (commentOverrides). In create mode this runs after create_role, making set_comment
+  // authoritative.
+  const desiredInline = commentEditor.varies ? null : assembleComment();
 
   for (const d of alterDetails) {
     const parents = d.parents || [];
@@ -1827,19 +2091,26 @@ function buildAlterRequests() {
       }
     }
 
-    // Identity (full name / email) via set_comment where it actually changes the comment.
-    if (identity) {
-      const desired = identityCommentJSON(d.comment, identity.fullName, identity.email);
-      if (desired !== null && canonicalComment(desired) !== canonicalComment(d.comment || '')) {
-        requests.push({
-          op: 'set_comment',
-          clusterId: d.clusterId,
-          params: { setComment: { loginName: alterSelected, comment: desired } },
-        });
-      }
+    // Comment via set_comment: a staged per-cluster override (varies case, from the Comments
+    // dialog) wins; otherwise the inline editor's assembled comment. Emit only on a real change.
+    const desiredComment = commentOverrides.has(d.clusterId) ? commentOverrides.get(d.clusterId) : desiredInline;
+    if (desiredComment !== null && canonicalComment(desiredComment) !== canonicalComment(d.comment || '')) {
+      requests.push({
+        op: 'set_comment',
+        clusterId: d.clusterId,
+        params: { setComment: { loginName: alterSelected, comment: desiredComment } },
+      });
     }
   }
   return requests;
+}
+
+/** Warn if any emitted set_comment stores a non-empty, non-JSON comment (plain text). */
+function warnIfPlainTextComment(requests) {
+  const plain = requests.some(
+    (r) => r.op === 'set_comment' && r.params.setComment.comment && !parseCommentObject(r.params.setComment.comment).isObject
+  );
+  if (plain) showToast('Comment saved as plain text (not JSON)', 'warn');
 }
 
 async function saveAlterations() {
@@ -1859,6 +2130,7 @@ async function saveAlterations() {
     showToast('No changes to save', 'error');
     return;
   }
+  warnIfPlainTextComment(requests);
 
   const ok = await executeAlterRequests(requests, 'Changes saved');
   if (!ok) return;
@@ -1952,7 +2224,7 @@ document.querySelectorAll('.op-tab').forEach((tab) => {
     if (isCreateMode()) {
       // Fresh, empty create form over the current target selection.
       resetEditMaps();
-      loadRoleIdentityValues(); // clears the identity inputs
+      loadCommentEditor(); // clears the identity inputs
       synthCreateBaseline();
       renderAlterDetail();
       updateOpsFooter();
@@ -2139,6 +2411,11 @@ document.getElementById('alter-search-term')?.addEventListener('keydown', (ev) =
   if (ev.key === 'Enter') {
     ev.preventDefault();
     runRoleSearch();
+  } else if (ev.key === 'Escape') {
+    // type=search would otherwise just clear the field (swallowing Esc) instead of the
+    // native <dialog> Esc-to-close. Force the close regardless of the field's content.
+    ev.preventDefault();
+    document.getElementById('search-dialog').close();
   }
 });
 
@@ -2233,6 +2510,18 @@ document.getElementById('alter-detail')?.addEventListener('input', (ev) => {
   }
 });
 
+// Comment editor: value/raw edits write straight into commentEditor (never clobbered by
+// renderAlterDetail, which does not touch #role-comment-editor).
+document.getElementById('role-comment-editor')?.addEventListener('input', (ev) => {
+  const t = ev.target;
+  if (t.dataset && t.dataset.cfKey) commentEditor.values[t.dataset.cfKey] = t.value;
+  else if (t.id === 'rce-raw') commentEditor.raw = t.value;
+});
+document.getElementById('rce-mode')?.addEventListener('click', (ev) => {
+  const btn = ev.target.closest('.seg-btn');
+  if (btn) switchCommentMode(btn.dataset.mode);
+});
+
 // Scope dialog
 document.getElementById('scope-dialog-ok')?.addEventListener('click', confirmScopeDialog);
 document.getElementById('scope-dialog-cancel')?.addEventListener('click', () => {
@@ -2254,13 +2543,31 @@ document.getElementById('scope-targets')?.addEventListener('change', (ev) => {
   }
 });
 
-// Comments dialog
-document.getElementById('comments-dialog-close')?.addEventListener('click', () => {
+// Comments dialog — edits stage locally; Cancel discards, OK keeps them (published on
+// "Save changes" together with the other edits).
+document.getElementById('comments-dialog-cancel')?.addEventListener('click', () => {
   document.getElementById('comments-dialog').close();
 });
+document.getElementById('comments-dialog-ok')?.addEventListener('click', commitCommentsDialog);
 document.getElementById('comments-list')?.addEventListener('click', (ev) => {
-  const btn = ev.target.closest('.comment-save');
-  if (btn) saveCommentVersion(Number(btn.dataset.idx));
+  // Fields/Raw toggle for a version.
+  const modeBtn = ev.target.closest('[data-cv-mode] .seg-btn');
+  if (modeBtn) {
+    const idx = Number(modeBtn.closest('[data-cv-mode]').dataset.cvMode);
+    const e = commentVersionEditors[idx];
+    if (e) {
+      switchEditorMode(e, modeBtn.dataset.mode);
+      renderCommentsDialog();
+    }
+  }
+});
+// Value/raw edits write straight into the per-version editor model.
+document.getElementById('comments-list')?.addEventListener('input', (ev) => {
+  const t = ev.target;
+  const idx = t.dataset.cvIdx != null ? Number(t.dataset.cvIdx) : (t.dataset.cvRaw != null ? Number(t.dataset.cvRaw) : null);
+  if (idx == null || !commentVersionEditors[idx]) return;
+  if (t.dataset.cfKey) commentVersionEditors[idx].values[t.dataset.cfKey] = t.value;
+  else if (t.dataset.cvRaw != null) commentVersionEditors[idx].raw = t.value;
 });
 
 document.getElementById('ui-theme')?.addEventListener('click', (ev) => {
@@ -2268,6 +2575,11 @@ document.getElementById('ui-theme')?.addEventListener('click', (ev) => {
   if (!btn) return;
   setThemeButtons(btn.dataset.pref);
   applyTheme(btn.dataset.pref);
+});
+
+document.getElementById('comment-view-pref')?.addEventListener('click', (ev) => {
+  const btn = ev.target.closest('.seg-btn');
+  if (btn) setCommentViewButtons(btn.dataset.pref);
 });
 
 document.getElementById('btn-template-help')?.addEventListener('click', () => {
@@ -2282,6 +2594,33 @@ document.getElementById('template-help-close')?.addEventListener('click', () => 
 document.getElementById('db-functions-editor')?.addEventListener('click', (ev) => {
   const row = ev.target.closest('.fn-row');
   if (row) openFnDialog(row.dataset.fnKey);
+});
+
+// Comment fields editor (Settings): edit key/label; reorder/remove/add rows (staged in draft).
+document.getElementById('comment-fields-editor')?.addEventListener('input', (ev) => {
+  const t = ev.target;
+  const idx = Number(t.dataset.idx);
+  if (!commentFieldsDraft[idx]) return;
+  if (t.classList.contains('cf-key')) commentFieldsDraft[idx].key = t.value;
+  else if (t.classList.contains('cf-label')) commentFieldsDraft[idx].label = t.value;
+});
+wireListEditor('comment-fields-editor', () => commentFieldsDraft, renderCommentFieldsDraft);
+document.getElementById('btn-add-comment-field')?.addEventListener('click', () => {
+  commentFieldsDraft.push({ key: '', label: '' });
+  renderCommentFieldsDraft();
+});
+
+// Preconfigured parent groups editor (Settings): edit value; reorder/remove/add rows.
+document.getElementById('parent-roles-editor')?.addEventListener('input', (ev) => {
+  const t = ev.target;
+  if (!t.classList.contains('pr-value')) return;
+  const idx = Number(t.dataset.idx);
+  if (parentRolesDraft[idx] != null) parentRolesDraft[idx] = t.value;
+});
+wireListEditor('parent-roles-editor', () => parentRolesDraft, renderParentRolesDraft);
+document.getElementById('btn-add-parent-role')?.addEventListener('click', () => {
+  parentRolesDraft.push('');
+  renderParentRolesDraft();
 });
 document.getElementById('fn-dialog-done')?.addEventListener('click', () => {
   if (fnDialogKey && dbFnDraft[fnDialogKey]) {
@@ -2312,8 +2651,11 @@ document.getElementById('fn-placeholder-list')?.addEventListener('click', (ev) =
   ta.setSelectionRange(caret, caret);
 });
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   document.documentElement.setAttribute('data-theme', 'dark');
   configureInputCapitalization();
-  loadConfig();
+  await loadConfig();
+  // The app opens on Create role; build the comment editor now so it honours the configured
+  // preferred view (loadCommentEditor otherwise runs only on op-tab entry / role load).
+  loadCommentEditor();
 });

@@ -42,6 +42,30 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   Add-privilege dialogs, several at once. Create-role's `parent_role` placeholder accepts
   a **comma-separated** value — `calltemplate` splits it into multiple `text[]` elements
   in the `ARRAY[...] || ${parent_role}` path.
+- **Role comments are format-agnostic** (plain text **or** arbitrary JSON — no forced keys).
+  The role form's inline comment editor (`#role-comment-editor`) has a **Fields ↔ Raw**
+  toggle: *Fields* edits string values only (never adds/removes keys); *Raw* edits the whole
+  comment as free text. Which JSON keys get friendly labels is a Settings-managed list
+  **`Config.CommentFields`** (YAML `comment_fields`, ordered `{key,label}`), defaulting to
+  `full_name→Full name`, `e_mail→Email`, saved via `SaveCommentFields`
+  (`Store.UpdateCommentFields` validates identifier keys, dedupes, defaults blank labels).
+  Configured fields always render; **every other key** in the comment also renders (labeled by
+  raw key) — string values are editable, non-string values (number/bool/array/object) render
+  **read-only** (shown as JSON, edited via Raw; `e.readonly`) so their type is preserved via
+  `baseObj`. `editorFromComment`
+  builds the model (Fields for JSON, Raw for non-JSON content, and for an **empty** comment
+  the configured **`ui.comment_default_view`** — `fields`|`raw`, `preferredCommentView()`);
+  `assembleComment`/`assembleCommentFrom` serialize it (empty value drops the key; preserves
+  unknown keys); `parseCommentObject` is the shared reader; `switchEditorMode` round-trips
+  Fields↔Raw. A non-JSON comment saves as plain text with a toast warning. The backend
+  `set_comment` op stays an opaque quoted literal; `pg.ParseFullName` (`full_name`) is kept
+  only for search-result display. When comments **vary** across clusters the inline editor is
+  hidden and reconciliation moves to the **Comments dialog**, whose per-version boxes reuse the
+  same Fields/Raw editor (`commentVersionEditors`). The dialog **stages** edits locally: **OK**
+  commits each version's assembled comment into `commentOverrides` (`Map<clusterId,string>`);
+  **Cancel** discards. Nothing is sent from the dialog — staged comments publish with the rest
+  of the edits on **Save changes** (`buildAlterRequests` prefers a cluster's override, else the
+  inline editor's comment). `commentOverrides` is cleared by `resetEditMaps` (pick / save / mode switch).
 - **One shared role form for Create and Alter.** Both modes render through
   `renderAlterDetail` over `alterDetails` and the same edit maps (`alterAdd`/`alterRevoke`,
   `alterAttrAdd`/`alterAttrRemove`, `alterConfigSet`/`alterConfigReset`, password). Mode =
@@ -49,21 +73,25 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   role over the selected clusters with an **empty synthetic baseline**
   (`synthCreateBaseline()` builds `alterDetails` rows `{exists:false, parents:[], …}` from
   `resolveSelectedClusters()`); every edit is therefore a pure grant/enable/set. **Alter** =
-  search → `pickUser` → `reloadDetails` loads the real per-cluster baseline. Identity
-  (login/full name/email) lives in a **static** `#role-identity` block above `#alter-detail`
-  (login editable+required in create, readonly in edit; full name/email editable in both).
-  The op-tab buttons are mode switches: Create resets to an empty form; Alter opens the
-  search popup and enters edit only on pick. `updateTargetPreview` re-synthesizes + reconciles
-  pending edits when the selection changes in create mode (`reconcilePendingWithUniverse`).
+  search → `pickUser` → `reloadDetails` loads the real per-cluster baseline. The **static**
+  `#role-identity` block above `#alter-detail` holds login (editable+required in create,
+  readonly in edit) plus an inline **comment editor** (`#role-comment-editor`) — see the
+  comment-handling decision below. The op-tab buttons are mode switches: Create resets to an
+  empty form; Alter opens the search popup and enters edit only on pick. `updateTargetPreview`
+  re-synthesizes + reconciles pending edits when the selection changes in create mode
+  (`reconcilePendingWithUniverse`).
 - **Run/build.** Create: `runOperation` validates the login, pre-flight-warns if it already
   exists on a selected cluster (`LoadRoleDetails`), then runs
   `buildCreateRoleRequests(base)` (one `create_role` per cluster, **empty** `parent_role` →
   template base groups only) **concatenated** with `buildAlterRequests()` — creates run
   first (sequential `executeAlterRequests`), then the grant/attr/setting/password ops.
-  Identity persists differently by mode: **create** passes full name/email to `create_role`;
-  **edit** emits `set_comment` per cluster with a merged comment JSON
-  (`identityCommentJSON` sets `full_name`/`e_mail`, preserving other keys; skips free-text
-  comments). `buildAlterRequests` is shared; the Comments dialog still edits raw comments.
+  The comment persists via **`set_comment`** in both modes: `buildAlterRequests` emits
+  `set_comment` per cluster where the desired comment changes — a per-cluster `commentOverrides`
+  entry (staged in the Comments dialog, varies case) wins, else the inline editor's
+  `assembleComment()`. **Create** runs `create_role` first (its `${fullname}`/`${email}` sourced
+  best-effort from the editor's `full_name`/`e_mail` values), then the follow-up `set_comment` is
+  authoritative. Everything (grants/attrs/settings/password/comments) publishes together on the
+  one **Save changes** pass.
 - Frontend is **vanilla JS** reached through `window.go.main.App` (`backend()` in
   [frontend/app.js](frontend/app.js)). No framework. `frontend/wailsjs/` is
   Wails-generated (regenerated by `wails dev`/`build`); a running `wails dev` watcher
@@ -90,7 +118,7 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
 Config/clusters/groups: `GetConfig`, `GetConfigPath`, `ReloadConfig`, `AddCluster`,
 `UpdateCluster`, `DeleteCluster`, `AddCategory`, `UpdateCategory`, `DeleteCategory`,
 `ImportFromEnvironment`, `SaveDBFunctions`, `SaveBatchSettings`, `SaveUISettings`,
-`SaveParentRoles`, `GetAppVersion`.
+`SaveParentRoles`, `SaveCommentFields`, `GetAppVersion`.
 Run/test: `TestConnection` (by saved cluster id), `TestConnectionInput` (ad-hoc
 `ClusterInput`+`Auth`, used by the cluster editor to test on-screen values),
 `PreviewTargets`, `RunOperation`.
@@ -134,13 +162,21 @@ command list + the `#fn-dialog` popup, incl. its allowed-placeholder chips) and
 **App shell**: header + tabs bar are fixed (`body` is a flex column, `overflow:hidden`,
 no page scroll); `main` fills the rest. Each panel manages its own scroll. Operations is
 a two-column grid — left `.ops-sidebar` and right `.ops-main` scroll **independently**;
-`.ops-main` is a flex column with a scrolling `.ops-body` and a pinned `.ops-footer`
-(**Create role** button for create; Save changes / Remove role for alter, toggled by
-`updateOpsFooter()`). Clusters and Settings are single-column with a fixed toolbar /
-pinned Save-settings footer. The **Test connections** button lives in the Clusters
+`.ops-main` is a flex column with a scrolling `.ops-body` (no horizontal padding, so its
+content lines up with the footer buttons) and a pinned `.ops-footer` (**Create role** button
+for create; Save changes / Remove role for alter, toggled by `updateOpsFooter()`). Clusters
+and Settings are single-column with a fixed toolbar / pinned Save-settings footer.
+**Action-button convention (keep consistent):** the primary/commit button is the emphasized
+(`.primary`) one, placed **rightmost**; Cancel/secondary sits to its left; destructive actions
+(e.g. Remove role) are separated on the **far left**. This holds for dialog `<menu>`s
+(`[Cancel] [Primary]`, all right-aligned) and page footers (Create role / Save changes /
+Save settings right-aligned; Remove role far left via `#btn-alter-remove{order:-1}` +
+`space-between`). The **Test connections** button lives in the Clusters
 toolbar (`btn-test-clusters` → `testAllClusters`): it tests every configured cluster and
-writes the outcome into a per-row **Status** column (`setClusterStatus`); the per-row
-**Test** button reports into the same cell.
+writes the outcome into a per-row **Status** column (`setClusterStatus`). Cluster rows have
+no per-row Test button (testing on-screen values is done from the cluster editor via
+`TestConnectionInput`); each row's **Actions** cell holds right-aligned **✎ edit** / **× delete**
+icon buttons (`.scope-act`, same as the role form) in a `.row-actions` flex.
 
 Top tabs **Operations / Clusters / Settings**, with **Create role** / **Alter role**
 op-tabs right-aligned in the same bar (shown only while Operations is active; toggled in
@@ -152,10 +188,17 @@ confirm-production controls); "Or pick clusters" is a collapse/expand toggle (co
 by default; the expanded `.cluster-list` flexes to fill the sidebar). The Clusters
 toolbar hosts the right-aligned **Cluster groups** button (`btn-manage-groups` →
 `#groups-dialog` list popup → `#group-dialog` add/edit form; edited like clusters, no
-Save button, so it lives here rather than Settings). Settings hosts DB templates (a
-compact list of command names; clicking one opens the `#fn-dialog` popup with its
-execution type, call template, and clickable placeholder chips — staged in `dbFnDraft`,
-persisted on **Save settings**) + batch.
+Save button, so it lives here rather than Settings). Settings is organised into
+divider-separated **`.settings-group`** sections (small uppercase `.settings-group-label`,
+same look as the role form): **General** (Appearance theme + Max concurrency), **Preconfigured
+parent groups**, **Comments** (Comment fields + Preferred comment view), and **DB command
+templates**. Parent groups and Comment fields are drag-orderable add/remove **list editors**
+built from the shared `listRowHtml`/`wireListEditor` helpers (drag handle + remove ×, `Add…`
+button), staged in `parentRolesDraft` / `commentFieldsDraft` (`#parent-roles-editor` /
+`#comment-fields-editor`). DB templates are a compact list of command names; clicking one opens
+the `#fn-dialog` popup (execution type, call template, clickable placeholder chips — staged in
+`dbFnDraft`). The **Preferred comment view** toggle is `#comment-view-pref`
+(`ui.comment_default_view`). All staged on **Save settings**.
 
 Feature descriptions are not shown inline — they live behind a **`?` help badge**
 (`.q-hint`; markup via `hintBadge(text)` in JS, or hand-written next to a static heading).
@@ -176,7 +219,8 @@ and the Cluster-groups / Find-role / Comments dialogs.
 - **Privileges** (parent roles) and **Attributes** (superuser/createrole/createdb/
   inherit/login/replication/bypassrls) render one-per-row: name left, **scope labels**
   right. Completeness is judged **per group**: all selected clusters of a group matched
-  → one filled uppercase group label; otherwise one transparent per-cluster label,
+  → one **outlined** (bordered, transparent) uppercase group label — matching the bordered
+  group boxes in Target selection; otherwise one **filled** (no border) per-cluster label,
   coloured by environment. `describeScope`/`scopeLabelsHtml` produce these everywhere
   (present-on, rows, comments, search results).
 - Edit model: `alterAdd`/`alterRevoke` and `alterAttrAdd`/`alterAttrRemove` are
@@ -193,8 +237,16 @@ and the Cluster-groups / Find-role / Comments dialogs.
   state is `alterConfigSet: Map<"name=value", Set<clusterId>>` and
   `alterConfigReset: Map<name, Set<clusterId>>`; `buildAlterRequests` emits
   `set_config`/`reset_config`. The scope dialog gains name+value inputs for a new setting.
-- **Comments** popup groups clusters by comment content compared **as JSON by value**
-  (`canonicalComment`), each group editable + saved via `set_comment`.
+- **Comment** editor (`#role-comment-editor`, in `#role-identity`) — see the format-agnostic
+  comment product decision above. State is the module-level `commentEditor` (rendered FROM /
+  written TO it, so `renderAlterDetail` never clobbers pending edits, like the old identity
+  block). Loaded on mode entry via `loadCommentEditor()`. When comments **vary** across
+  clusters the inline editor is **hidden** (only then does `renderAlterDetail` render a
+  "Comments differ — reconcile per cluster" section, flagged *(edited)* when overrides are
+  staged); the **Comments** popup (grouped by `canonicalComment`) reconciles per cluster, each
+  version editable via its own Fields/Raw editor (`commentVersionEditors`). It has no per-row
+  save — **OK** stages edits into `commentOverrides` (`commitCommentsDialog`), **Cancel**
+  discards, and the staged comments publish with everything else on **Save changes**.
 - **Password** row (field + checkbox) and a red **Remove role** button; results render
   in the **Status** panel (hidden until non-empty).
 

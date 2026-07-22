@@ -54,6 +54,10 @@ export function SaveBatchSettings(arg1) {
   return window['go']['main']['App']['SaveBatchSettings'](arg1);
 }
 
+export function SaveCommentFields(arg1) {
+  return window['go']['main']['App']['SaveCommentFields'](arg1);
+}
+
 export function SaveDBFunctions(arg1) {
   return window['go']['main']['App']['SaveDBFunctions'](arg1);
 }

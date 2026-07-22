@@ -196,8 +196,23 @@ export namespace model {
 	        this.error = source["error"];
 	    }
 	}
+	export class CommentField {
+	    key: string;
+	    label: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CommentField(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.label = source["label"];
+	    }
+	}
 	export class UISettings {
 	    theme: string;
+	    commentDefaultView: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new UISettings(source);
@@ -206,6 +221,7 @@ export namespace model {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.theme = source["theme"];
+	        this.commentDefaultView = source["commentDefaultView"];
 	    }
 	}
 	export class DBFunction {
@@ -276,6 +292,7 @@ export namespace model {
 	    batch: BatchSettings;
 	    ui: UISettings;
 	    parentRoles: string[];
+	    commentFields: CommentField[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -290,6 +307,7 @@ export namespace model {
 	        this.batch = this.convertValues(source["batch"], BatchSettings);
 	        this.ui = this.convertValues(source["ui"], UISettings);
 	        this.parentRoles = source["parentRoles"];
+	        this.commentFields = this.convertValues(source["commentFields"], CommentField);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

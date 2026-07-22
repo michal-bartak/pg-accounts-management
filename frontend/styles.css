@@ -195,7 +195,7 @@ main { flex: 1 1 auto; min-height: 0; overflow: hidden; }
 #panel-clusters .toolbar { flex: none; }
 #panel-clusters .table-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; }
 .settings-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 1rem 1.25rem; }
-.settings-footer { flex: none; border-top: 1px solid var(--border); padding: 0.75rem 1.25rem; }
+.settings-footer { flex: none; border-top: 1px solid var(--border); padding: 1rem 1.25rem; }
 
 .toolbar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
 
@@ -255,6 +255,14 @@ th, td {
 th { background: var(--surface); color: var(--muted); font-weight: 500; }
 tr:last-child td { border-bottom: none; }
 
+/* Table row action icons (Edit ✎ / Delete ×) — same square buttons as the role form,
+   right-aligned in the last (Actions) column. Tighten only that cell's padding (top/bottom +
+   right); left is left at the default so the other columns (e.g. alias) are unaffected. */
+.row-actions { display: flex; gap: 0.35rem; justify-content: flex-end; }
+#clusters-table th:last-child,
+#clusters-table td:last-child { text-align: right; padding-right: 0.35rem; }
+#clusters-table td:last-child { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+
 .badge {
   display: inline-block;
   padding: 0.2rem 0.55rem;
@@ -263,9 +271,11 @@ tr:last-child td { border-bottom: none; }
   font-weight: 600;
   text-transform: uppercase;
   flex-shrink: 0;
+  border: 1px solid currentColor;
 }
-/* Per-group badge colours are generated into #cat-colors from state.categories. */
-.badge { background: rgba(154, 163, 181, 0.2); color: var(--muted); }
+/* Group badge = outlined (transparent + border), matching the group scope chips. Per-group
+   colours are generated into #cat-colors from state.categories. */
+.badge { background: transparent; color: var(--muted); }
 
 .status-ok { color: var(--ok); }
 .status-error { color: var(--danger); }
@@ -294,6 +304,15 @@ tr:last-child td { border-bottom: none; }
   white-space: normal;
 }
 .q-hint-pop[hidden] { display: none; }
+/* Warning variant (e.g. non-text comment value): a plain amber ⚠ that still drives the
+   shared hover/focus hint popover — no circular badge chrome. */
+.q-hint.q-warn,
+.q-hint.q-warn:hover,
+.q-hint.q-warn:focus,
+.q-hint.q-warn:focus-visible {
+  width: 16px; height: 16px; border-radius: 0; border: none;
+  background: transparent; color: var(--warn, #e8a838); font-size: 1.15rem;
+}
 
 .ops-layout {
   flex: 1 1 auto;
@@ -316,10 +335,16 @@ tr:last-child td { border-bottom: none; }
 .clusters-toggle .caret { color: var(--muted); font-size: 1.05rem; line-height: 1; }
 .cluster-list:not(.hidden) { flex: 1 1 auto; min-height: 4rem; max-height: none; }
 .ops-main { display: flex; flex-direction: column; min-height: 0; }
-/* Small inset so focus outlines aren't clipped by the scroll container edges. */
-.ops-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0.25rem 0.5rem; }
+/* No horizontal padding so body content lines up with the pinned footer buttons; small
+   vertical inset keeps focus outlines off the top/bottom scroll edges. */
+.ops-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0.25rem 0; }
 .ops-footer { flex: none; display: flex; gap: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.75rem; margin-top: 0.5rem; }
-.ops-footer .run-bar, .ops-footer .alter-actions { margin: 0; flex: 1; }
+.ops-footer .run-bar,
+.ops-footer .alter-actions { margin: 0; flex: 1; display: flex; gap: 0.5rem; }
+/* Primary (commit) action on the right; destructive Remove role separated on the far left. */
+.ops-footer .run-bar { justify-content: flex-end; }
+.ops-footer .alter-actions { justify-content: space-between; }
+#btn-alter-remove { order: -1; }
 
 .ops-sidebar {
   background: var(--surface);
@@ -415,23 +440,51 @@ tr:last-child td { border-bottom: none; }
   font-size: var(--fs-label);
 }
 
-/* Shared identity block (login / full name / email), sits above #alter-detail.
-   Login on its own row (half width); full name + email share the next row. */
+/* Shared identity block: login on its own row, then the comment editor, then a note. */
 .role-identity {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-areas:
-    "login ."
-    "full  email"
-    "note  note";
+  display: flex;
+  flex-direction: column;
   gap: 0.75rem;
 }
-.ri-login { grid-area: login; }
-.ri-full { grid-area: full; }
-.ri-email { grid-area: email; }
-.ri-note { grid-area: note; }
+.ri-login { max-width: 50%; }
 .role-identity .ri-note:empty { display: none; }
 #role-login[readonly] { opacity: 0.7; cursor: default; }
+
+/* Inline comment editor (Fields / Raw). */
+.role-comment-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.rce-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.rce-label { font-size: var(--fs-label); }
+.rce-mode { flex: 0 0 auto; }
+.rce-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.rce-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: var(--fs-label);
+}
+/* Field label + optional ⚠ icon on one line (the icon is assigned to this label). */
+.rce-field-label { display: inline-flex; align-items: center; gap: 0.3rem; }
+.rce-raw {
+  width: 100%;
+  font-family: var(--mono, monospace);
+  resize: vertical;
+}
+.rce-notice:empty { display: none; }
+/* Two-line button (e.g. the Comments-differ reconcile button). */
+.btn-two-line { line-height: 1.3; text-align: center; }
 
 .run-bar { display: flex; gap: 0.5rem; margin: 1.25rem 0; flex-wrap: wrap; }
 
@@ -525,6 +578,36 @@ tr:last-child td { border-bottom: none; }
   font-size: var(--fs-h2);
 }
 
+/* Grouped settings sections — same divider + small uppercase label as the role form. */
+.settings-group {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+  margin-top: 1.25rem;
+}
+.settings-group:first-child {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+.settings-group .settings-row { margin-bottom: 0; }
+.settings-group-label {
+  display: block;
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  margin-bottom: 0.75rem;
+}
+.settings-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.settings-group-head .settings-group-label { margin-bottom: 0; }
+.settings-num { width: 6rem; }
+
 /* Compact command list — one clickable row per operation. */
 #db-functions-editor {
   display: grid;
@@ -577,9 +660,8 @@ tr:last-child td { border-bottom: none; }
   align-items: center;
   justify-content: flex-end;
 }
-.settings-batch { display: inline-flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
 
-#confirm-dialog form menu,
+#confirm-form menu,
 #cluster-form menu,
 #group-form menu {
   display: flex;
@@ -606,6 +688,8 @@ dialog {
 }
 
 dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+/* All popup headers use the same size as the Clusters / Cluster groups popup. */
+dialog h2 { font-size: var(--fs-h2); }
 
 #cluster-form,
 #group-form {
@@ -689,6 +773,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 
 .toast.error { border-color: var(--danger); }
 .toast.success { border-color: var(--ok); }
+.toast.warn { border-color: var(--warn, #e8a838); }
 .toast.hidden { display: none; }
 
 .hidden { display: none !important; }
@@ -783,6 +868,8 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 .scope-act:hover { opacity: 1; border-color: var(--muted); }
 .scope-act:disabled { opacity: 0.25; cursor: default; pointer-events: none; }
 .scope-act:disabled:hover { border-color: var(--border); }
+/* "off" indicator for an attribute that's enabled nowhere — de-emphasised (~50% less visible). */
+.scope-off { opacity: 0.5; }
 
 .alter-add-priv { display: flex; gap: 0.4rem; margin-top: 0.7rem; }
 
@@ -817,13 +904,6 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
   font-size: var(--fs-base);
 }
 .alter-identity .hint { margin: 0; }
-.comment-view {
-  width: 100%;
-  resize: vertical;
-  font-family: var(--font);
-  color: var(--muted);
-}
-
 .alter-section {
   border-top: 1px solid var(--border);
   padding-top: 0.9rem;
@@ -853,9 +933,10 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 /* Scope-label colours are generated per group into #cat-colors (keyed by data-cat);
    this is the neutral fallback for labels without a matching group. */
 .chip-scope { color: var(--muted); background: rgba(154, 163, 181, 0.18); }
-/* Whole group matched: filled + uppercase. One cluster of a group: transparent. */
-.chip-scope.scope-kind-group { text-transform: uppercase; }
-.chip-scope.scope-kind-cluster { background: transparent; border: 1px solid currentColor; }
+/* Whole group matched: outlined + uppercase (like the bordered group boxes in Target
+   selection). One cluster of a group: filled, no border. */
+.chip-scope.scope-kind-group { text-transform: uppercase; background: transparent; border: 1px solid currentColor; }
+.chip-scope.scope-kind-cluster { border: none; }
 /* Pending grant (green) wins over the environment colour. */
 .chip-scope.chip-scope-add { color: var(--ok); background: rgba(127, 217, 154, 0.22); border-color: var(--ok); }
 .chip-scope.chip-scope-strike { text-decoration: line-through; color: var(--danger); background: transparent; border-color: var(--danger); }
@@ -882,6 +963,9 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
   margin-left: auto;
   justify-content: flex-end;
 }
+/* The "off" / "none" note is a .hint (which carries a top margin) inside this flex row —
+   drop the margin so it doesn't add height to the row. */
+.scope-row-labels .hint { margin: 0; }
 .scope-row-actions { display: flex; gap: 0.35rem; flex-shrink: 0; align-items: stretch; }
 .scope-row.is-removed .scope-row-name { text-decoration: line-through; color: var(--danger); }
 .scope-row.is-added .scope-row-name { color: var(--ok); }
@@ -934,8 +1018,59 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 .scope-cluster .hint { margin: 0; }
 #scope-form menu { margin: 0.5rem 0 0; padding: 0; display: flex; justify-content: flex-end; gap: 0.5rem; }
 
-/* Preconfigured parent groups: Settings input + pickers (Create-role chips / scope checkboxes) */
-.parent-roles-input { width: min(32rem, 100%); }
+/* Shared draggable list editor (comment fields, parent groups). */
+.list-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: min(32rem, 100%);
+}
+.le-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.le-row input { flex: 1 1 0; min-width: 0; }
+/* The primary text field (comment key / parent group value) shares one fixed width so the two
+   editors line up; the comment label takes the remaining space. */
+.le-row .cf-key,
+.le-row .pr-value { flex: 0 0 13rem; }
+.le-row .cf-label { flex: 1 1 0; }
+/* A parent-group row is just grip + one primary field + delete, so shrink-wrap the editor to
+   that width instead of stretching the field across the full 32rem. */
+#parent-roles-editor.list-editor { width: fit-content; max-width: 100%; }
+.le-grip {
+  flex: 0 0 auto;
+  cursor: grab;
+  color: var(--muted);
+  user-select: none;
+  padding: 0 0.15rem;
+  line-height: 1;
+  font-size: 1.1em;
+}
+.le-grip:active { cursor: grabbing; }
+/* Delete button: a square matching the text-field height. */
+.le-del {
+  flex: 0 0 auto;
+  width: var(--control-h);
+  height: var(--control-h);
+  min-height: var(--control-h);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-base);
+  line-height: 1;
+}
+/* Add… buttons (Settings list editors + Operations privilege/setting) — full control height. */
+.list-add { align-self: flex-start; }
+#btn-add-comment-field,
+#btn-add-parent-role { margin-top: 0.5rem; }
+
+/* Settings row whose fields differ in height (e.g. list editor + toggle): top-align labels. */
+.settings-row-top { align-items: flex-start; }
+
+/* Preconfigured parent groups pickers (Create-role chips / scope checkboxes). */
 .parent-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-top: 0.5rem; }
 .parent-picker:empty { display: none; }
 .picker-label { font-size: var(--fs-xs); color: var(--muted); }
@@ -950,13 +1085,26 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 .pick-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 .scope-preconfigured { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
 
-/* Comments dialog */
+/* Comments dialog — fixed width so it doesn't jitter as field/comment lengths change. */
+#comments-dialog { width: min(560px, 92vw); }
 #comments-list { display: grid; gap: 0.9rem; max-height: 55vh; overflow-y: auto; }
-.comment-version { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem 0.75rem; }
-.comment-scope { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.4rem; }
+.comment-version {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem; /* fixed clearance between scope / switch / editor / actions, in either mode */
+}
+.comment-scope { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+/* Fields/Raw switch sits at the right edge of each version box. */
+.comment-version .rce-toolbar { justify-content: flex-end; }
+/* Custom-field inputs need not span the whole box; keep them compact and left-aligned. */
+.comment-version .rce-field { align-items: flex-start; }
+.comment-version .rce-field input { width: min(20rem, 100%); }
 .comment-edit {
   width: 100%;
   font-family: var(--font);
   resize: vertical;
 }
-.comment-actions { margin-top: 0.4rem; display: flex; justify-content: flex-end; }
+.comment-actions { display: flex; justify-content: flex-end; }

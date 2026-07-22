@@ -28,6 +28,8 @@ export function RunOperation(arg1:model.RunRequest):Promise<Array<model.ClusterR
 
 export function SaveBatchSettings(arg1:model.BatchSettings):Promise<void>;
 
+export function SaveCommentFields(arg1:Array<model.CommentField>):Promise<void>;
+
 export function SaveDBFunctions(arg1:model.DBFunctions):Promise<void>;
 
 export function SaveParentRoles(arg1:Array<string>):Promise<void>;

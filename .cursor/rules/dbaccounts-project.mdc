@@ -106,8 +106,9 @@ dialog (no separate "Find user" button) that searches the *selected*
 clusters (name + `COMMENT ON ROLE`), grouped by login; picking one opens a single
 consolidated form. Privileges (`pg_auth_members`) and attributes (superuser, createrole,
 createdb, inherit, login, replication, bypassrls) list one-per-row with **scope labels**
-judged per group (filled group label when all selected clusters of a group match, else
-transparent per-cluster labels; coloured by environment). **✎ Edit** opens a per-cluster
+judged per group (outlined/bordered group label when all selected clusters of a group match
+— matching Target selection's group boxes — else filled per-cluster labels; coloured by
+environment). **✎ Edit** opens a per-cluster
 checkbox editor that grants **and** revokes; **×** removes everywhere; **↺** discards
 pending. **Settings** (role GUCs) use the same editor keyed by `name=value`
 (`alterConfigSet`/`alterConfigReset`), emitting `set_config`/`reset_config`. Comments
@@ -119,12 +120,20 @@ popup groups clusters by comment content (compared as JSON by value) and saves v
 `alterDetails` + the `alter*` edit maps. Mode = `isCreateMode()` (`currentOp`). Create =
 editing a not-yet-existing role with an empty synthetic baseline (`synthCreateBaseline()`
 from `resolveSelectedClusters()`; `reconcilePendingWithUniverse()` on selection change);
-Alter = search → `pickUser` → `reloadDetails`. Identity (login/full name/email) is a
-static `#role-identity` block (login readonly in edit). Run: create =
-`buildCreateRoleRequests` (one `create_role` per cluster, empty `parent_role`) **concat**
-`buildAlterRequests()`; identity persists via `create_role` args (create) or `set_comment`
-merged JSON (edit, `identityCommentJSON`). One shared `confirmScopeDialog`/`buildScopeTargets`
-(no create fork).
+Alter = search → `pickUser` → `reloadDetails`. The static `#role-identity` block holds login
+(readonly in edit) + an inline **comment editor** (`#role-comment-editor`, module-level
+`commentEditor` state, `loadCommentEditor`). Comments are **format-agnostic** (plain text or
+arbitrary JSON, no forced keys): Fields↔Raw toggle, Fields edits string values only, labels
+come from Settings-managed `Config.CommentFields` (`comment_fields`, default full_name/e_mail,
+`SaveCommentFields`); empty comments default to `ui.comment_default_view` (`preferredCommentView`);
+`editorFromComment`/`assembleComment(From)`/`switchEditorMode`/`parseCommentObject` are the core
+helpers. Run: create = `buildCreateRoleRequests` (one `create_role` per cluster, empty
+`parent_role`) **concat** `buildAlterRequests()`; the comment persists via `set_comment` in
+both modes (`assembleComment` diffed per cluster; create's `create_role` gets
+`${fullname}`/`${email}` from the editor, follow-up `set_comment` authoritative). When comments
+vary the inline editor hides and the Comments dialog reconciles per cluster (per-version
+Fields/Raw editors, `commentVersionEditors`). One shared
+`confirmScopeDialog`/`buildScopeTargets` (no create fork).
 
 ## Versioning & packaging
 

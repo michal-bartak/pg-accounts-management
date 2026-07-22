@@ -72,8 +72,17 @@ const (
 	ThemeSystem = "system"
 )
 
+const (
+	CommentViewFields = "fields"
+	CommentViewRaw    = "raw"
+)
+
 type UISettings struct {
 	Theme string `yaml:"theme" json:"theme"` // light | dark | system
+	// CommentDefaultView is the comment editor's preferred mode for an empty comment
+	// (create role / a role with no comment): fields | raw. Content-bearing comments always
+	// auto-detect (JSON -> fields, plain text -> raw).
+	CommentDefaultView string `yaml:"comment_default_view,omitempty" json:"commentDefaultView"`
 }
 
 // NormalizeTheme returns a valid theme preference; unknown values become system.
@@ -88,6 +97,14 @@ func NormalizeTheme(theme string) string {
 	}
 }
 
+// NormalizeCommentView returns a valid comment-view preference; unknown values become fields.
+func NormalizeCommentView(view string) string {
+	if strings.ToLower(strings.TrimSpace(view)) == CommentViewRaw {
+		return CommentViewRaw
+	}
+	return CommentViewFields
+}
+
 type Config struct {
 	Version     int           `yaml:"version" json:"version"`
 	Categories  []Category    `yaml:"categories" json:"categories"`
@@ -98,6 +115,16 @@ type Config struct {
 	// ParentRoles are preconfigured parent groups offered as pick-list choices when
 	// granting privileges (Create role / Alter role), instead of typing role names.
 	ParentRoles []string `yaml:"parent_roles,omitempty" json:"parentRoles"`
+	// CommentFields are the JSON keys the app surfaces as labeled inputs when a role
+	// comment holds JSON (Create role / Alter role). Ordered; keys not listed here are
+	// still shown generically. Defaults to full_name/e_mail.
+	CommentFields []CommentField `yaml:"comment_fields,omitempty" json:"commentFields"`
+}
+
+// CommentField maps a JSON comment key to a human label shown in the role form.
+type CommentField struct {
+	Key   string `yaml:"key" json:"key"`
+	Label string `yaml:"label" json:"label"`
 }
 
 type ClusterInput struct {

@@ -41,8 +41,20 @@
               <div id="role-present" class="alter-present hidden"></div>
               <div id="role-identity" class="role-identity">
                 <label class="ri-login">Login name <input id="role-login" name="loginName" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
-                <label class="ri-full">Full name <input id="role-fullname" name="fullName" autocapitalize="words" autocomplete="name" /></label>
-                <label class="ri-email">Email <input id="role-email" name="email" type="email" autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
+                <div id="role-comment-editor" class="role-comment-editor">
+                  <div class="rce-toolbar">
+                    <span class="rce-label">Comment
+                      <button type="button" class="q-hint" tabindex="0" aria-label="Role comment. Fields edits known/JSON keys as labeled inputs; Raw edits the comment as free text (plain text or JSON)." data-hint="Role comment. Fields edits known/JSON keys as labeled inputs; Raw edits the comment as free text (plain text or JSON).">?</button>
+                    </span>
+                    <div class="segmented rce-mode" id="rce-mode" role="group" aria-label="Comment editing mode">
+                      <button type="button" class="seg-btn" data-mode="fields">Fields</button>
+                      <button type="button" class="seg-btn" data-mode="raw">Raw</button>
+                    </div>
+                  </div>
+                  <div id="rce-fields" class="rce-fields"></div>
+                  <textarea id="rce-raw" class="rce-raw hidden" rows="4" autocapitalize="none" autocomplete="off" spellcheck="false"></textarea>
+                  <p class="hint rce-notice" id="rce-notice"></p>
+                </div>
                 <p class="hint ri-note" id="role-identity-note"></p>
               </div>
               <p class="hint" id="alter-current-hint">Use the <strong>Alter role</strong> button above to find a role.</p>
@@ -109,32 +121,55 @@
 
     <section id="panel-settings" class="panel">
       <div class="settings-body">
-        <div class="settings-row">
-          <div class="settings-field">
-            <span class="settings-field-label">Appearance</span>
-            <div class="segmented" id="ui-theme" role="group" aria-label="Appearance">
-              <button type="button" class="seg-btn" data-pref="system">System</button>
-              <button type="button" class="seg-btn" data-pref="dark">Dark</button>
-              <button type="button" class="seg-btn" data-pref="light">Light</button>
+        <div class="settings-group">
+          <span class="settings-group-label">General</span>
+          <div class="settings-row">
+            <div class="settings-field">
+              <span class="settings-field-label">Appearance</span>
+              <div class="segmented" id="ui-theme" role="group" aria-label="Appearance">
+                <button type="button" class="seg-btn" data-pref="system">System</button>
+                <button type="button" class="seg-btn" data-pref="dark">Dark</button>
+                <button type="button" class="seg-btn" data-pref="light">Light</button>
+              </div>
+            </div>
+            <div class="settings-field">
+              <span class="settings-field-label">Max concurrency <button type="button" class="q-hint" tabindex="0" aria-label="How many clusters an operation runs against in parallel." data-hint="How many clusters an operation runs against in parallel.">?</button></span>
+              <input type="number" id="batch-concurrency" class="settings-num" min="1" max="50" value="5" />
             </div>
           </div>
         </div>
 
-        <div class="settings-row">
-          <div class="settings-field">
-            <span class="settings-field-label">Preconfigured parent groups <button type="button" class="q-hint" tabindex="0" aria-label="Comma-separated role names, offered as pick-list choices when granting privileges in Create role and Alter role." data-hint="Comma-separated role names, offered as pick-list choices when granting privileges in Create role and Alter role.">?</button></span>
-            <input id="parent-roles" type="text" class="parent-roles-input" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="e.g. gr_devs_ro, gr_reporting, gr_admins" />
+        <div class="settings-group">
+          <span class="settings-group-label">Preconfigured parent groups <button type="button" class="q-hint" tabindex="0" aria-label="Role names offered as pick-list choices when granting privileges in Create role and Alter role. Drag the handle to reorder." data-hint="Role names offered as pick-list choices when granting privileges in Create role and Alter role. Drag the handle to reorder.">?</button></span>
+          <div id="parent-roles-editor" class="list-editor"></div>
+          <button type="button" class="list-add" id="btn-add-parent-role">Add group…</button>
+        </div>
+
+        <div class="settings-group">
+          <span class="settings-group-label">Comments</span>
+          <div class="settings-row settings-row-top">
+            <div class="settings-field">
+              <span class="settings-field-label">Comment fields <button type="button" class="q-hint" tabindex="0" aria-label="JSON keys shown as labeled inputs when a role comment holds JSON (Create / Alter role). Drag the handle to reorder; keys not listed here are still shown. Plain-text comments use the Raw view." data-hint="JSON keys shown as labeled inputs when a role comment holds JSON (Create / Alter role). Drag the handle to reorder; keys not listed here are still shown. Plain-text comments use the Raw view.">?</button></span>
+              <div id="comment-fields-editor" class="list-editor"></div>
+              <button type="button" class="list-add" id="btn-add-comment-field">Add field…</button>
+            </div>
+            <div class="settings-field">
+              <span class="settings-field-label">Preferred comment view <button type="button" class="q-hint" tabindex="0" aria-label="Default editor mode for a new/empty comment (Create role, or a role with no comment). Comments that already have content auto-detect." data-hint="Default editor mode for a new/empty comment (Create role, or a role with no comment). Comments that already have content auto-detect.">?</button></span>
+              <div class="segmented" id="comment-view-pref" role="group" aria-label="Preferred comment view">
+                <button type="button" class="seg-btn" data-pref="fields">Fields</button>
+                <button type="button" class="seg-btn" data-pref="raw">Raw</button>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="settings-section-head">
-          <h2>DB command templates</h2>
-          <button type="button" id="btn-template-help">Template syntax help</button>
+        <div class="settings-group">
+          <div class="settings-group-head">
+            <span class="settings-group-label">DB command templates</span>
+            <button type="button" id="btn-template-help">Template syntax help</button>
+          </div>
+          <div id="db-functions-editor"></div>
         </div>
-        <div id="db-functions-editor"></div>
-
-        <h2>Batch</h2>
-        <label class="settings-batch">Max concurrency <input type="number" id="batch-concurrency" min="1" max="50" value="5" /></label>
 
         <div class="settings-meta">
           <span class="settings-meta-label">Config file</span>
@@ -207,8 +242,8 @@
       <p class="hint">Choose the clusters. Tick a group to select all its clusters.</p>
       <div id="scope-targets" class="scope-targets"></div>
       <menu>
-        <button type="button" value="ok" id="scope-dialog-ok" class="primary">Add</button>
         <button type="button" value="cancel" id="scope-dialog-cancel">Cancel</button>
+        <button type="button" value="ok" id="scope-dialog-ok" class="primary">Add</button>
       </menu>
     </form>
   </dialog>
@@ -218,7 +253,8 @@
       <h2>Comments <button type="button" class="q-hint" tabindex="0" aria-label="Clusters are grouped by identical comment. Edit a box and save it to update all its clusters." data-hint="Clusters are grouped by identical comment. Edit a box and save it to update all its clusters.">?</button></h2>
       <div id="comments-list"></div>
       <menu>
-        <button type="button" id="comments-dialog-close" class="primary">Close</button>
+        <button type="button" id="comments-dialog-cancel">Cancel</button>
+        <button type="button" id="comments-dialog-ok" class="primary">OK</button>
       </menu>
     </div>
   </dialog>
@@ -228,8 +264,8 @@
       <h2 id="confirm-dialog-title">Confirm</h2>
       <p id="confirm-dialog-message"></p>
       <menu>
-        <button type="button" class="primary" id="confirm-dialog-ok">Continue</button>
         <button type="button" id="confirm-dialog-cancel">Cancel</button>
+        <button type="button" class="primary" id="confirm-dialog-ok">Continue</button>
       </menu>
     </div>
   </dialog>
@@ -258,8 +294,8 @@
       <label>Category <select name="category" required></select></label>
       <menu>
         <button type="button" id="btn-test-cluster">Test connection</button>
-        <button type="submit" value="save" class="primary">Save</button>
         <button type="button" value="cancel">Cancel</button>
+        <button type="submit" value="save" class="primary">Save</button>
       </menu>
       <p id="cluster-test-error" class="form-error hidden"></p>
     </form>
@@ -297,8 +333,8 @@
       <label>Colour <input name="color" type="color" value="#9aa3b5" /></label>
       <label class="inline"><input type="checkbox" name="confirm" /> Require confirmation before running</label>
       <menu>
-        <button type="submit" value="save" class="primary">Save</button>
         <button type="button" value="cancel">Cancel</button>
+        <button type="submit" value="save" class="primary">Save</button>
       </menu>
     </form>
   </dialog>
@@ -321,8 +357,8 @@
         <span id="fn-placeholder-list"></span>
       </div>
       <menu>
-        <button type="button" id="fn-dialog-done" class="primary">Done</button>
         <button type="button" id="fn-dialog-cancel">Cancel</button>
+        <button type="button" id="fn-dialog-done" class="primary">Done</button>
       </menu>
     </form>
   </dialog>

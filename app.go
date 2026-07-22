@@ -75,6 +75,10 @@ func (a *App) SaveParentRoles(roles []string) error {
 	return a.store.UpdateParentRoles(roles)
 }
 
+func (a *App) SaveCommentFields(fields []model.CommentField) error {
+	return a.store.UpdateCommentFields(fields)
+}
+
 func (a *App) AddCluster(in model.ClusterInput) (model.Cluster, error) {
 	return a.store.AddCluster(in)
 }

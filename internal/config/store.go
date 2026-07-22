@@ -52,8 +52,18 @@ func DefaultConfig() model.Config {
 				Call:      "ALTER ROLE ${loginname} WITH ${attribute}",
 			},
 		},
-		Batch: model.BatchSettings{MaxConcurrency: 5},
-		UI:    model.UISettings{Theme: model.ThemeSystem},
+		Batch:         model.BatchSettings{MaxConcurrency: 5},
+		UI:            model.UISettings{Theme: model.ThemeSystem, CommentDefaultView: model.CommentViewFields},
+		CommentFields: defaultCommentFields(),
+	}
+}
+
+// defaultCommentFields is the built-in comment-key mapping (the company convention),
+// used when config omits comment_fields.
+func defaultCommentFields() []model.CommentField {
+	return []model.CommentField{
+		{Key: "full_name", Label: "Full name"},
+		{Key: "e_mail", Label: "Email"},
 	}
 }
 
@@ -115,7 +125,12 @@ func (s *Store) Load() error {
 		cfg.Batch.MaxConcurrency = 5
 	}
 	cfg.UI.Theme = model.NormalizeTheme(cfg.UI.Theme)
+	cfg.UI.CommentDefaultView = model.NormalizeCommentView(cfg.UI.CommentDefaultView)
 	cfg.ParentRoles = sanitizeParentRoles(cfg.ParentRoles)
+	cfg.CommentFields = sanitizeCommentFields(cfg.CommentFields)
+	if len(cfg.CommentFields) == 0 {
+		cfg.CommentFields = defaultCommentFields()
+	}
 	migrateDBFunctions(&cfg.DBFunctions)
 	s.cfg = cfg
 	return nil
@@ -154,7 +169,10 @@ func (s *Store) UpdateBatch(batch model.BatchSettings) error {
 }
 
 func (s *Store) UpdateUI(ui model.UISettings) error {
-	s.cfg.UI = model.UISettings{Theme: model.NormalizeTheme(ui.Theme)}
+	s.cfg.UI = model.UISettings{
+		Theme:              model.NormalizeTheme(ui.Theme),
+		CommentDefaultView: model.NormalizeCommentView(ui.CommentDefaultView),
+	}
 	return s.Save()
 }
 
@@ -164,6 +182,15 @@ func (s *Store) UpdateParentRoles(roles []string) error {
 		return err
 	}
 	s.cfg.ParentRoles = cleaned
+	return s.Save()
+}
+
+func (s *Store) UpdateCommentFields(fields []model.CommentField) error {
+	cleaned, err := validateCommentFields(fields)
+	if err != nil {
+		return err
+	}
+	s.cfg.CommentFields = cleaned
 	return s.Save()
 }
 
@@ -367,6 +394,53 @@ func sanitizeParentRoles(roles []string) []string {
 		}
 		seen[r] = true
 		out = append(out, r)
+	}
+	return out
+}
+
+// validateCommentFields trims key+label, drops empty-key rows, dedupes by key
+// (order-preserving), rejects keys that are not bare identifiers, and defaults a blank
+// label to the key.
+func validateCommentFields(fields []model.CommentField) ([]model.CommentField, error) {
+	seen := make(map[string]bool, len(fields))
+	var out []model.CommentField
+	for _, f := range fields {
+		key := strings.TrimSpace(f.Key)
+		if key == "" {
+			continue
+		}
+		if !parentRoleRE.MatchString(key) {
+			return nil, fmt.Errorf("invalid comment field key %q: use letters, digits, underscore", key)
+		}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		label := strings.TrimSpace(f.Label)
+		if label == "" {
+			label = key
+		}
+		out = append(out, model.CommentField{Key: key, Label: label})
+	}
+	return out, nil
+}
+
+// sanitizeCommentFields trims/drops empty-key rows/dedupes without failing (used on load,
+// to tolerate hand-edited config). Rows with an invalid key are dropped rather than rejected.
+func sanitizeCommentFields(fields []model.CommentField) []model.CommentField {
+	seen := make(map[string]bool, len(fields))
+	var out []model.CommentField
+	for _, f := range fields {
+		key := strings.TrimSpace(f.Key)
+		if key == "" || seen[key] || !parentRoleRE.MatchString(key) {
+			continue
+		}
+		seen[key] = true
+		label := strings.TrimSpace(f.Label)
+		if label == "" {
+			label = key
+		}
+		out = append(out, model.CommentField{Key: key, Label: label})
 	}
 	return out
 }

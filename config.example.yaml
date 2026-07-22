@@ -58,8 +58,11 @@ batch:
   max_concurrency: 5
 
 # ui.theme: light | dark | system (follow OS appearance)
+# ui.comment_default_view: fields | raw — preferred comment editor mode for a NEW/empty
+#   comment (Create role, or a role with no comment). Content-bearing comments auto-detect.
 ui:
   theme: system
+  comment_default_view: fields
 
 # parent_roles: preconfigured parent groups offered as pick-list choices when granting
 # privileges (Create role / Alter role). Bare identifiers; several can be granted at once.
@@ -67,3 +70,13 @@ parent_roles:
   - gr_devs_ro
   - gr_reporting
   - gr_admins
+
+# comment_fields: JSON keys surfaced as labeled inputs in the role form when a role's
+# COMMENT holds JSON. Ordered; keys not listed here are still shown generically. Keys are
+# bare identifiers. Defaults to full_name/e_mail when omitted. Plain-text comments are
+# edited via the Raw view regardless of this list.
+comment_fields:
+  - key: full_name
+    label: Full name
+  - key: e_mail
+    label: Email
