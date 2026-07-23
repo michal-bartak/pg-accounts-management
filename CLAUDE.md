@@ -152,9 +152,11 @@ Defaults in [internal/config/store.go](internal/config/store.go); example in
 | `set_attribute` | loginname, **attribute** (space-separated keyword list) | statement (`ALTER ROLE ${loginname} WITH ${attribute}`) |
 | `set_config` / `reset_config` | loginname, config_name(, config_value) | **no template** — hardcoded `ALTER ROLE … SET/RESET` in `pg.ExecuteOperation` |
 
-Field kinds when embedding (statement/block): role names → **identifiers** (unquoted,
-validated `[A-Za-z_][A-Za-z0-9_]*`); `parent_roles` → comma-separated identifier list
-(`fieldIdentifierList`); `new_password`/`comment`/`fullname`/`email` → quoted **literals**;
+Field kinds when embedding (statement/block): role names → **double-quoted identifiers**
+(`quoteSQLIdentifier` → `"name"` with `"`→`""`, so case is preserved and special chars are safe;
+rejects only empty/comma/NUL — comma is the list delimiter); `parent_roles` → comma-separated
+list, each element double-quoted (`fieldIdentifierList` → `"a", "b"`);
+`new_password`/`comment`/`fullname`/`email` → quoted **literals**;
 `attribute` → a **space-separated keyword list** (`fieldKeywordList`) so the frontend combines
 all of a cluster's attribute changes into ONE `ALTER ROLE … WITH kw1 kw2 …`; each keyword is
 whitelisted (`SUPERUSER`/`NOSUPERUSER`, `CREATEROLE`/…, `LOGIN`, `REPLICATION`, `BYPASSRLS`) in

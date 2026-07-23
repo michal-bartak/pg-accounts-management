@@ -20,7 +20,7 @@ func TestBuild_statement_dropRole(t *testing.T) {
 	if useQuery || len(vals) != 0 {
 		t.Fatalf("useQuery=%v vals=%v", useQuery, vals)
 	}
-	if sql != "DROP ROLE jdoe" {
+	if sql != `DROP ROLE "jdoe"` {
 		t.Fatalf("got: %s", sql)
 	}
 }
@@ -38,8 +38,8 @@ func TestBuild_statement_setComment(t *testing.T) {
 	if useQuery || len(vals) != 0 {
 		t.Fatalf("useQuery=%v vals=%v", useQuery, vals)
 	}
-	// login name embedded as identifier; comment embedded as an escaped string literal.
-	want := `COMMENT ON ROLE jdoe IS '{"full_name":"O''Hara"}'`
+	// login name double-quoted as identifier; comment embedded as an escaped string literal.
+	want := `COMMENT ON ROLE "jdoe" IS '{"full_name":"O''Hara"}'`
 	if sql != want {
 		t.Fatalf("got:  %s\nwant: %s", sql, want)
 	}
@@ -55,7 +55,7 @@ func TestBuild_statement_setComment_empty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sql != "COMMENT ON ROLE jdoe IS ''" {
+	if sql != `COMMENT ON ROLE "jdoe" IS ''` {
 		t.Fatalf("got: %s", sql)
 	}
 }
@@ -70,8 +70,8 @@ func TestBuild_statement_setAttribute(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Attribute keyword embedded unquoted (like an identifier).
-	if sql != "ALTER ROLE jdoe WITH NOSUPERUSER" {
+	// Login is double-quoted; the attribute keyword is embedded unquoted.
+	if sql != `ALTER ROLE "jdoe" WITH NOSUPERUSER` {
 		t.Fatalf("got: %s", sql)
 	}
 }
@@ -86,7 +86,7 @@ func TestBuild_statement_setAttribute_multipleKeywords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sql != "ALTER ROLE jdoe WITH NOSUPERUSER NOLOGIN CREATEDB" {
+	if sql != `ALTER ROLE "jdoe" WITH NOSUPERUSER NOLOGIN CREATEDB` {
 		t.Fatalf("got: %s", sql)
 	}
 }
@@ -113,7 +113,7 @@ func TestBuild_statement_rolenameAlias(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sql != "DROP ROLE testuser" {
+	if sql != `DROP ROLE "testuser"` {
 		t.Fatalf("got: %s", sql)
 	}
 }
@@ -131,7 +131,7 @@ func TestBuild_block_wrapsBody(t *testing.T) {
 	if useQuery {
 		t.Fatal("expected Exec mode")
 	}
-	if !strings.HasPrefix(sql, "DO $dbaccounts$") || !strings.Contains(sql, "DROP ROLE jdoe") {
+	if !strings.HasPrefix(sql, "DO $dbaccounts$") || !strings.Contains(sql, `DROP ROLE "jdoe"`) {
 		t.Fatalf("got: %s", sql)
 	}
 }
@@ -185,7 +185,7 @@ func TestBuild_statement_grantParents_singleRole(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sql != "GRANT Gr_devs_all_ro TO test" {
+	if sql != `GRANT "Gr_devs_all_ro" TO "test"` {
 		t.Fatalf("got: %s", sql)
 	}
 	if strings.Contains(sql, "'") {
@@ -203,20 +203,37 @@ func TestBuild_statement_grantParents_multipleRoles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sql != "GRANT gr_a, gr_b TO testuser" {
+	if sql != `GRANT "gr_a", "gr_b" TO "testuser"` {
 		t.Fatalf("got: %s", sql)
 	}
 }
 
-func TestBuild_statement_grantParents_invalidRoleName(t *testing.T) {
-	_, _, _, err := Build(
+func TestBuild_statement_grantParents_hyphenNowQuoted(t *testing.T) {
+	// A hyphenated name is valid once identifiers are double-quoted.
+	sql, _, _, err := Build(
 		"GRANT ${parent_roles} TO ${loginname}",
 		map[string]string{"parent_roles": "bad-role", "loginname": "test"},
 		"grant_parents",
 		model.ExecutionStatement,
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sql != `GRANT "bad-role" TO "test"` {
+		t.Fatalf("got: %s", sql)
+	}
+}
+
+func TestBuild_statement_grantParents_emptyElementRejected(t *testing.T) {
+	// An empty list element (trailing comma) is still rejected.
+	_, _, _, err := Build(
+		"GRANT ${parent_roles} TO ${loginname}",
+		map[string]string{"parent_roles": "gr_a,", "loginname": "test"},
+		"grant_parents",
+		model.ExecutionStatement,
+	)
 	if err == nil {
-		t.Fatal("expected error for invalid role name")
+		t.Fatal("expected error for empty list element")
 	}
 }
 
@@ -230,11 +247,29 @@ func TestBuild_statement_revokeParents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sql != "REVOKE Gr_devs_all_ro FROM test" {
+	if sql != `REVOKE "Gr_devs_all_ro" FROM "test"` {
 		t.Fatalf("got: %s", sql)
 	}
 	if strings.Contains(sql, "'") {
-		t.Fatalf("role names must not be quoted: %s", sql)
+		t.Fatalf("role names must not be single-quoted: %s", sql)
+	}
+}
+
+// Identifiers are double-quoted, so mixed case is preserved, hyphens/dots are allowed, and an
+// embedded double-quote is doubled.
+func TestBuild_statement_identifiersQuoted_preserveCaseAndSpecial(t *testing.T) {
+	sql, _, _, err := Build(
+		"REVOKE ${parent_roles} FROM ${loginname}",
+		map[string]string{"parent_roles": `My-Role,db.reader,od"d`, "loginname": "AdminUser"},
+		"revoke_parents",
+		model.ExecutionStatement,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `REVOKE "My-Role", "db.reader", "od""d" FROM "AdminUser"`
+	if sql != want {
+		t.Fatalf("got:  %s\nwant: %s", sql, want)
 	}
 }
 

@@ -186,15 +186,18 @@ func resolveArg(args map[string]string, field string) (string, bool) {
 	return "", false
 }
 
+// quoteSQLIdentifier double-quotes a role identifier so case is preserved and special
+// characters are safe (embedded `"` are doubled). A comma is rejected because it is the
+// delimiter for identifier lists (parent_roles); a NUL byte is invalid in an identifier.
 func quoteSQLIdentifier(name string) (string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return "", fmt.Errorf("identifier value is required")
 	}
-	if !roleLiteralRE.MatchString(name) {
-		return "", fmt.Errorf("invalid identifier %q: use letters, digits, underscore", name)
+	if strings.ContainsAny(name, ",\x00") {
+		return "", fmt.Errorf("invalid identifier %q: commas and NUL bytes are not allowed", name)
 	}
-	return name, nil
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`, nil
 }
 
 func quoteSQLIdentifierList(value string) (string, error) {

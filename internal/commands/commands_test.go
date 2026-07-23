@@ -315,7 +315,7 @@ func TestBuild_removeRole_statementMode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if useQuery || sql != "DROP ROLE jdoe" || len(vals) != 0 {
+	if useQuery || sql != `DROP ROLE "jdoe"` || len(vals) != 0 {
 		t.Fatalf("useQuery=%v sql=%q vals=%v", useQuery, sql, vals)
 	}
 }
@@ -333,7 +333,7 @@ func TestBuild_revokeParents_statementMode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if useQuery || sql != "REVOKE Gr_devs_all_ro FROM test" || len(vals) != 0 {
+	if useQuery || sql != `REVOKE "Gr_devs_all_ro" FROM "test"` || len(vals) != 0 {
 		t.Fatalf("useQuery=%v sql=%q vals=%v", useQuery, sql, vals)
 	}
 }
@@ -355,7 +355,7 @@ func TestBuild_grantParents_statementMode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if useQuery || sql != "GRANT Gr_devs_all_ro TO test" || len(vals) != 0 {
+	if useQuery || sql != `GRANT "Gr_devs_all_ro" TO "test"` || len(vals) != 0 {
 		t.Fatalf("useQuery=%v sql=%q vals=%v", useQuery, sql, vals)
 	}
 }

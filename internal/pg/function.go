@@ -12,10 +12,7 @@ import (
 	"github.com/michalbartak/dbaccounts/internal/model"
 )
 
-var (
-	roleIdentRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
-	gucNameRE   = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$`)
-)
+var gucNameRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$`)
 
 // Querier is the subset of pgx used to run an operation. Both *pgx.Conn and pgx.Tx satisfy it,
 // so an operation can run either standalone (autocommit) or inside a per-cluster transaction.
@@ -25,22 +22,25 @@ type Querier interface {
 }
 
 // execRoleConfig runs ALTER ROLE <login> SET <name> = '<value>' / RESET <name>.
-// Role name and GUC name are validated as identifiers; the value is a quoted literal.
+// The role name is double-quoted (case preserved, special chars safe); the GUC name is a
+// validated bare identifier (unquoted — GUC names are case-insensitive and may be namespaced);
+// the value is a quoted literal.
 func execRoleConfig(ctx context.Context, q Querier, operation string, args map[string]string) (string, error) {
 	login := strings.TrimSpace(args["loginname"])
 	name := strings.TrimSpace(args["config_name"])
-	if !roleIdentRE.MatchString(login) {
+	if login == "" || strings.ContainsAny(login, ",\x00") {
 		return "", fmt.Errorf("invalid role name: %q", login)
 	}
 	if !gucNameRE.MatchString(name) {
 		return "", fmt.Errorf("invalid setting name: %q", name)
 	}
+	qlogin := `"` + strings.ReplaceAll(login, `"`, `""`) + `"`
 	var sql string
 	if operation == "reset_config" {
-		sql = fmt.Sprintf("ALTER ROLE %s RESET %s", login, name)
+		sql = fmt.Sprintf("ALTER ROLE %s RESET %s", qlogin, name)
 	} else {
 		value := strings.ReplaceAll(args["config_value"], "'", "''")
-		sql = fmt.Sprintf("ALTER ROLE %s SET %s = '%s'", login, name, value)
+		sql = fmt.Sprintf("ALTER ROLE %s SET %s = '%s'", qlogin, name, value)
 	}
 	if _, err := q.Exec(ctx, sql); err != nil {
 		return "", err
