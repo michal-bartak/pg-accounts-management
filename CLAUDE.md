@@ -77,22 +77,35 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   Configured fields always render; **every other key** in the comment also renders (labeled by
   raw key) — string values are editable, non-string values (number/bool/array/object) render
   **read-only** (shown as JSON, edited via Raw; `e.readonly`) so their type is preserved via
-  `baseObj`. `editorFromComment`
+  `baseObj`. A **`null`** value is the exception: it is treated as an empty **editable** string
+  field (no read-only / no ⚠), and on save an empty value for a key that was already in the loaded
+  comment serializes back as JSON **`null`** (so a loaded null round-trips and clearing a field
+  stores null); a key that was never in the comment stays absent, so an all-blank/empty comment
+  still assembles to `''` (load stays idempotent — opening a role never marks it dirty).
+  `editorFromComment`
   builds the model (Fields for JSON, Raw for non-JSON content, and for an **empty** comment
   the configured **`ui.comment_default_view`** — `fields`|`raw`, `preferredCommentView()`);
-  `assembleComment`/`assembleCommentFrom` serialize it (empty value drops the key; preserves
+  `assembleComment`/`assembleCommentFrom` serialize it (empty value → null for existing keys, else
+  drops the key; preserves
   unknown keys); `parseCommentObject` is the shared reader; `switchEditorMode` round-trips
   Fields↔Raw. The **Fields** toggle is disabled whenever the raw text is non-empty and not a
   JSON object (`commentFieldsBlocked`) — Fields can't represent plain text, so switching would
   drop it; edit such comments in Raw. A non-JSON comment saves as plain text with an inline note. The backend
   `set_comment` op stays an opaque quoted literal; `pg.ParseFullName` (`full_name`) is kept
-  only for search-result display. When comments **vary** across clusters the inline editor is
-  hidden and reconciliation moves to the **Comments dialog**, whose per-version boxes reuse the
-  same Fields/Raw editor (`commentVersionEditors`). The dialog **stages** edits locally: **OK**
-  commits each version's assembled comment into `commentOverrides` (`Map<clusterId,string>`);
-  **Cancel** discards. Nothing is sent from the dialog — staged comments publish with the rest
-  of the edits on **Save changes** (`buildAlterClusterOps` prefers a cluster's override, else the
-  inline editor's comment). `commentOverrides` is cleared by `resetEditMaps` (pick / save / mode switch).
+  only for search-result display. The comment UI **mode follows the staged state**
+  (`commentEditor.varies`), not the DB baseline: while comments vary the inline editor is hidden and
+  reconciliation moves to the **Comments dialog**, whose per-version boxes reuse the
+  same Fields/Raw editor (`commentVersionEditors`). Each version box (when there is >1) also has a
+  **Use in all clusters** button (left of the Fields/Raw toggle, `data-cv-useall`) that broadcasts
+  that version's comment to every version editor. The dialog **stages** edits locally: **OK**
+  (`commitCommentsDialog`) commits each version's assembled comment into `commentOverrides`
+  (`Map<clusterId,string>`); **Cancel** discards. **OK also folds a now-consistent result**: if the
+  reconciled comments are all canonically equal (via Use-in-all or manual editing), it loads that one
+  comment into the inline editor (`commentEditor.varies=false`) and clears `commentOverrides`, so the
+  "Comments differ" banner clears on **OK** (before Save) and the inline editor takes over. Nothing is
+  sent from the dialog — staged comments publish with the rest of the edits on **Save changes**
+  (`buildAlterClusterOps` prefers a cluster's override, else the inline editor's comment).
+  `commentOverrides` is cleared by `resetEditMaps` (pick / save / mode switch).
 - **One shared role form for Create and Alter.** Both modes render through
   `renderAlterDetail` over `alterDetails` and the same edit maps (`alterAdd`/`alterRevoke`,
   `alterAttrAdd`/`alterAttrRemove`, `alterConfigSet`/`alterConfigReset`, password). Mode =
@@ -107,6 +120,21 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   empty form; Alter opens the search popup and enters edit only on pick. `updateTargetPreview`
   re-synthesizes + reconciles pending edits when the selection changes in create mode
   (`reconcilePendingWithUniverse`).
+- **Per-cluster presence editor (Alter).** The static **Present on** block (`#role-present`, a
+  sibling of `#alter-detail` with its own click listener) shows existing clusters (plain chips),
+  pending-**add** (green) and pending-**remove** (red strikethrough) plus a **✎** button
+  (`#btn-present-edit`) that opens the scope dialog with `ctx.kind === 'presence'`. Adding a
+  cluster inserts a **synthetic `exists:false` row** into `alterDetails` (empty baseline, like
+  `synthCreateBaseline`) so the whole form (privileges/attributes/settings/comment editors) targets
+  it; dropping a cluster records it in **`roleRemoveClusters`** (`Set<clusterId>`, reset in
+  `resetEditMaps`). The presence editor's universe is `alterScopeClusters` (the searched scope, so a
+  cluster must have been in Target selection at search time to be addable); `confirmPresenceScope`
+  recomputes remove/add sets from the real `exists:true` rows. `buildAlterClusterOps` emits a lone
+  `remove_role` for removed clusters and **prepends `create_role`** for `exists:false` rows *in
+  Alter mode only* (`!isCreateMode()`, so Create's `buildCreateClusterOps` doesn't double-prepend);
+  the consistent inline comment then flows to new clusters as a `set_comment` (varies ⇒ created
+  bare). All of it publishes on the one **Save changes** pass. `removeRole` (red button) targets
+  only `exists:true` rows.
 - **Run/build.** Both modes build **per-cluster ordered op lists** and send ONE
   `app.RunRoleBatch({clusters, auth, confirmProduction})` via `executeRoleBatch`; the backend runs
   each cluster's ops as a single transaction. `buildAlterClusterOps()` produces
@@ -125,8 +153,13 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   when blocked/cancelled/threw); on `null` **or any per-cluster failure** the Save/Create/Remove
   paths leave the form and pending edits untouched (chip + popup are the sole error surface). Only
   a **fully clean** outcome refreshes the form — Save re-reads the baseline via `fetchRoleDetails`
-  and re-renders *only* when the reload itself is clean (no empty/error, so a transient unreachable
-  cluster can't wipe it); Create resets to an empty form; Remove calls `reloadDetails` (empty-state
+  and adopts it *only* when the reload itself is clean (no empty/error, so a transient unreachable
+  cluster can't wipe it). On a **fully successful** Save, though, the comment we sent is known-live,
+  so `saveAlterations` **optimistically reconciles the local comment baseline** (from
+  `commentOverrides` / the inline editor) and clears the staged overrides *before* the reload, then
+  always re-renders — so the "Comments differ" banner reflects what was written even when a cluster
+  is momentarily unreachable on reload (a clean reload still overrides with DB truth + resets the
+  other edit maps). Create resets to an empty form; Remove calls `reloadDetails` (empty-state
   reset). The genuine "not found" state still renders for an actual search `pickUser`.
   **Role-load reachability** is reported the same way as runs: `reloadDetails` → `reportRoleLoad`
   feeds the per-cluster load results (reachable = ok, unreachable = error) into the shared
@@ -373,12 +406,19 @@ wails dev            # dev window (regenerates frontend/wailsjs/)
 make package         # build/bin/DbAccounts.app + dist/*.tar.gz
 ```
 
-- Run `go test ./... -count=1` and `node --check frontend/app.js` before committing.
-  CI: `.github/workflows/test.yml`.
-- Frontend has **no build step / no package.json**; served statically by Wails. For a
-  quick UI smoke test without the Go backend, `python3 -m http.server` in `frontend/`
-  and exercise the global functions (`backend()` is undefined, so search/save show an inline
-  error, but rendering/logic can be driven with mock `window.go.main.App`/`state`/`alterDetails`).
+- Run `go test ./... -count=1`, `node --check frontend/app.js`, and `node --test frontend/app.test.mjs`
+  before committing. CI: `.github/workflows/test.yml` (go-test + frontend-test jobs).
+- Frontend has **no build step / no package.json**; served statically by Wails. Logic tests live in
+  [frontend/app.test.mjs](frontend/app.test.mjs) — Node's built-in `node --test`, zero dependencies:
+  it loads `app.js` into a `node:vm` context behind a permissive DOM stub (the `DOMContentLoaded`
+  init never fires, so loading only defines the globals) and drives the real functions, running
+  snippets in the same context so they read/write app.js's top-level `let` state by bare name (same
+  trick as the browser console). Covers `canonicalComment`, `editorFromComment`/`assembleCommentFrom`
+  (null↔empty), `commentConsensus` (varies / unset-on-one / pending-add), and `buildAlterClusterOps`
+  (presence create/remove + comment publishing). For a quick UI smoke test without the Go backend,
+  `python3 -m http.server` in `frontend/` and exercise the global functions (`backend()` is
+  undefined, so search/save show an inline error, but rendering/logic can be driven with mock
+  `window.go.main.App`/`state`/`alterDetails`).
 - Introspection/write SQL is best verified against a throwaway Postgres
   (`docker run … postgres:16`), calling `pg.RoleDetail` / `pg.ExecuteOperation`
   directly; remove any scratch `_test.go` afterward.

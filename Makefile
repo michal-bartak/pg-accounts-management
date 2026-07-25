@@ -1,4 +1,4 @@
-.PHONY: version sync-wails-version ensure-wails test test-vet build build-ci package package-ci clean dist
+.PHONY: version sync-wails-version ensure-wails test test-frontend test-vet build build-ci package package-ci clean dist
 
 VERSION := $(shell tr -d ' \n\r' < VERSION)
 VERSION_PKG := github.com/michalbartak/dbaccounts/internal/version
@@ -56,7 +56,15 @@ ensure-wails:
 test:
 	go test ./... -count=1
 
-test-vet: test
+# Frontend logic tests (Node built-in runner, no deps). Skipped with a note if node is absent.
+test-frontend:
+	@if command -v node >/dev/null 2>&1; then \
+		node --check frontend/app.js && node --test frontend/app.test.mjs; \
+	else \
+		echo "skipping frontend tests: node not found"; \
+	fi
+
+test-vet: test test-frontend
 	go vet ./...
 
 # Production app bundle (macOS: build/bin/DbAccounts.app). Requires Wails CLI.

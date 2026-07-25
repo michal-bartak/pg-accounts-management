@@ -971,6 +971,8 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 /* Keep the value labels next to the "Present on" text (not pushed to the right edge like
    the scope rows, which is where .alter-cluster-badges' margin-left:auto is meant for). */
 .alter-present .alter-cluster-badges { margin-left: 0; }
+/* The presence ✎ edit button sits at the far right of the "Present on" row. */
+.alter-present #btn-present-edit { margin-left: auto; }
 .alter-meta-label,
 .alter-privs-label {
   font-size: var(--fs-xs);
@@ -1176,8 +1178,8 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   gap: 0.5rem; /* fixed clearance between scope / switch / editor / actions, in either mode */
 }
 .comment-scope { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-/* Fields/Raw switch sits at the right edge of each version box. */
-.comment-version .rce-toolbar { justify-content: flex-end; }
+/* "Use in all clusters" on the left, Fields/Raw switch on the right of each version box. */
+.comment-version .rce-toolbar { justify-content: space-between; align-items: center; }
 /* Custom-field inputs need not span the whole box; keep them compact and left-aligned. */
 .comment-version .rce-field { align-items: flex-start; }
 .comment-version .rce-field input { width: min(20rem, 100%); }
