@@ -58,6 +58,16 @@ func SearchRoles(ctx context.Context, conn *pgx.Conn, term string) ([]RoleRow, e
 	return out, rows.Err()
 }
 
+// RoleDetailQueries returns the SQL that RoleDetail executes for loginName, with the $1 bind
+// inlined as a quoted literal — for display in the load-status popup (not re-executed).
+func RoleDetailQueries(loginName string) []string {
+	lit := "'" + strings.ReplaceAll(loginName, "'", "''") + "'"
+	return []string{
+		strings.ReplaceAll(roleDetailSQL, "$1", lit),
+		strings.ReplaceAll(roleParentsSQL, "$1", lit),
+	}
+}
+
 // RoleDetail reads whether a login exists, its comment, attribute flags, role GUC
 // settings (rolconfig), and direct parent memberships.
 func RoleDetail(ctx context.Context, conn *pgx.Conn, loginName string) (exists bool, comment string, parents []string, attrs map[string]bool, settings map[string]string, err error) {

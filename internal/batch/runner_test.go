@@ -149,7 +149,7 @@ func TestRun_grantParents_and_changePassword_resolve(t *testing.T) {
 func TestRunRoleBatch_validation(t *testing.T) {
 	r := NewRunner(testStore(t))
 	// Empty batch → error.
-	if _, err := r.RunRoleBatch(model.RoleBatchRequest{}); err == nil {
+	if _, err := r.RunRoleBatch(model.RoleBatchRequest{}, nil); err == nil {
 		t.Fatal("expected error for empty batch")
 	}
 	// Unknown cluster → error.
@@ -158,7 +158,7 @@ func TestRunRoleBatch_validation(t *testing.T) {
 			ClusterID:  "does-not-exist",
 			Operations: []model.OperationSpec{{Operation: commands.OpRemoveRole, RemoveRole: &model.RemoveRoleParams{LoginName: "x"}}},
 		}},
-	})
+	}, nil)
 	if err == nil || !strings.Contains(err.Error(), "cluster") {
 		t.Fatalf("got: %v", err)
 	}
@@ -171,7 +171,7 @@ func TestRunRoleBatch_requiresProductionConfirm(t *testing.T) {
 			ClusterID:  "c-prod-1",
 			Operations: []model.OperationSpec{{Operation: commands.OpRemoveRole, RemoveRole: &model.RemoveRoleParams{LoginName: "jdoe"}}},
 		}},
-	})
+	}, nil)
 	if err == nil || !strings.Contains(err.Error(), "production") {
 		t.Fatalf("got: %v", err)
 	}
@@ -193,7 +193,7 @@ func TestRunRoleBatch_perClusterResults(t *testing.T) {
 				{Operation: commands.OpRemoveRole, RemoveRole: &model.RemoveRoleParams{LoginName: "u"}},
 			}},
 		},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

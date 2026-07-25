@@ -30,11 +30,15 @@ export function RunRoleBatch(arg1:model.RoleBatchRequest):Promise<Array<model.Cl
 
 export function SaveBatchSettings(arg1:model.BatchSettings):Promise<void>;
 
+export function SaveClusters(arg1:model.ClustersConfig):Promise<void>;
+
 export function SaveCommentFields(arg1:Array<model.CommentField>):Promise<void>;
 
 export function SaveDBFunctions(arg1:model.DBFunctions):Promise<void>;
 
 export function SaveParentRoles(arg1:Array<string>):Promise<void>;
+
+export function SaveTargetSelection(arg1:model.TargetSelection):Promise<void>;
 
 export function SaveUISettings(arg1:model.UISettings):Promise<void>;
 

@@ -11,6 +11,7 @@ import (
 	"github.com/michalbartak/dbaccounts/internal/model"
 	"github.com/michalbartak/dbaccounts/internal/pg"
 	"github.com/michalbartak/dbaccounts/internal/version"
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type App struct {
@@ -79,6 +80,12 @@ func (a *App) SaveCommentFields(fields []model.CommentField) error {
 	return a.store.UpdateCommentFields(fields)
 }
 
+// SaveTargetSelection persists the Operations-page target selection so it survives
+// re-renders (e.g. after saving Settings) and app restarts.
+func (a *App) SaveTargetSelection(t model.TargetSelection) error {
+	return a.store.UpdateTargets(t)
+}
+
 func (a *App) AddCluster(in model.ClusterInput) (model.Cluster, error) {
 	return a.store.AddCluster(in)
 }
@@ -101,6 +108,12 @@ func (a *App) UpdateCategory(id string, in model.CategoryInput) (model.Category,
 
 func (a *App) DeleteCategory(id string) error {
 	return a.store.DeleteCategory(id)
+}
+
+// SaveClusters replaces the whole clusters+categories set at once (the staged Clusters editor's
+// Save). Validates the full set atomically; nothing persists on error.
+func (a *App) SaveClusters(cfg model.ClustersConfig) error {
+	return a.store.SaveClustersAndCategories(cfg.Clusters, cfg.Categories)
 }
 
 func (a *App) ImportFromEnvironment() model.EnvImport {
@@ -149,9 +162,14 @@ func (a *App) RunOperation(req model.RunRequest) ([]model.ClusterResult, error) 
 }
 
 // RunRoleBatch applies, per cluster, an ordered list of operations inside a single transaction
-// (all-or-nothing per cluster). Used by the role Create/Alter forms.
+// (all-or-nothing per cluster). Used by the role Create/Alter forms. Emits a "role-batch-progress"
+// event (model.ClusterProgress) as each cluster starts and finishes so the UI can show live status.
 func (a *App) RunRoleBatch(req model.RoleBatchRequest) ([]model.ClusterResult, error) {
-	return a.batch.RunRoleBatch(req)
+	return a.batch.RunRoleBatch(req, func(ev model.ClusterProgress) {
+		if a.ctx != nil {
+			wailsruntime.EventsEmit(a.ctx, "role-batch-progress", ev)
+		}
+	})
 }
 
 // SearchRoles scans the selected clusters/categories for roles matching the term

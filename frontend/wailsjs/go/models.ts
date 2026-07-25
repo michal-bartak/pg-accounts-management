@@ -344,6 +344,7 @@ export namespace model {
 	    status: string;
 	    message: string;
 	    durationMs: number;
+	    queries?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new ClusterResult(source);
@@ -358,6 +359,7 @@ export namespace model {
 	        this.status = source["status"];
 	        this.message = source["message"];
 	        this.durationMs = source["durationMs"];
+	        this.queries = source["queries"];
 	    }
 	}
 	export class ClusterRoleDetail {
@@ -372,6 +374,8 @@ export namespace model {
 	    attributes: Record<string, boolean>;
 	    settings: Record<string, string>;
 	    error?: string;
+	    durationMs: number;
+	    queries?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new ClusterRoleDetail(source);
@@ -390,7 +394,41 @@ export namespace model {
 	        this.attributes = source["attributes"];
 	        this.settings = source["settings"];
 	        this.error = source["error"];
+	        this.durationMs = source["durationMs"];
+	        this.queries = source["queries"];
 	    }
+	}
+	export class ClustersConfig {
+	    clusters: Cluster[];
+	    categories: Category[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ClustersConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.clusters = this.convertValues(source["clusters"], Cluster);
+	        this.categories = this.convertValues(source["categories"], Category);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class CommentField {
 	    key: string;
@@ -404,6 +442,20 @@ export namespace model {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.key = source["key"];
 	        this.label = source["label"];
+	    }
+	}
+	export class TargetSelection {
+	    categoryIds: string[];
+	    clusterIds: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new TargetSelection(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.categoryIds = source["categoryIds"];
+	        this.clusterIds = source["clusterIds"];
 	    }
 	}
 	export class UISettings {
@@ -489,6 +541,7 @@ export namespace model {
 	    ui: UISettings;
 	    parentRoles: string[];
 	    commentFields: CommentField[];
+	    targets: TargetSelection;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -504,6 +557,7 @@ export namespace model {
 	        this.ui = this.convertValues(source["ui"], UISettings);
 	        this.parentRoles = source["parentRoles"];
 	        this.commentFields = this.convertValues(source["commentFields"], CommentField);
+	        this.targets = this.convertValues(source["targets"], TargetSelection);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -738,6 +792,7 @@ export namespace model {
 		    return a;
 		}
 	}
+	
 	
 	
 	

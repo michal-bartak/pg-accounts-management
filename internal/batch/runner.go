@@ -185,6 +185,7 @@ func (r *Runner) LoadRoleDetails(loginName string, categoryIDs, clusterIDs []str
 
 	r.scanClusters(clusters, auth,
 		func(ctx context.Context, cl model.Cluster, conn *pgx.Conn) error {
+			start := time.Now()
 			exists, comment, parents, attrs, settings, err := pg.RoleDetail(ctx, conn, loginName)
 			if err != nil {
 				return err
@@ -201,6 +202,8 @@ func (r *Runner) LoadRoleDetails(loginName string, categoryIDs, clusterIDs []str
 				Parents:    parents,
 				Attributes: attrs,
 				Settings:   settings,
+				DurationMs: time.Since(start).Milliseconds(),
+				Queries:    pg.RoleDetailQueries(loginName),
 			})
 			mu.Unlock()
 			return nil
@@ -241,7 +244,7 @@ func (r *Runner) runOne(cluster model.Cluster, operation string, fn model.DBFunc
 	}
 	defer conn.Close(ctx)
 
-	msg, err := pg.CallFunction(ctx, conn, fn, operation, args)
+	_, msg, err := pg.CallFunction(ctx, conn, fn, operation, args)
 	res.DurationMs = time.Since(start).Milliseconds()
 	if err != nil {
 		res.Message = err.Error()
@@ -255,7 +258,11 @@ func (r *Runner) runOne(cluster model.Cluster, operation string, fn model.DBFunc
 // RunRoleBatch applies, per cluster, an ordered list of operations inside a single transaction
 // (all-or-nothing per cluster). Clusters run concurrently (bounded by max concurrency); a failed
 // cluster rolls back and is reported independently while the others proceed.
-func (r *Runner) RunRoleBatch(req model.RoleBatchRequest) ([]model.ClusterResult, error) {
+//
+// The optional progress callback (nil to skip) is invoked from each cluster's goroutine with a
+// "running" event when work actually starts (after acquiring a worker slot) and a "done" event when
+// the result is ready. It fires concurrently from multiple goroutines, so it must be thread-safe.
+func (r *Runner) RunRoleBatch(req model.RoleBatchRequest, progress func(model.ClusterProgress)) ([]model.ClusterResult, error) {
 	cfg := r.store.Get()
 	if err := commands.ValidateRoleBatch(cfg, req); err != nil {
 		return nil, err
@@ -289,7 +296,22 @@ func (r *Runner) RunRoleBatch(req model.RoleBatchRequest) ([]model.ClusterResult
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			results[idx] = r.runClusterTx(cfg, cl, ops, req.Auth)
+			if progress != nil {
+				progress(model.ClusterProgress{
+					ClusterID: cl.ID, Alias: cl.Alias, Host: cl.Host,
+					Category: cl.Category, Phase: "running",
+				})
+			}
+			res := r.runClusterTx(cfg, cl, ops, req.Auth)
+			results[idx] = res
+			if progress != nil {
+				progress(model.ClusterProgress{
+					ClusterID: res.ClusterID, Alias: res.Alias, Host: res.Host,
+					Category: res.Category, Phase: "done",
+					Status: res.Status, Message: res.Message, DurationMs: res.DurationMs,
+					Queries: res.Queries,
+				})
+			}
 		}(i, t.cluster, t.ops)
 	}
 	wg.Wait()
@@ -331,10 +353,15 @@ func (r *Runner) runClusterTx(cfg model.Config, cluster model.Cluster, ops []mod
 		return res
 	}
 
+	res.Queries = make([]string, 0, len(ops))
 	for i, op := range ops {
 		fn, args, berr := commands.BuildArgs(cfg, op)
+		var sqlText string
 		if berr == nil {
-			_, berr = pg.ExecuteOperation(ctx, tx, fn, op.Operation, args)
+			sqlText, _, berr = pg.ExecuteOperation(ctx, tx, fn, op.Operation, args)
+		}
+		if sqlText != "" {
+			res.Queries = append(res.Queries, sqlText) // include the failing op's SQL too
 		}
 		if berr != nil {
 			_ = tx.Rollback(ctx)

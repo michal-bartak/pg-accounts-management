@@ -40,9 +40,11 @@ Example template: [`config.example.yaml`](config.example.yaml). Implemented in `
 ## Wails API (`app.go` → `window.go.main.App`)
 
 - `GetConfig`, `GetConfigPath`, `ReloadConfig`, `GetAppVersion`
-- `AddCluster`, `UpdateCluster`, `DeleteCluster`
+- `AddCluster`, `UpdateCluster`, `DeleteCluster` (per-item; kept but unused by the UI now)
+- `SaveClusters(ClustersConfig)` — staged Clusters editor: replaces the whole clusters+categories
+  set atomically via `Store.SaveClustersAndCategories` (validate + UUID/slug ids + referential integrity)
 - `ImportFromEnvironment` — reads `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`
-- `SaveDBFunctions`, `SaveBatchSettings`, `SaveUISettings`, `SaveParentRoles`
+- `SaveDBFunctions`, `SaveBatchSettings`, `SaveUISettings`, `SaveParentRoles`, `SaveTargetSelection`
 - `TestConnection`, `PreviewTargets`, `RunRoleBatch` (per-cluster transactional batch — the
   create/update/remove path), `RunOperation` (legacy single-op, unused by the UI)
 - **Introspection (reads, for Alter role):** `SearchRoles`, `LoadRoleDetails` — scan the
@@ -91,11 +93,20 @@ non-empty). Do not add a heavy frontend framework unless requested.
 scroll); header + tabs fixed. Operations = two independently scrolling columns
 (`.ops-sidebar` / `.ops-main`); `.ops-main` has a scrolling `.ops-body` + pinned
 `.ops-footer` (Run or Save/Remove, via `updateOpsFooter()`). Clusters/Settings are
-single-column with fixed toolbar / pinned Save-settings footer. **Test connections**
-(`btn-test-clusters` → `testAllClusters`) is in the Clusters toolbar; it tests every
-cluster into a per-row **Status** column (`setClusterStatus`), shared with the per-row
-Test button. Left sidebar is Target selection only; "Or pick clusters" collapses/expands
-(collapsed by default; expanded list flexes to fill). **Cluster groups** are edited from
+single-column, sharing a padded panel + inset **`[Discard] [Save]`** footer (Settings:
+`btn-discard-settings`/`btn-save-settings`+`discardSettings`; the divider goes up to the content
+margins, not the window). The **Clusters tab is STAGED**
+like Settings: cluster/group add/edit/delete mutate `clustersDraft`/`categoriesDraft` (seeded
+once from saved `state` in `loadConfig`); nothing persists until the pinned **Save**/**Discard**
+footer (`btn-save-clusters` → `App.SaveClusters` → `Store.SaveClustersAndCategories`, atomic
+validate+replace; Save enabled-when-dirty / disabled-when-clean via `clustersDirty`). Only the Clusters editor
+reads the drafts — Operations keeps reading saved `state`. **Test connections**
+(`btn-test-clusters` → `testAllClusters`) tests the on-screen **draft** values via
+`TestConnectionInput` into a per-row **Status** column (`setClusterStatus`). Left sidebar is Target selection only; "Or pick clusters" collapses/expands
+(collapsed by default; expanded list flexes to fill). Target selection is **remembered**
+(module-level `selectedCategoryIds`=null→all / `selectedClusterIds`, seeded once from
+persisted `Config.Targets`, re-render keeps it, persisted via `SaveTargetSelection`) so it
+survives Settings-save and restarts. **Cluster groups** are edited from
 the Clusters toolbar (right-aligned `btn-manage-groups` → `#groups-dialog` list →
 `#group-dialog` form; no Save button, so not in Settings). Feature descriptions live
 behind a **`?` help badge** (`.q-hint`, via
@@ -131,13 +142,34 @@ come from Settings-managed `Config.CommentFields` (`comment_fields`, default ful
 helpers. Run: both modes build per-cluster ordered op lists and send ONE
 `App.RunRoleBatch(RoleBatchRequest)` (`executeRoleBatch`); the backend (`batch.runClusterTx`) runs
 each cluster's ops in a **single transaction** (commit/rollback, one result per cluster, bounded
-concurrency). `buildAlterClusterOps` orders grant→revoke→password→**set_attribute (all keywords
+concurrency), emitting a `role-batch-progress` Wails event (`model.ClusterProgress`) per cluster
+start/finish so the UI shows live progress in the footer status chip `#run-status` (button-sized,
+neutral color, spinner-only-while-running, no ✓/✕ glyph) (+ its `#run-status-dialog` popup — no
+Host column; each done row has a magnifier (`.rst-view`) opening a larger `#run-queries-dialog`
+with that cluster's executed SQL — not shown inline — plus a copy button that copies message +
+all queries). Each `ClusterResult`/`ClusterProgress` carries `Queries []string` (executed SQL from
+`pg.ExecuteOperation`'s `(sql, msg, err)` return; function-mode binds inlined; failing op's SQL
+kept). `clearRunStatus()` clears it on op-tab/page-tab switch so it never leaks across pages.
+**No corner toast** (`showToast` removed): simple confirmations flash the action button
+("Saved"/"Created", `flashButton`); Save buttons are enabled-when-dirty / disabled-when-clean,
+no marker (`setDirty` toggles `disabled`; disabled = `pointer-events:none`, no hover — Settings
+`settingsDirty`, role `buildAlterClusterOps().length>0`, Clusters `clustersDirty`). All
+right-aligned action buttons + op-tabs align to the 1.25rem panel edge. Errors/validation render
+inline in a `.form-error` (`showInlineError` →
+`#ops-error`/`#settings-error`/`#clusters-error`/`#scope-error`/`#group-error`/
+`#cluster-test-error`/`#alter-search-errors`) + a red button flash; run outcomes stay in the chip.
+`buildAlterClusterOps` orders grant→revoke→password→**set_attribute (all keywords
 combined)**→set_config→reset_config→set_comment; create prepends `create_role`
 (`buildCreateClusterOps`). Comment persists via `set_comment` (per-cluster `commentOverrides` wins,
 else `assembleComment`; create's `create_role` gets `${fullname}`/`${email}` from the editor,
 follow-up `set_comment` authoritative). When comments vary the inline editor hides and the Comments
 dialog reconciles per cluster (`commentVersionEditors`). One shared
-`confirmScopeDialog`/`buildScopeTargets` (no create fork).
+`confirmScopeDialog`/`buildScopeTargets` (no create fork). **Errors never touch the role form**:
+`executeRoleBatch` returns the results array or `null`; on `null`/any per-cluster failure the
+Save/Create/Remove paths leave the form + pending edits intact (chip/popup are the only error
+surface). Only a fully clean run refreshes the form — Save re-reads via `fetchRoleDetails` and
+re-renders only when that reload is itself clean (never clobbers on transient unreachable); the
+"not found" empty state still renders for a real search `pickUser`.
 
 ## Versioning & packaging
 

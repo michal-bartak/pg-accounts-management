@@ -167,7 +167,9 @@ body {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.5rem 1rem;
+  /* 1.25rem horizontal matches the header + panel content edges, so the right-aligned op-tabs
+     line up with the Save/Create action buttons below. */
+  padding: 0.5rem 1.25rem;
   border-bottom: 1px solid var(--border);
 }
 
@@ -190,12 +192,17 @@ main { flex: 1 1 auto; min-height: 0; overflow: hidden; }
 .panel.active { display: flex; flex-direction: column; }
 
 /* Clusters / Settings: single column, header fixed, body scrolls. */
-#panel-clusters, #panel-settings { padding: 0; }
-#panel-clusters { padding: 1rem 1.25rem; }
+/* Clusters + Settings share the same padded panel + inset (up-to-margins) footer divider. */
+#panel-clusters, #panel-settings { padding: 1rem 1.25rem; }
 #panel-clusters .toolbar { flex: none; }
 #panel-clusters .table-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; }
-.settings-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 1rem 1.25rem; }
-.settings-footer { flex: none; border-top: 1px solid var(--border); padding: 1rem 1.25rem; }
+/* Staged editor footer: Discard/Save on the right, inline error on the left; border-top inset
+   to the panel content (not the full window). */
+.clusters-footer,
+.settings-footer { flex: none; display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: flex-end; border-top: 1px solid var(--border); padding: 0.75rem 0 0; margin-top: 0.75rem; }
+.clusters-footer .form-error,
+.settings-footer .form-error { margin: 0; margin-right: auto; }
+.settings-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 
 .toolbar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
 
@@ -209,16 +216,17 @@ button {
   cursor: pointer;
 }
 
-button:hover { border-color: var(--muted); }
+button:not(:disabled):hover { border-color: var(--muted); }
 button.primary {
   background: var(--primary);
   border-color: var(--primary);
   color: #fff;
 }
-button.primary:hover { background: var(--primary-hover); }
+button.primary:not(:disabled):hover { background: var(--primary-hover); }
 button.danger { border-color: var(--danger); color: var(--danger); }
 button.small { min-height: 0; padding: 0.25rem 0.5rem; font-size: var(--fs-sm); }
-button:disabled { opacity: 0.4; cursor: default; }
+/* A disabled button is fully inert — no hover/pointer reaction. */
+button:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
 
 select {
   appearance: none;
@@ -338,14 +346,103 @@ tr:last-child td { border-bottom: none; }
 /* Small, equal inset on the scrolling body and the pinned footer: keeps body content aligned
    with the footer buttons while leaving room for focus rings (the body scroll container would
    otherwise clip the ring on flush left/right-edge inputs). */
-.ops-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0.25rem; }
-.ops-footer { flex: none; display: flex; gap: 0.5rem; border-top: 1px solid var(--border); padding: 0.75rem 0.25rem 0; margin-top: 0.5rem; }
+.ops-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0.25rem 0; }
+/* No horizontal padding: the footer's right edge lines up with the Settings/Clusters Save
+   buttons (all at the panel content edge, 1.25rem from the window). */
+.ops-footer { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; border-top: 1px solid var(--border); padding: 0.75rem 0 0; margin-top: 0.5rem; }
+/* Validation/error line spans its own row above the chip + action buttons. */
+.ops-footer .form-error { flex-basis: 100%; margin: 0 0 0.25rem; order: -1; }
 .ops-footer .run-bar,
 .ops-footer .alter-actions { margin: 0; flex: 1; display: flex; gap: 0.5rem; }
 /* Primary (commit) action on the right; destructive Remove role separated on the far left. */
 .ops-footer .run-bar { justify-content: flex-end; }
 .ops-footer .alter-actions { justify-content: space-between; }
 #btn-alter-remove { order: -1; }
+
+/* Run-status chip (pinned left of the footer buttons): clickable summary of the last/ongoing
+   batch; click opens #run-status-dialog with per-cluster detail. */
+.run-status {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.55rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  /* Neutral, constant color (button-sized) — the result is conveyed by the text, not colour. */
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--fs-base);
+  white-space: nowrap;
+}
+.run-status:hover,
+.run-status:focus-visible { border-color: var(--border); }
+/* Icon shows ONLY while running (a spinning ring); no ok/error glyph. */
+.run-status .run-status-icon { display: none; }
+.run-status.running .run-status-icon {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: none;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 2px solid var(--border);
+  border-top-color: var(--muted);
+  animation: run-status-spin 0.7s linear infinite;
+}
+@keyframes run-status-spin { to { transform: rotate(360deg); } }
+
+/* Per-cluster status cell markers inside #run-status-table (rows rendered live while a batch runs). */
+#run-status-table .rst-running { color: var(--muted); }
+#run-status-table td { vertical-align: middle; }
+/* Action icons (magnifier + copy) stay on one line — .config-path-copy is display:flex, so
+   without a flex row here they'd stack vertically. align-items:center keeps them vertically
+   aligned with the other (middle-aligned) cells so the row doesn't look shifted. */
+#run-status-table .rst-actions { display: flex; gap: 0.25rem; justify-content: flex-end; align-items: center; }
+.rst-view,
+.rst-copy { color: var(--muted); }
+.rst-view:hover,
+.rst-copy:hover { color: var(--primary); }
+
+/* Executed-queries popup (opened by the per-row magnifier). */
+#run-queries-dialog { max-width: min(820px, 94vw); }
+.run-queries-dialog-body { padding: 1.25rem; display: block; min-width: 520px; }
+.run-queries-dialog-body h2 { margin: 0 0 0.75rem; }
+.run-queries-content {
+  max-height: 60vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  padding: 0.75rem;
+}
+#run-queries-pre {
+  margin: 0;
+  white-space: pre;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--fs-sm);
+}
+.run-queries-dialog-body menu {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
+#run-status-dialog { max-width: min(1040px, 96vw); }
+.run-status-dialog-body { padding: 1.25rem; display: block; min-width: 640px; }
+.run-status-dialog-body h2 { margin: 0 0 0.75rem; }
+.run-status-dialog-body .table-wrap { max-height: 60vh; overflow-y: auto; }
+.run-status-dialog-body menu {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+  padding: 0;
+}
 
 .ops-sidebar {
   background: var(--surface);
@@ -655,14 +752,6 @@ tr:last-child td { border-bottom: none; }
 
 #batch-concurrency { width: 5rem; }
 
-.settings-footer {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: center;
-  justify-content: flex-end;
-}
-
 #confirm-form menu,
 #cluster-form menu,
 #group-form menu {
@@ -718,8 +807,14 @@ dialog h2 { font-size: var(--fs-h2); }
 /* Success flash: instant green + "OK", then fade back to the resting style over ~1s. */
 #btn-test-cluster.test-ok { background: var(--ok); border-color: var(--ok); color: #fff; }
 #btn-test-cluster.test-fade { transition: background 1s ease, border-color 1s ease, color 1s ease; }
-/* Test-connection error printed below the buttons. */
-#cluster-form .form-error { margin: 0.5rem 0 0; color: var(--danger); font-size: var(--fs-sm); }
+
+/* Generic button feedback (confirmations/errors) + unsaved-changes marker. */
+button.flash-ok { background: var(--ok); border-color: var(--ok); color: #fff; }
+button.flash-err { background: var(--danger); border-color: var(--danger); color: #fff; }
+button.flash-fade { transition: background .8s ease, border-color .8s ease, color .8s ease; }
+
+/* Inline error text near a control (replaces the removed corner toast). */
+.form-error { margin: 0.4rem 0 0; color: var(--danger); font-size: var(--fs-sm); }
 #group-form label.inline { flex-direction: row; align-items: center; gap: 0.5rem; }
 #group-form input[type="color"] { width: 3rem; min-height: 0; height: 2rem; padding: 0; cursor: pointer; }
 
@@ -759,24 +854,6 @@ dialog h2 { font-size: var(--fs-h2); }
   margin: 1rem 0 0;
   padding: 0;
 }
-
-.toast {
-  position: fixed;
-  bottom: 1rem;
-  right: 1rem;
-  padding: 0.75rem 1rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  max-width: 360px;
-  z-index: 100;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-}
-
-.toast.error { border-color: var(--danger); }
-.toast.success { border-color: var(--ok); }
-.toast.warn { border-color: var(--warn, #e8a838); }
-.toast.hidden { display: none; }
 
 .hidden { display: none !important; }
 

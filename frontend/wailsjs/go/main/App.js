@@ -58,6 +58,10 @@ export function SaveBatchSettings(arg1) {
   return window['go']['main']['App']['SaveBatchSettings'](arg1);
 }
 
+export function SaveClusters(arg1) {
+  return window['go']['main']['App']['SaveClusters'](arg1);
+}
+
 export function SaveCommentFields(arg1) {
   return window['go']['main']['App']['SaveCommentFields'](arg1);
 }
@@ -68,6 +72,10 @@ export function SaveDBFunctions(arg1) {
 
 export function SaveParentRoles(arg1) {
   return window['go']['main']['App']['SaveParentRoles'](arg1);
+}
+
+export function SaveTargetSelection(arg1) {
+  return window['go']['main']['App']['SaveTargetSelection'](arg1);
 }
 
 export function SaveUISettings(arg1) {

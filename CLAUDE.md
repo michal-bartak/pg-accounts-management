@@ -30,11 +30,36 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   `set_config` (`ALTER ROLE … SET x = '…'`) and `reset_config` (`ALTER ROLE … RESET x`) for role GUCs.
 - **Categories = cluster groups**, edited from the **Clusters** tab (a right-aligned
   *Cluster groups* toolbar button opens the `#groups-dialog` list popup; *Add group*
-  opens the `#group-dialog` form — label + base `color` + `confirm`); CRUD via
-  `AddCategory/UpdateCategory/DeleteCategory` (id is a slug of the
-  label, immutable; delete blocked while a cluster uses it). Group colours are applied
+  opens the `#group-dialog` form — label + base `color` + `confirm`). Group id is a slug of the
+  label, immutable on edit; delete blocked while a cluster uses it. Group colours are applied
   by a generated `<style id="cat-colors">` keyed on `data-cat`; there are no hardcoded
   production/uat colours.
+- **The Clusters tab is STAGED** (like Settings): add/edit/delete of clusters *and* groups mutate
+  in-memory drafts (`clustersDraft`/`categoriesDraft`, seeded once from saved `state` in
+  `loadConfig`, kept across other `loadConfig` calls), and nothing persists until the footer
+  **Save** (`btn-save-clusters` → `App.SaveClusters(ClustersConfig)` →
+  `Store.SaveClustersAndCategories`, an atomic validate-and-replace: category label required /
+  slug id / no dup ids, cluster fields validated + port/sslmode defaulted + UUID minted for new,
+  and referential integrity — every `cluster.category` must exist). **Discard** reverts drafts to
+  saved. Save is **enabled only when dirty, disabled (inert) when clean**
+  (`clustersDirty`/`refreshClustersDirty` → `setDirty`). New
+  draft clusters carry a `tmp_<n>` id (sent as `""` so the backend mints a UUID); new groups get
+  their slug id immediately so clusters can reference them pre-save. **Only the Clusters editor
+  reads the drafts** — Operations target selection / run resolution keep reading saved `state`, so
+  unsaved cluster edits never affect what a run targets. `Test connections` tests the on-screen
+  draft values via `TestConnectionInput`, writing per-row Status.
+- **No corner toast — feedback goes to the action button or inline.** There is no `showToast`.
+  Simple confirmations **flash the action button** ("Saved"/"Created", green, ~1.2 s via
+  `flashButton`); Save buttons are **enabled only when there are changes, disabled (inert) when
+  clean** — no marker (`setDirty` toggles `disabled`; disabled buttons are `pointer-events:none`
+  so they don't react to hover) — Settings (`btn-save-settings`, `settingsDirty`), the role form
+  (`btn-alter-save`, dirty = `buildAlterClusterOps().length>0`, in `updateOpsFooter`), and the
+  Clusters Save. All right-aligned action buttons + the op-tabs share one right margin (the
+  `.tabs`, `.ops-footer`, and Settings/Clusters footers all align to the 1.25rem panel edge). Errors/validation render **inline** in a `.form-error` next to the control
+  (`showInlineError`/`clearInlineError`) — `#ops-error` (Operations footer), `#settings-error`,
+  `#clusters-error`, `#scope-error`, `#group-error`, `#cluster-test-error`, `#alter-search-errors`
+  — plus a red button flash. Run/batch outcomes stay in the **run-status chip** (unchanged); rare
+  clipboard failures log to the console.
 - **Preconfigured parent groups** (`Config.ParentRoles`, YAML `parent_roles`) are a
   Settings-managed list of bare-identifier role names, saved via `SaveParentRoles`
   (`Store.UpdateParentRoles` validates identifier syntax, dedupes). They are offered as
@@ -59,7 +84,7 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   unknown keys); `parseCommentObject` is the shared reader; `switchEditorMode` round-trips
   Fields↔Raw. The **Fields** toggle is disabled whenever the raw text is non-empty and not a
   JSON object (`commentFieldsBlocked`) — Fields can't represent plain text, so switching would
-  drop it; edit such comments in Raw. A non-JSON comment saves as plain text with a toast warning. The backend
+  drop it; edit such comments in Raw. A non-JSON comment saves as plain text with an inline note. The backend
   `set_comment` op stays an opaque quoted literal; `pg.ParseFullName` (`full_name`) is kept
   only for search-result display. When comments **vary** across clusters the inline editor is
   hidden and reconciliation moves to the **Comments dialog**, whose per-version boxes reuse the
@@ -93,8 +118,24 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   diff. **Update**: `saveAlterations` uses `buildAlterClusterOps()`. `removeRole` sends one
   `remove_role` op per cluster. The comment persists via **`set_comment`** (per-cluster
   `commentOverrides` wins, else the inline editor's `assembleComment()`). Everything publishes
-  together, atomically per cluster, on the one **Save changes** / **Create role** pass; results
-  render one row per cluster.
+  together, atomically per cluster, on the one **Save changes** / **Create role** pass. Progress
+  shows **live** in a footer status chip (`#run-status`) fed by `role-batch-progress` Wails events
+  (one per cluster start/finish); clicking it opens `#run-status-dialog` with one row per cluster.
+  **Errors never mutate the role form.** `executeRoleBatch` returns the results array (or `null`
+  when blocked/cancelled/threw); on `null` **or any per-cluster failure** the Save/Create/Remove
+  paths leave the form and pending edits untouched (chip + popup are the sole error surface). Only
+  a **fully clean** outcome refreshes the form — Save re-reads the baseline via `fetchRoleDetails`
+  and re-renders *only* when the reload itself is clean (no empty/error, so a transient unreachable
+  cluster can't wipe it); Create resets to an empty form; Remove calls `reloadDetails` (empty-state
+  reset). The genuine "not found" state still renders for an actual search `pickUser`.
+  **Role-load reachability** is reported the same way as runs: `reloadDetails` → `reportRoleLoad`
+  feeds the per-cluster load results (reachable = ok, unreachable = error) into the shared
+  **run-status chip** (`beginRunStatus`/`finishRunStatus`), so the bottom bar shows OK/Error and
+  the `#run-status-dialog` shows per-cluster status/duration/message + the executed introspection
+  SQL on click — `ClusterRoleDetail` now carries `DurationMs`/`Queries` (from `LoadRoleDetails`
+  timing + `pg.RoleDetailQueries`), mirroring `ClusterResult`. The form no longer renders an
+  "Unreachable clusters" block (`renderDetailErrors` is gone). `updateOpsFooter` keeps the footer
+  visible while `runState` is set so the chip shows even in the empty (not-found) state.
 - Frontend is **vanilla JS** reached through `window.go.main.App` (`backend()` in
   [frontend/app.js](frontend/app.js)). No framework. `frontend/wailsjs/` is
   Wails-generated (regenerated by `wails dev`/`build`); a running `wails dev` watcher
@@ -110,7 +151,13 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
    Rollback on the first error** (message names the failing op). `RoleBatchRequest` carries
    per-cluster **ordered** op lists (`[]ClusterOps{ClusterID, []OperationSpec}`); each cluster's
    change is atomic and never interleaved with another's (separate connections). One
-   `ClusterResult` per cluster; timeout scales with op count. `pg.ExecuteOperation`/`execRoleConfig`/
+   `ClusterResult` per cluster (incl. `Queries []string` — the executed SQL per op, from
+   `pg.ExecuteOperation`'s `(sql, msg, err)` return; function-mode binds are inlined for display,
+   and `runClusterTx` records each op's SQL before the error check so a failing op's SQL is kept);
+   timeout scales with op count. `RunRoleBatch` also takes an optional
+   `func(model.ClusterProgress)` callback, invoked from each goroutine on cluster start ("running")
+   and finish ("done"); `App.RunRoleBatch` passes a closure that `wailsruntime.EventsEmit`s each as
+   a `role-batch-progress` event (the runner stays Wails-free per the import table). `pg.ExecuteOperation`/`execRoleConfig`/
    `runQuery` take a `pg.Querier` (satisfied by `*pgx.Conn` and `pgx.Tx`). The legacy single-op
    `App.RunOperation`/`batch.Run` (one autocommit statement) is kept but no longer used by the UI.
 2. **Read (introspection), catalog queries — added for "Alter role".**
@@ -127,7 +174,10 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
 Config/clusters/groups: `GetConfig`, `GetConfigPath`, `ReloadConfig`, `AddCluster`,
 `UpdateCluster`, `DeleteCluster`, `AddCategory`, `UpdateCategory`, `DeleteCategory`,
 `ImportFromEnvironment`, `SaveDBFunctions`, `SaveBatchSettings`, `SaveUISettings`,
-`SaveParentRoles`, `SaveCommentFields`, `GetAppVersion`.
+`SaveParentRoles`, `SaveCommentFields`, `SaveTargetSelection`, `SaveClusters`
+(staged Clusters editor — replaces the whole clusters+categories set at once via
+`Store.SaveClustersAndCategories`; the per-item `Add/Update/Delete Cluster/Category` are kept
+but no longer used by the UI), `GetAppVersion`.
 Run/test: `TestConnection` (by saved cluster id), `TestConnectionInput` (ad-hoc
 `ClusterInput`+`Auth`, used by the cluster editor to test on-screen values),
 `PreviewTargets`, `RunRoleBatch(RoleBatchRequest)` (per-cluster transactional batch; the UI's
@@ -183,8 +233,8 @@ and Settings are single-column with a fixed toolbar / pinned Save-settings foote
 (`.primary`) one, placed **rightmost**; Cancel/secondary sits to its left; destructive actions
 (e.g. Remove role) are separated on the **far left**. This holds for dialog `<menu>`s
 (`[Cancel] [Primary]`, all right-aligned) and page footers (Create role / Save changes /
-Save settings right-aligned; Remove role far left via `#btn-alter-remove{order:-1}` +
-`space-between`). The **Test connections** button lives in the Clusters
+Settings & Clusters `[Discard] [Save]` right-aligned; Remove role far left via
+`#btn-alter-remove{order:-1}` + `space-between`). The **Test connections** button lives in the Clusters
 toolbar (`btn-test-clusters` → `testAllClusters`): it tests every configured cluster and
 writes the outcome into a per-row **Status** column (`setClusterStatus`). Cluster rows have
 no per-row Test button (testing on-screen values is done from the cluster editor via
@@ -198,7 +248,14 @@ the `.tab` click handler). The two op-tabs drive **one shared `#role-form`** (th
 opens the search popup and fills it on pick — see the shared-role-form product decision
 above. The left sidebar is **Target selection** only (no connection or
 confirm-production controls); "Or pick clusters" is a collapse/expand toggle (collapsed
-by default; the expanded `.cluster-list` flexes to fill the sidebar). The Clusters
+by default; the expanded `.cluster-list` flexes to fill the sidebar). The selection is
+**remembered** — held in module-level `selectedCategoryIds` (`null` = the default
+all-groups-checked) / `selectedClusterIds`, seeded **once** from persisted `Config.Targets`
+on first `loadConfig` (later `loadConfig` calls keep the in-memory selection, so saving
+Settings / cluster CRUD no longer resets it), and persisted (debounced) via
+`SaveTargetSelection` (`Store.UpdateTargets` → `Config.Targets`, empty = all groups) so it
+survives restarts. `render{Category,Cluster}Checkboxes` set `checked` from these; the
+checkbox `change` handler is `onTargetChange`. The Clusters
 toolbar hosts the right-aligned **Cluster groups** button (`btn-manage-groups` →
 `#groups-dialog` list popup → `#group-dialog` add/edit form; edited like clusters, no
 Save button, so it lives here rather than Settings). Settings is organised into
@@ -211,7 +268,9 @@ button), staged in `parentRolesDraft` / `commentFieldsDraft` (`#parent-roles-edi
 `#comment-fields-editor`). DB templates are a compact list of command names; clicking one opens
 the `#fn-dialog` popup (execution type, call template, clickable placeholder chips — staged in
 `dbFnDraft`). The **Preferred comment view** toggle is `#comment-view-pref`
-(`ui.comment_default_view`). All staged on **Save settings**.
+(`ui.comment_default_view`). All staged; the Settings panel uses the same padded-panel + inset
+footer as Clusters, with **Discard** (`btn-discard-settings` → `discardSettings`) + **Save**
+(`btn-save-settings`, enabled-when-dirty / disabled-when-clean) buttons.
 
 Feature descriptions are not shown inline — they live behind a **`?` help badge**
 (`.q-hint`; markup via `hintBadge(text)` in JS, or hand-written next to a static heading).
@@ -261,8 +320,20 @@ and the Cluster-groups / Find-role / Comments dialogs.
   version editable via its own Fields/Raw editor (`commentVersionEditors`). It has no per-row
   save — **OK** stages edits into `commentOverrides` (`commitCommentsDialog`), **Cancel**
   discards, and the staged comments publish with everything else on **Save changes**.
-- **Password** row (field + checkbox) and a red **Remove role** button; results render
-  in the **Status** panel (hidden until non-empty).
+- **Password** row (field + checkbox) and a red **Remove role** button. Run results are not an
+  in-body table: they surface in the **footer status chip** `#run-status` (left of the action
+  buttons; hidden until a run starts, then `running… (D/T)` → `OK`/`Error`), updated live from
+  `role-batch-progress` events (`beginRunStatus`/`applyRunProgress`/`finishRunStatus`/
+  `renderRunStatus`, state in `runState`). The chip is **button-sized, neutral-colored, and
+  glyph-free** (spinner only while running; the *word* OK/Error carries the result — no ✓/✕).
+  Clicking it opens `#run-status-dialog` (columns Cluster/Category/Status/Duration/Message +
+  actions; **no Host column**), live while running. Each done row's actions cell has a
+  **magnifier** (`.rst-view`) that opens a separate, larger `#run-queries-dialog` listing that
+  cluster's executed SQL (`ClusterResult.Queries`/`ClusterProgress.Queries` — the queries are
+  NOT shown inline in the table) and a **copy button** (`.rst-copy`) that copies the cluster's
+  message + all queries it sent (including a failed op's, since `runClusterTx` records each op's
+  SQL before the error check); `#run-queries-dialog` also has its own Copy button.
+  `clearRunStatus()` (op-tab / page-tab switch) keeps it from leaking across pages.
 
 ## Layout
 
@@ -306,8 +377,8 @@ make package         # build/bin/DbAccounts.app + dist/*.tar.gz
   CI: `.github/workflows/test.yml`.
 - Frontend has **no build step / no package.json**; served statically by Wails. For a
   quick UI smoke test without the Go backend, `python3 -m http.server` in `frontend/`
-  and exercise the global functions (`backend()` is undefined, so search/save toast an
-  error, but rendering/logic can be driven with mock `state`/`alterDetails`).
+  and exercise the global functions (`backend()` is undefined, so search/save show an inline
+  error, but rendering/logic can be driven with mock `window.go.main.App`/`state`/`alterDetails`).
 - Introspection/write SQL is best verified against a throwaway Postgres
   (`docker run … postgres:16`), calling `pg.RoleDetail` / `pg.ExecuteOperation`
   directly; remove any scratch `_test.go` afterward.

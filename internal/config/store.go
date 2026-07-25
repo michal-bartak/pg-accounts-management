@@ -176,6 +176,12 @@ func (s *Store) UpdateUI(ui model.UISettings) error {
 	return s.Save()
 }
 
+// UpdateTargets persists the Operations-page target selection (cluster groups / clusters).
+func (s *Store) UpdateTargets(t model.TargetSelection) error {
+	s.cfg.Targets = t
+	return s.Save()
+}
+
 func (s *Store) UpdateParentRoles(roles []string) error {
 	cleaned, err := validateParentRoles(roles)
 	if err != nil {
@@ -339,6 +345,65 @@ func (s *Store) DeleteCategory(id string) error {
 		}
 	}
 	return fmt.Errorf("group not found: %s", id)
+}
+
+// SaveClustersAndCategories replaces the whole clusters+categories set in one atomic write
+// (used by the staged Clusters editor). Categories: label required, id = slugify(label) when
+// empty else kept, duplicate ids rejected, colour normalized. Clusters: validated, port/sslmode
+// defaulted, a fresh UUID minted when id is empty else kept. Referential integrity: every
+// cluster's category must exist in the resulting category set. Nothing is persisted unless the
+// whole set validates.
+func (s *Store) SaveClustersAndCategories(clusters []model.Cluster, categories []model.Category) error {
+	cats := make([]model.Category, 0, len(categories))
+	seenCat := make(map[string]bool, len(categories))
+	for _, c := range categories {
+		label := strings.TrimSpace(c.Label)
+		if label == "" {
+			return errors.New("group label is required")
+		}
+		id := strings.TrimSpace(c.ID)
+		if id == "" {
+			id = slugify(label)
+		}
+		if id == "" {
+			return fmt.Errorf("group %q label must contain a letter or digit", label)
+		}
+		if seenCat[id] {
+			return fmt.Errorf("a group with id %q already exists", id)
+		}
+		seenCat[id] = true
+		cats = append(cats, model.Category{ID: id, Label: label, Color: normalizeColor(c.Color), Confirm: c.Confirm})
+	}
+	if len(cats) == 0 {
+		return errors.New("at least one cluster group is required")
+	}
+
+	out := make([]model.Cluster, 0, len(clusters))
+	for _, c := range clusters {
+		in := model.ClusterInput{
+			Alias: c.Alias, Host: c.Host, Port: c.Port, Database: c.Database,
+			Category: c.Category, SSLMode: c.SSLMode, ConnectUser: c.ConnectUser,
+		}
+		if err := validateClusterInput(in); err != nil {
+			return err
+		}
+		if !seenCat[c.Category] {
+			return fmt.Errorf("cluster %q references unknown group %q", c.Alias, c.Category)
+		}
+		id := strings.TrimSpace(c.ID)
+		if id == "" {
+			id = uuid.New().String()
+		}
+		out = append(out, model.Cluster{
+			ID: id, Alias: c.Alias, Host: c.Host, Port: defaultPort(c.Port),
+			Database: c.Database, Category: c.Category, SSLMode: defaultSSLMode(c.SSLMode),
+			ConnectUser: c.ConnectUser,
+		})
+	}
+
+	s.cfg.Categories = cats
+	s.cfg.Clusters = out
+	return s.Save()
 }
 
 // slugify turns a label into a lowercase [a-z0-9_] id.

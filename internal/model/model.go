@@ -119,12 +119,29 @@ type Config struct {
 	// comment holds JSON (Create role / Alter role). Ordered; keys not listed here are
 	// still shown generically. Defaults to full_name/e_mail.
 	CommentFields []CommentField `yaml:"comment_fields,omitempty" json:"commentFields"`
+	// Targets is the last target selection on the Operations page (cluster groups and/or
+	// specific clusters), remembered across re-renders and restarts. Empty = "all groups".
+	Targets TargetSelection `yaml:"targets,omitempty" json:"targets"`
+}
+
+// TargetSelection remembers the Operations-page target selection. An empty selection
+// (both lists empty/absent) is treated by the UI as the default "all groups selected".
+type TargetSelection struct {
+	CategoryIDs []string `yaml:"category_ids,omitempty" json:"categoryIds"`
+	ClusterIDs  []string `yaml:"cluster_ids,omitempty" json:"clusterIds"`
 }
 
 // CommentField maps a JSON comment key to a human label shown in the role form.
 type CommentField struct {
 	Key   string `yaml:"key" json:"key"`
 	Label string `yaml:"label" json:"label"`
+}
+
+// ClustersConfig is the whole clusters+categories set, saved atomically from the staged
+// Clusters editor. A cluster/category with an empty ID is treated as new.
+type ClustersConfig struct {
+	Clusters   []Cluster  `json:"clusters"`
+	Categories []Category `json:"categories"`
 }
 
 type ClusterInput struct {
@@ -239,6 +256,23 @@ type ClusterResult struct {
 	Status     string `json:"status"`
 	Message    string `json:"message"`
 	DurationMs int64  `json:"durationMs"`
+	// Queries are the SQL statements executed on this cluster, in order (including the failing
+	// one on rollback). Display-only; function-mode ops have their bind params inlined.
+	Queries []string `json:"queries,omitempty"`
+}
+
+// ClusterProgress is a live per-cluster event during a role batch run.
+// Phase is "running" (work started for this cluster) or "done" (result ready).
+type ClusterProgress struct {
+	ClusterID  string `json:"clusterId"`
+	Alias      string `json:"alias"`
+	Host       string `json:"host"`
+	Category   string `json:"category"`
+	Phase      string   `json:"phase"`  // "running" | "done"
+	Status     string   `json:"status"` // "" while running; "ok"/"error" when done
+	Message    string   `json:"message"`
+	DurationMs int64    `json:"durationMs"`
+	Queries    []string `json:"queries,omitempty"` // executed SQL (set on the "done" event)
 }
 
 type EnvImport struct {
@@ -303,4 +337,7 @@ type ClusterRoleDetail struct {
 	Attributes map[string]bool   `json:"attributes"`
 	Settings   map[string]string `json:"settings"`
 	Error      string            `json:"error,omitempty"`
+	// DurationMs/Queries mirror ClusterResult so the load reports through the same run-status chip.
+	DurationMs int64    `json:"durationMs"`
+	Queries    []string `json:"queries,omitempty"`
 }

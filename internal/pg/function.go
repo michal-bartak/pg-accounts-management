@@ -25,17 +25,16 @@ type Querier interface {
 // The role name is double-quoted (case preserved, special chars safe); the GUC name is a
 // validated bare identifier (unquoted — GUC names are case-insensitive and may be namespaced);
 // the value is a quoted literal.
-func execRoleConfig(ctx context.Context, q Querier, operation string, args map[string]string) (string, error) {
+func execRoleConfig(ctx context.Context, q Querier, operation string, args map[string]string) (sql string, msg string, err error) {
 	login := strings.TrimSpace(args["loginname"])
 	name := strings.TrimSpace(args["config_name"])
 	if login == "" || strings.ContainsAny(login, ",\x00") {
-		return "", fmt.Errorf("invalid role name: %q", login)
+		return "", "", fmt.Errorf("invalid role name: %q", login)
 	}
 	if !gucNameRE.MatchString(name) {
-		return "", fmt.Errorf("invalid setting name: %q", name)
+		return "", "", fmt.Errorf("invalid setting name: %q", name)
 	}
 	qlogin := `"` + strings.ReplaceAll(login, `"`, `""`) + `"`
-	var sql string
 	if operation == "reset_config" {
 		sql = fmt.Sprintf("ALTER ROLE %s RESET %s", qlogin, name)
 	} else {
@@ -43,14 +42,16 @@ func execRoleConfig(ctx context.Context, q Querier, operation string, args map[s
 		sql = fmt.Sprintf("ALTER ROLE %s SET %s = '%s'", qlogin, name, value)
 	}
 	if _, err := q.Exec(ctx, sql); err != nil {
-		return "", err
+		return sql, "", err // return the SQL even on failure so it can be surfaced
 	}
-	return "ok", nil
+	return sql, "ok", nil
 }
 
 // ExecuteOperation runs one operation on q (a *pgx.Conn for autocommit, or a pgx.Tx to
-// participate in a per-cluster transaction).
-func ExecuteOperation(ctx context.Context, q Querier, fn model.DBFunction, operation string, args map[string]string) (string, error) {
+// participate in a per-cluster transaction). It returns the executed SQL text (for display;
+// function-mode bind params are inlined) — non-empty whenever a statement was actually sent,
+// including on execution error — plus a status message.
+func ExecuteOperation(ctx context.Context, q Querier, fn model.DBFunction, operation string, args map[string]string) (sql string, msg string, err error) {
 	// Role GUC settings are written with hardcoded ALTER ROLE SET/RESET (no template).
 	if operation == "set_config" || operation == "reset_config" {
 		return execRoleConfig(ctx, q, operation, args)
@@ -58,30 +59,59 @@ func ExecuteOperation(ctx context.Context, q Querier, fn model.DBFunction, opera
 
 	call := strings.TrimSpace(fn.Call)
 	if call == "" {
-		return "", errCallNotConfigured()
+		return "", "", errCallNotConfigured()
 	}
 
 	execution := model.NormalizeExecution(fn.Execution)
 	query, values, useQuery, err := calltemplate.Build(call, args, operation, execution)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
+	// statement/block SQL is already fully embedded; function-mode uses pgx binds, so inline
+	// the values into a readable, copy-pasteable approximation for display.
+	sql = query
 	if useQuery {
-		return runQuery(ctx, q, query, values...)
+		sql = inlineParams(query, values)
+		msg, err = runQuery(ctx, q, query, values...)
+		return sql, msg, err
 	}
-	tag, err := q.Exec(ctx, query)
-	if err != nil {
-		return "", err
+	if _, err := q.Exec(ctx, query); err != nil {
+		return sql, "", err
 	}
-	if tag.RowsAffected() > 0 {
-		return "ok", nil
+	return sql, "ok", nil
+}
+
+// inlineParams substitutes $1,$2,… in a function-mode query with quoted literals, for a
+// human-readable display string (NOT re-executed). String values become 'escaped'; []string
+// (from ARRAY || concat) become ARRAY['a','b']::text[]. Highest index first so $10 isn't
+// clobbered by the $1 replacement.
+func inlineParams(query string, values []any) string {
+	for i := len(values); i >= 1; i-- {
+		token := fmt.Sprintf("$%d", i)
+		query = strings.ReplaceAll(query, token, sqlLiteral(values[i-1]))
 	}
-	return "ok", nil
+	return query
+}
+
+func sqlLiteral(v any) string {
+	switch t := v.(type) {
+	case []string:
+		// The query token already carries a ::text[] cast (e.g. $1::text[]), so don't add one.
+		parts := make([]string, len(t))
+		for i, s := range t {
+			parts[i] = "'" + strings.ReplaceAll(s, "'", "''") + "'"
+		}
+		return "ARRAY[" + strings.Join(parts, ", ") + "]"
+	case string:
+		return "'" + strings.ReplaceAll(t, "'", "''") + "'"
+	default:
+		return "'" + strings.ReplaceAll(fmt.Sprintf("%v", t), "'", "''") + "'"
+	}
 }
 
 // CallFunction is an alias for ExecuteOperation (Wails-era name).
-func CallFunction(ctx context.Context, conn *pgx.Conn, fn model.DBFunction, operation string, args map[string]string) (string, error) {
+func CallFunction(ctx context.Context, conn *pgx.Conn, fn model.DBFunction, operation string, args map[string]string) (sql string, msg string, err error) {
 	return ExecuteOperation(ctx, conn, fn, operation, args)
 }
 
