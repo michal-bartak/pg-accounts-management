@@ -307,3 +307,58 @@ test('addPrivilegeScope: granting a cluster clears its pending revoke and merges
   assert.deepEqual(r.add, ['B', 'C']); // prior add B kept; C newly granted; A already present so not re-added
   assert.deepEqual(r.rev, []);         // pending revoke of A cancelled by granting A
 });
+
+// Shared primitives used by all three sections (privileges, attributes, settings).
+test('scopeMergeAdd: additive — extends add over desired, cancels revoke there, never touches others', () => {
+  const r = evalJSON(`(() => {
+    const add = new Set(['x']), rev = new Set(['a','z']);
+    scopeMergeAdd(add, rev, new Set(['a','b']) /*cur*/, new Set(['a','c']) /*desired*/);
+    return { add:[...add].sort(), rev:[...rev].sort() };
+  })()`);
+  assert.deepEqual(r.add, ['c', 'x']); // c newly added; a already in cur so not added; prior x kept
+  assert.deepEqual(r.rev, ['z']);      // a removed from rev (granted); z (outside desired) untouched
+});
+
+test('scopeDiff: full desired-vs-current diff → grant (desired−cur), revoke (cur−desired)', () => {
+  const r = evalJSON(`(() => {
+    const d = scopeDiff(new Set(['a','b','c']) /*cur*/, new Set(['b','d']) /*desired*/);
+    return { add:[...d.add].sort(), rev:[...d.rev].sort() };
+  })()`);
+  assert.deepEqual(r.add, ['d']);
+  assert.deepEqual(r.rev, ['a', 'c']);
+});
+
+// Same additive bug/fix as privileges, now shared: "Add setting" must not RESET clusters that
+// already carry the value elsewhere.
+test('applyConfigScope: adding an existing setting to a new cluster SETs D and RESETs nothing', () => {
+  const r = evalJSON(`(() => {
+    alterDetails = [
+      { clusterId:'A', exists:true, parents:[], attributes:{}, settings:{work_mem:'64MB'}, comment:'' },
+      { clusterId:'B', exists:true, parents:[], attributes:{}, settings:{work_mem:'64MB'}, comment:'' },
+      { clusterId:'C', exists:true, parents:[], attributes:{}, settings:{work_mem:'64MB'}, comment:'' },
+      { clusterId:'D', exists:true, parents:[], attributes:{}, settings:{}, comment:'' },
+    ];
+    alterConfigSet = new Map(); alterConfigReset = new Map();
+    applyConfigScope('work_mem', '64MB', null, true /*isNew*/, new Set(['D']));
+    return { set:[...(alterConfigSet.get('work_mem=64MB')||[])].sort(),
+             reset:[...(alterConfigReset.get('work_mem')||[])].sort() };
+  })()`);
+  assert.deepEqual(r.set, ['D']); // only D newly set
+  assert.deepEqual(r.reset, []);  // A/B/C keep the setting — nothing reset
+});
+
+// Editing a setting's value still RESETs the clusters that leave the old value.
+test('applyConfigScope: editing a value SETs desired and RESETs clusters leaving the old value', () => {
+  const r = evalJSON(`(() => {
+    alterDetails = [
+      { clusterId:'A', exists:true, parents:[], attributes:{}, settings:{work_mem:'64MB'}, comment:'' },
+      { clusterId:'B', exists:true, parents:[], attributes:{}, settings:{work_mem:'64MB'}, comment:'' },
+    ];
+    alterConfigSet = new Map(); alterConfigReset = new Map();
+    applyConfigScope('work_mem', '128MB', '64MB', false /*edit*/, new Set(['A']));
+    return { set:[...(alterConfigSet.get('work_mem=128MB')||[])].sort(),
+             reset:[...(alterConfigReset.get('work_mem')||[])].sort() };
+  })()`);
+  assert.deepEqual(r.set, ['A']);   // A moved to the new value
+  assert.deepEqual(r.reset, ['B']); // B left 64MB and wasn't re-selected → reset
+});
