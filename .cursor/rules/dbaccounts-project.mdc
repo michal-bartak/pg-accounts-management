@@ -64,13 +64,19 @@ Config: `db_functions.<operation>.call` + optional `.execution` (`function` \| `
 | `change_password` | loginname, new_password | |
 | `set_comment` | loginname, comment | Default `statement`: `COMMENT ON ROLE ${loginname} IS ${comment}` — comment as escaped literal |
 | `set_attribute` | loginname, attribute | Default `statement`: `ALTER ROLE ${loginname} WITH ${attribute}` — attribute is a whitelisted keyword (SUPERUSER/NOSUPERUSER/…), embedded unquoted |
-| `set_config` / `reset_config` | loginname, config_name(, config_value) | **No template.** Hardcoded in `pg.ExecuteOperation`: `ALTER ROLE … SET x = '…'` / `RESET x` for role GUCs (read from `pg_roles.rolconfig`). |
+| `set_config` | loginname, config_name, config_value | Default `statement`: `ALTER ROLE ${loginname} SET ${config_name} = ${config_value}` — `config_name` is a bare unquoted GUC name (`fieldConfigName`, `gucNameRE`-validated), value a literal. Role GUCs read from `pg_roles.rolconfig`. |
+| `reset_config` | loginname, config_name | Default `statement`: `ALTER ROLE ${loginname} RESET ${config_name}` |
 
 **Execution:** `function` → `SELECT` + `$n` binds (`Query`). `statement` / `block` → embed values (`Exec`): role fields as identifiers (`loginname`, `parent_roles` list on grant_parents); passwords/names as quoted literals. Do not use raw `$1` in templates.
 
-**Create role default:**
+**Defaults are vanilla PostgreSQL DDL (statement mode)** — e.g. create_role default:
 
-`admin_access.create_role(${loginname}, NULL, ${fullname}, ${email}, ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_role})`
+`CREATE ROLE ${loginname}`
+
+(fullname/email/parent_role are unused by the vanilla default; a `function`-mode override can
+consume them, e.g. `admin_access.create_role(${loginname}, NULL, ${fullname}, ${email}, ARRAY['grp'] || ${parent_role})`).
+Loading an existing config never force-overwrites user templates; the `#fn-dialog` **Default**
+button reverts one template to the vanilla built-in.
 
 **Template processing:**
 

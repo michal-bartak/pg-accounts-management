@@ -749,6 +749,9 @@ tr:last-child td { border-bottom: none; }
 }
 .ph-chip:hover { border-color: var(--muted); }
 #fn-form menu { display: flex; gap: 0.5rem; justify-content: flex-end; margin: 0.5rem 0 0; padding: 0; }
+/* Default (revert-to-vanilla) sits on the far left, away from Cancel/Done. */
+#fn-dialog-default { margin-right: auto; }
+.fn-contract { margin: 0 0 0.75rem; color: var(--muted); font-size: var(--fs-sm); }
 
 #batch-concurrency { width: 5rem; }
 

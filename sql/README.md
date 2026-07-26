@@ -224,11 +224,14 @@ set_attribute:
 
 ---
 
-## Role settings (no template)
+## Role settings
 
-The Alter-role **Settings** section reads `pg_roles.rolconfig` and writes role GUCs with
-**hardcoded** SQL — there is no configurable template. Set: `ALTER ROLE <role> SET <name> = '<value>'`
-(name validated as a GUC identifier, value single-quote-escaped). Remove: `ALTER ROLE <role> RESET <name>`.
+The Alter-role **Settings** section reads `pg_roles.rolconfig` and writes role GUCs through the
+configurable `set_config` / `reset_config` templates (like every other operation). Defaults:
+`ALTER ROLE ${loginname} SET ${config_name} = ${config_value}` and
+`ALTER ROLE ${loginname} RESET ${config_name}`. `config_name` is embedded as a **bare, unquoted**
+GUC name (validated as a GUC identifier — case-insensitive, optionally namespaced); `config_value`
+is a single-quote-escaped literal (`E'…'` when it contains a backslash).
 
 ---
 
@@ -243,6 +246,8 @@ The Alter-role **Settings** section reads `pg_roles.rolconfig` and writes role G
 | `change_password` | `loginname`, `new_password` | Identifier + literal (password) |
 | `set_comment` | `loginname`, `comment` | Identifier + literal (comment) |
 | `set_attribute` | `loginname`, `attribute` | Identifier + whitelisted keyword (e.g. `NOLOGIN`) |
+| `set_config` | `loginname`, `config_name`, `config_value` | Identifier + bare GUC name (unquoted) + literal |
+| `reset_config` | `loginname`, `config_name` | Identifier + bare GUC name (unquoted) |
 
 ---
 

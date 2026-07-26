@@ -28,22 +28,28 @@ func DefaultConfig() model.Config {
 			{ID: "uat", Label: "UAT", Color: "#6eb5ff", Confirm: false},
 		},
 		Clusters: []model.Cluster{},
+		// Defaults are vanilla PostgreSQL DDL (statement mode). Deployments that need
+		// privileged wrapper functions override these in config / the Settings editor.
 		DBFunctions: model.DBFunctions{
 			CreateRole: model.DBFunction{
-				Call: "admin_access.create_role(${loginname}, NULL, ${fullname}, ${email}, ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_role})",
+				Execution: model.ExecutionStatement,
+				Call:      "CREATE ROLE ${loginname}",
 			},
 			RemoveRole: model.DBFunction{
-				Call: "your_schema.remove_app_role(${loginname})",
+				Execution: model.ExecutionStatement,
+				Call:      "DROP ROLE ${loginname}",
 			},
 			GrantParents: model.DBFunction{
-				Call: "your_schema.grant_role_parents(${loginname}, ${parent_roles})",
+				Execution: model.ExecutionStatement,
+				Call:      "GRANT ${parent_roles} TO ${loginname}",
 			},
 			RevokeParents: model.DBFunction{
 				Execution: model.ExecutionStatement,
 				Call:      "REVOKE ${parent_roles} FROM ${loginname}",
 			},
 			ChangePassword: model.DBFunction{
-				Call: "your_schema.change_role_password(${loginname}, ${new_password})",
+				Execution: model.ExecutionStatement,
+				Call:      "ALTER ROLE ${loginname} PASSWORD ${new_password}",
 			},
 			SetComment: model.DBFunction{
 				Execution: model.ExecutionStatement,
@@ -52,6 +58,14 @@ func DefaultConfig() model.Config {
 			SetAttribute: model.DBFunction{
 				Execution: model.ExecutionStatement,
 				Call:      "ALTER ROLE ${loginname} WITH ${attribute}",
+			},
+			SetConfig: model.DBFunction{
+				Execution: model.ExecutionStatement,
+				Call:      "ALTER ROLE ${loginname} SET ${config_name} = ${config_value}",
+			},
+			ResetConfig: model.DBFunction{
+				Execution: model.ExecutionStatement,
+				Call:      "ALTER ROLE ${loginname} RESET ${config_name}",
 			},
 		},
 		Batch:         model.BatchSettings{MaxConcurrency: 5},

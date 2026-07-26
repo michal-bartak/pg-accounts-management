@@ -214,7 +214,8 @@ func TestBuildArgs_allOperations(t *testing.T) {
 	}
 }
 
-// TestBuildQuery_allOperations verifies SQL from default templates + command args.
+// TestBuildQuery_allOperations verifies SQL from the (vanilla) default templates + command
+// args, building each op in its own default execution mode.
 func TestBuildQuery_allOperations(t *testing.T) {
 	cfg := testConfig()
 
@@ -223,7 +224,6 @@ func TestBuildQuery_allOperations(t *testing.T) {
 		operation  string
 		spec       model.OperationSpec
 		wantSubstr []string
-		minBinds   int
 	}{
 		{
 			name:      "create_role",
@@ -232,44 +232,55 @@ func TestBuildQuery_allOperations(t *testing.T) {
 				Operation:  OpCreateRole,
 				CreateRole: &model.CreateRoleParams{LoginName: "jdoe", FullName: "John", Email: "j@x.com", ParentRole: "gr_extra"},
 			},
-			wantSubstr: []string{
-				"SELECT admin_access.create_role(",
-				"NULL",
-				"ARRAY['gr_personal_users', 'gr_personal_users_ldap']::text[]",
-				"::text[]",
-			},
-			minBinds: 4,
-		},
-		{
-			name:      "create_role_empty_parent",
-			operation: OpCreateRole,
-			spec: model.OperationSpec{
-				Operation:  OpCreateRole,
-				CreateRole: &model.CreateRoleParams{LoginName: "jdoe", FullName: "John", Email: "j@x.com", ParentRole: ""},
-			},
-			wantSubstr: []string{"|| NULL"},
-			minBinds:   3,
+			wantSubstr: []string{`CREATE ROLE "jdoe"`},
 		},
 		{
 			name:       "remove_role",
 			operation:  OpRemoveRole,
 			spec:       model.OperationSpec{Operation: OpRemoveRole, RemoveRole: &model.RemoveRoleParams{LoginName: "jdoe"}},
-			wantSubstr: []string{"SELECT your_schema.remove_app_role($1)"},
-			minBinds:   1,
+			wantSubstr: []string{`DROP ROLE "jdoe"`},
 		},
 		{
 			name:       "grant_parents",
 			operation:  OpGrantParents,
 			spec:       model.OperationSpec{Operation: OpGrantParents, GrantParents: &model.GrantParentsParams{LoginName: "jdoe", ParentRoles: "gr_a,gr_b"}},
-			wantSubstr: []string{"SELECT your_schema.grant_role_parents($1, $2)"},
-			minBinds:   2,
+			wantSubstr: []string{`GRANT "gr_a", "gr_b" TO "jdoe"`},
+		},
+		{
+			name:       "revoke_parents",
+			operation:  OpRevokeParents,
+			spec:       model.OperationSpec{Operation: OpRevokeParents, RevokeParents: &model.RevokeParentsParams{LoginName: "jdoe", ParentRoles: "gr_a,gr_b"}},
+			wantSubstr: []string{`REVOKE "gr_a", "gr_b" FROM "jdoe"`},
 		},
 		{
 			name:       "change_password",
 			operation:  OpChangePassword,
 			spec:       model.OperationSpec{Operation: OpChangePassword, ChangePassword: &model.ChangePasswordParams{LoginName: "jdoe", NewPassword: "s3cret"}},
-			wantSubstr: []string{"SELECT your_schema.change_role_password($1, $2)"},
-			minBinds:   2,
+			wantSubstr: []string{`ALTER ROLE "jdoe" PASSWORD 's3cret'`},
+		},
+		{
+			name:       "set_comment",
+			operation:  OpSetComment,
+			spec:       model.OperationSpec{Operation: OpSetComment, SetComment: &model.SetCommentParams{LoginName: "jdoe", Comment: "hi"}},
+			wantSubstr: []string{`COMMENT ON ROLE "jdoe" IS 'hi'`},
+		},
+		{
+			name:       "set_attribute",
+			operation:  OpSetAttribute,
+			spec:       model.OperationSpec{Operation: OpSetAttribute, SetAttribute: &model.SetAttributeParams{LoginName: "jdoe", Attribute: "NOLOGIN"}},
+			wantSubstr: []string{`ALTER ROLE "jdoe" WITH NOLOGIN`},
+		},
+		{
+			name:       "set_config",
+			operation:  OpSetConfig,
+			spec:       model.OperationSpec{Operation: OpSetConfig, SetConfig: &model.SetConfigParams{LoginName: "jdoe", ConfigName: "search_path", ConfigValue: "public"}},
+			wantSubstr: []string{`ALTER ROLE "jdoe" SET search_path = 'public'`},
+		},
+		{
+			name:       "reset_config",
+			operation:  OpResetConfig,
+			spec:       model.OperationSpec{Operation: OpResetConfig, ResetConfig: &model.ResetConfigParams{LoginName: "jdoe", ConfigName: "search_path"}},
+			wantSubstr: []string{`ALTER ROLE "jdoe" RESET search_path`},
 		},
 	}
 
@@ -279,7 +290,7 @@ func TestBuildQuery_allOperations(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			q, vals, err := calltemplate.BuildQueryFromTemplate(fn.Call, args, tc.operation)
+			q, _, _, err := calltemplate.Build(fn.Call, args, tc.operation, fn.Execution)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -287,9 +298,6 @@ func TestBuildQuery_allOperations(t *testing.T) {
 				if !strings.Contains(q, s) {
 					t.Fatalf("query missing %q:\n%s", s, q)
 				}
-			}
-			if len(vals) < tc.minBinds {
-				t.Fatalf("binds: got %d want >= %d: %v", len(vals), tc.minBinds, vals)
 			}
 			if strings.Contains(q, "${") {
 				t.Fatalf("unresolved placeholders: %s", q)
@@ -409,9 +417,9 @@ func TestValidateRequest_setConfig(t *testing.T) {
 	if !ValidConfigName("auto_explain.log_min_duration") || ValidConfigName("a b") {
 		t.Fatal("ValidConfigName wrong")
 	}
-	// set_config/reset_config build empty DBFunction (handled directly in pg).
+	// set_config/reset_config now build through the call-template like every other op.
 	fn, args, err := BuildArgs(cfg, ok.OperationSpec)
-	if err != nil || fn.Call != "" || args["config_name"] != "log_statement" || args["config_value"] != "all" {
+	if err != nil || fn.Call == "" || args["config_name"] != "log_statement" || args["config_value"] != "all" {
 		t.Fatalf("BuildArgs set_config: fn=%q args=%v err=%v", fn.Call, args, err)
 	}
 }

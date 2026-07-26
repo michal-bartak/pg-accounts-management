@@ -15,18 +15,22 @@ type RoleRow struct {
 }
 
 // searchRolesSQL matches on role name or the role's COMMENT ON ROLE (pg_shdescription).
+// The comment column may be NULL (no comment set); the scanner accepts NULL and normalizes
+// it to "" — so a user-supplied override query need not wrap it in COALESCE.
 const searchRolesSQL = `SELECT r.rolname,
-       COALESCE(d.description, '')
+       d.description AS comment
 FROM pg_roles r
 LEFT JOIN pg_shdescription d
   ON d.objoid = r.oid AND d.classoid = 'pg_authid'::regclass
 WHERE r.rolname ILIKE $1 OR d.description ILIKE $1
 ORDER BY r.rolname`
 
+// roleDetailSQL reads one role. comment and rolconfig may be NULL (no comment / no GUCs);
+// the scanner accepts NULL for both, so an override query need not COALESCE them.
 const roleDetailSQL = `SELECT r.rolsuper, r.rolcreaterole, r.rolcreatedb, r.rolinherit,
        r.rolcanlogin, r.rolreplication, r.rolbypassrls,
-       COALESCE(d.description, ''),
-       COALESCE(r.rolconfig, '{}')
+       d.description AS comment,
+       r.rolconfig
 FROM pg_roles r
 LEFT JOIN pg_shdescription d
   ON d.objoid = r.oid AND d.classoid = 'pg_authid'::regclass
@@ -50,8 +54,12 @@ func SearchRoles(ctx context.Context, conn *pgx.Conn, term string) ([]RoleRow, e
 	var out []RoleRow
 	for rows.Next() {
 		var r RoleRow
-		if err := rows.Scan(&r.Name, &r.Comment); err != nil {
+		var comment *string // NULL when the role has no COMMENT ON ROLE
+		if err := rows.Scan(&r.Name, &comment); err != nil {
 			return nil, err
+		}
+		if comment != nil {
+			r.Comment = *comment
 		}
 		out = append(out, r)
 	}
@@ -72,9 +80,10 @@ func RoleDetailQueries(loginName string) []string {
 // settings (rolconfig), and direct parent memberships.
 func RoleDetail(ctx context.Context, conn *pgx.Conn, loginName string) (exists bool, comment string, parents []string, attrs map[string]bool, settings map[string]string, err error) {
 	var super, createRole, createDB, inherit, canLogin, replication, bypassRLS bool
-	var rolconfig []string
+	var rolconfig []string       // NULL rolconfig scans into a nil slice
+	var commentVal *string       // NULL when the role has no COMMENT ON ROLE
 	err = conn.QueryRow(ctx, roleDetailSQL, loginName).Scan(
-		&super, &createRole, &createDB, &inherit, &canLogin, &replication, &bypassRLS, &comment, &rolconfig,
+		&super, &createRole, &createDB, &inherit, &canLogin, &replication, &bypassRLS, &commentVal, &rolconfig,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -83,6 +92,9 @@ func RoleDetail(ctx context.Context, conn *pgx.Conn, loginName string) (exists b
 		return false, "", nil, nil, nil, err
 	}
 	exists = true
+	if commentVal != nil {
+		comment = *commentVal
+	}
 	attrs = map[string]bool{
 		"super":       super,
 		"createrole":  createRole,

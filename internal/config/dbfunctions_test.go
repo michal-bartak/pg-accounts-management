@@ -13,8 +13,10 @@ func TestMigrateOne_brokenCreateRoleName(t *testing.T) {
 		Name: "admin_access.create_role(${loginname}, NULL)",
 	}
 	got := migrateOne(broken, def.DBFunctions.CreateRole, "create_role")
-	if !strings.Contains(got.Call, "ARRAY['gr_personal_users'") || !strings.Contains(got.Call, "|| ${parent_role}") {
-		t.Fatalf("got: %s", got.Call)
+	// A broken create_role (full SQL stored in the deprecated Name field) falls back to the
+	// current default template.
+	if got.Call != def.DBFunctions.CreateRole.Call {
+		t.Fatalf("got: %s, want default %s", got.Call, def.DBFunctions.CreateRole.Call)
 	}
 }
 

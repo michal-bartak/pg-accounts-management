@@ -24,10 +24,15 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   (`askConfirm('Production', …)`); no checkbox. `commands.RequiresProductionConfirm`
   and the frontend `hasProductionTargets`/`categoryConfirm` read the flag (not the id
   `"production"`). The frontend sends `confirmProduction: true` after the dialog.
-- **Most writes go through configurable call templates** (`db_functions.<op>`) executed by
+- **All writes go through configurable call templates** (`db_functions.<op>`) executed by
   `pg.ExecuteOperation`, driven by the batched `RunRoleBatch` (per-cluster transaction; see the
-  two-data-paths section). Exceptions with **no template** (hardcoded SQL in `pg.ExecuteOperation`):
-  `set_config` (`ALTER ROLE … SET x = '…'`) and `reset_config` (`ALTER ROLE … RESET x`) for role GUCs.
+  two-data-paths section). This now includes `set_config`/`reset_config` (role GUCs) — there is no
+  longer a hardcoded-SQL exception in `pg.ExecuteOperation`. **Template defaults are vanilla
+  PostgreSQL DDL** (`CREATE ROLE`, `DROP ROLE`, `GRANT/REVOKE … `, `ALTER ROLE … PASSWORD/WITH/SET/RESET`,
+  `COMMENT ON ROLE`), all **statement** mode (`config.DefaultConfig`); deployments that need privileged
+  wrapper functions override per-op in config or the Settings editor. Loading an existing config never
+  force-overwrites a user's templates (`migrateOne` keeps a non-empty `call`); the editor's **Default**
+  button is how a user reverts one template to the vanilla built-in.
 - **Categories = cluster groups**, edited from the **Clusters** tab (a right-aligned
   *Cluster groups* toolbar button opens the `#groups-dialog` list popup; *Add group*
   opens the `#group-dialog` form — label + base `color` + `confirm`). Group id is a slug of the
@@ -200,7 +205,12 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
    from `pg_roles.rolconfig` → `Settings` map), `ParseFullName` (JSON comment
    `full_name`), `likePattern` (escaped ILIKE). `batch.Runner.SearchRoles` /
    `LoadRoleDetails` fan out over the **resolved selected clusters** (not all) and
-   collect per-cluster errors instead of failing.
+   collect per-cluster errors instead of failing. The `comment` (and `rolconfig`)
+   columns are read **NULL-safe**: `comment` scans into a `*string` and is normalized to `""`
+   after fetch (a NULL `rolconfig` scans into a nil slice), so the read queries don't rely on
+   `COALESCE` — an override query that omits it still works. These three queries are still
+   hardcoded consts today; templating them (a `db_reads` section with a named-column contract) is
+   the planned **Step 2**.
 
 ## Bound methods (`app.go` → `window.go.main.App`)
 
@@ -224,34 +234,45 @@ Introspection (Alter role): `SearchRoles(RoleSearchRequest)`,
 Defaults in [internal/config/store.go](internal/config/store.go); example in
 [config.example.yaml](config.example.yaml); DSL in [sql/README.md](sql/README.md).
 
-| op | placeholders | default execution |
-|----|--------------|-------------------|
-| `create_role` | loginname, fullname, email, parent_role | function (`ARRAY[] \|\| ${parent_role}`) |
-| `remove_role` | loginname (rolename alias) | function |
-| `grant_parents` | loginname, parent_roles | function |
-| `revoke_parents` | loginname, parent_roles | statement (`REVOKE … FROM …`) |
-| `change_password` | loginname, new_password | function |
-| `set_comment` | loginname, **comment** | statement (`COMMENT ON ROLE ${loginname} IS ${comment}`) |
-| `set_attribute` | loginname, **attribute** (space-separated keyword list) | statement (`ALTER ROLE ${loginname} WITH ${attribute}`) |
-| `set_config` / `reset_config` | loginname, config_name(, config_value) | **no template** — hardcoded `ALTER ROLE … SET/RESET` in `pg.ExecuteOperation` |
+All defaults are **statement** mode, vanilla PostgreSQL DDL:
+
+| op | placeholders | default template |
+|----|--------------|------------------|
+| `create_role` | loginname, fullname, email, parent_role | `CREATE ROLE ${loginname}` (fullname/email/parent unused by the vanilla default; a `function`-mode override can consume them via `ARRAY[] \|\| ${parent_role}`) |
+| `remove_role` | loginname (rolename alias) | `DROP ROLE ${loginname}` |
+| `grant_parents` | loginname, parent_roles | `GRANT ${parent_roles} TO ${loginname}` |
+| `revoke_parents` | loginname, parent_roles | `REVOKE ${parent_roles} FROM ${loginname}` |
+| `change_password` | loginname, new_password | `ALTER ROLE ${loginname} PASSWORD ${new_password}` |
+| `set_comment` | loginname, **comment** | `COMMENT ON ROLE ${loginname} IS ${comment}` |
+| `set_attribute` | loginname, **attribute** (space-separated keyword list) | `ALTER ROLE ${loginname} WITH ${attribute}` |
+| `set_config` | loginname, **config_name**, config_value | `ALTER ROLE ${loginname} SET ${config_name} = ${config_value}` |
+| `reset_config` | loginname, **config_name** | `ALTER ROLE ${loginname} RESET ${config_name}` |
 
 Field kinds when embedding (statement/block): role names → **double-quoted identifiers**
 (`quoteSQLIdentifier` → `"name"` with `"`→`""`, so case is preserved and special chars are safe;
 rejects only empty/comma/NUL — comma is the list delimiter); `parent_roles` → comma-separated
 list, each element double-quoted (`fieldIdentifierList` → `"a", "b"`);
-`new_password`/`comment`/`fullname`/`email` → quoted **literals**;
+`new_password`/`comment`/`fullname`/`email`/**`config_value`** → quoted **literals**
+(`quoteSQLLiteral`, `E'…'` for backslash-bearing values);
+`config_name` → a **bare, unquoted GUC name** (`fieldConfigName`, validated by `gucNameRE` in
+`calltemplate/execution.go` — GUC names are case-insensitive, optionally namespaced, so they are
+not double-quoted; validation is the injection guard);
 `attribute` → a **space-separated keyword list** (`fieldKeywordList`) so the frontend combines
 all of a cluster's attribute changes into ONE `ALTER ROLE … WITH kw1 kw2 …`; each keyword is
 whitelisted (`SUPERUSER`/`NOSUPERUSER`, `CREATEROLE`/…, `LOGIN`, `REPLICATION`, `BYPASSRLS`) in
 `commands.ValidateOperation`.
 
 ### Adding a new operation
-Extend all of: `calltemplate.AllowedPlaceholders` + `placeholderKindForField`;
-`commands` op const + `BuildArgs` + `ValidateOperation`; `model.DBFunctions` +
-`*Params` + `OperationSpec`; `config.store.DefaultConfig` + `dbfunctions.go`
-migrate/validate lists; the `DB_FUNCTIONS` table in `frontend/app.js` (drives the compact
-command list + the `#fn-dialog` popup, incl. its allowed-placeholder chips) and
-`readDBFunctionsFromEditor`; example config; and tests in `calltemplate`/`commands`/`config`.
+Extend all of: `calltemplate.AllowedPlaceholders` + `placeholderKindForField` (+ a new
+`fieldKind` and `buildEmbedded` case if the value needs non-standard embedding, e.g.
+`fieldConfigName` for unquoted GUC names); `commands` op const + `BuildArgs` +
+`ValidateOperation`; `model.DBFunctions` + `*Params` + `OperationSpec`;
+`config.store.DefaultConfig` + `dbfunctions.go` migrate/validate lists; the `DB_FUNCTIONS`
+table in `frontend/app.js` — each entry is `[key, title, prop, placeholders, defaultCall,
+defaultExecution, contract]`; `defaultCall`/`defaultExecution` **mirror the backend default**
+(the `#fn-dialog` **Default** button reverts to them) and `contract` is the one-sentence
+description shown in the dialog — plus `readDBFunctionsFromEditor`/`savedDBFunctions`; example
+config; and tests in `calltemplate`/`commands`/`config`.
 
 ## Frontend (`frontend/`)
 

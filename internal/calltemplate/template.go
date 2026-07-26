@@ -48,6 +48,10 @@ func AllowedPlaceholders(operation string) map[string]bool {
 		names = []string{"loginname", "comment"}
 	case "set_attribute":
 		names = []string{"loginname", "attribute"}
+	case "set_config":
+		names = []string{"loginname", "config_name", "config_value"}
+	case "reset_config":
+		names = []string{"loginname", "config_name"}
 	default:
 		return nil
 	}

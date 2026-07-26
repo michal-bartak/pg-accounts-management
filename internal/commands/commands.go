@@ -105,8 +105,7 @@ func BuildArgs(cfg model.Config, op model.OperationSpec) (model.DBFunction, map[
 		if op.SetConfig == nil {
 			return model.DBFunction{}, nil, fmt.Errorf("set config parameters missing")
 		}
-		// Built directly in pg.ExecuteOperation (no template); empty DBFunction.
-		return model.DBFunction{}, map[string]string{
+		return cfg.DBFunctions.SetConfig, map[string]string{
 			"loginname":    op.SetConfig.LoginName,
 			"config_name":  op.SetConfig.ConfigName,
 			"config_value": op.SetConfig.ConfigValue,
@@ -115,7 +114,7 @@ func BuildArgs(cfg model.Config, op model.OperationSpec) (model.DBFunction, map[
 		if op.ResetConfig == nil {
 			return model.DBFunction{}, nil, fmt.Errorf("reset config parameters missing")
 		}
-		return model.DBFunction{}, map[string]string{
+		return cfg.DBFunctions.ResetConfig, map[string]string{
 			"loginname":   op.ResetConfig.LoginName,
 			"config_name": op.ResetConfig.ConfigName,
 		}, nil

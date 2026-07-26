@@ -119,6 +119,80 @@ func TestBuild_statement_setAttribute_multipleKeywords(t *testing.T) {
 	}
 }
 
+func TestBuild_statement_setConfig(t *testing.T) {
+	sql, _, _, err := Build(
+		"ALTER ROLE ${loginname} SET ${config_name} = ${config_value}",
+		map[string]string{"loginname": "jdoe", "config_name": "search_path", "config_value": "public"},
+		"set_config",
+		model.ExecutionStatement,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Login double-quoted, GUC name embedded unquoted, value a quoted literal.
+	if sql != `ALTER ROLE "jdoe" SET search_path = 'public'` {
+		t.Fatalf("got: %s", sql)
+	}
+}
+
+func TestBuild_statement_setConfig_namespacedName(t *testing.T) {
+	sql, _, _, err := Build(
+		"ALTER ROLE ${loginname} SET ${config_name} = ${config_value}",
+		map[string]string{"loginname": "jdoe", "config_name": "auto_explain.log_min_duration", "config_value": "0"},
+		"set_config",
+		model.ExecutionStatement,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sql != `ALTER ROLE "jdoe" SET auto_explain.log_min_duration = '0'` {
+		t.Fatalf("got: %s", sql)
+	}
+}
+
+func TestBuild_statement_setConfig_rejectsBadName(t *testing.T) {
+	_, _, _, err := Build(
+		"ALTER ROLE ${loginname} SET ${config_name} = ${config_value}",
+		map[string]string{"loginname": "jdoe", "config_name": "bad name; DROP", "config_value": "x"},
+		"set_config",
+		model.ExecutionStatement,
+	)
+	if err == nil {
+		t.Fatal("expected error for a non-identifier setting name")
+	}
+}
+
+func TestBuild_statement_setConfig_valueEscaped(t *testing.T) {
+	sql, _, _, err := Build(
+		"ALTER ROLE ${loginname} SET ${config_name} = ${config_value}",
+		map[string]string{"loginname": "jdoe", "config_name": "search_path", "config_value": `a\b`},
+		"set_config",
+		model.ExecutionStatement,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A backslash-bearing value uses an E'…' escape string.
+	if sql != `ALTER ROLE "jdoe" SET search_path = E'a\\b'` {
+		t.Fatalf("got: %s", sql)
+	}
+}
+
+func TestBuild_statement_resetConfig(t *testing.T) {
+	sql, _, _, err := Build(
+		"ALTER ROLE ${loginname} RESET ${config_name}",
+		map[string]string{"loginname": "jdoe", "config_name": "search_path"},
+		"reset_config",
+		model.ExecutionStatement,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sql != `ALTER ROLE "jdoe" RESET search_path` {
+		t.Fatalf("got: %s", sql)
+	}
+}
+
 func TestBuild_statement_setAttribute_rejectsBadToken(t *testing.T) {
 	_, _, _, err := Build(
 		"ALTER ROLE ${loginname} WITH ${attribute}",

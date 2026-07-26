@@ -498,6 +498,8 @@ export namespace model {
 	    changePassword: DBFunction;
 	    setComment: DBFunction;
 	    setAttribute: DBFunction;
+	    setConfig: DBFunction;
+	    resetConfig: DBFunction;
 	
 	    static createFrom(source: any = {}) {
 	        return new DBFunctions(source);
@@ -512,6 +514,8 @@ export namespace model {
 	        this.changePassword = this.convertValues(source["changePassword"], DBFunction);
 	        this.setComment = this.convertValues(source["setComment"], DBFunction);
 	        this.setAttribute = this.convertValues(source["setAttribute"], DBFunction);
+	        this.setConfig = this.convertValues(source["setConfig"], DBFunction);
+	        this.resetConfig = this.convertValues(source["resetConfig"], DBFunction);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

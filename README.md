@@ -85,6 +85,11 @@ action still prompts for a one-off password.) See
 ## Database call templates
 
 Each operation has a **call template** and **execution mode** in **Settings** or `db_functions.<operation>` in config (`execution`: `function` | `statement` | `block`).
+The **defaults are vanilla PostgreSQL DDL** (`CREATE ROLE`, `DROP ROLE`, `GRANT`/`REVOKE`,
+`ALTER ROLE … PASSWORD`/`WITH`/`SET`/`RESET`, `COMMENT ON ROLE`), all in **statement** mode.
+Override any of them — e.g. point an operation at a `SECURITY DEFINER` wrapper function (see the
+function example below) so a low-privilege user can act through it, or to add audit logging /
+notifications. Each template's dialog has a **Default** button that reverts it to the vanilla built-in.
 
 Use **statement** (or **block**) when the template is raw SQL such as DDL/GRANT — PostgreSQL cannot bind role names as `$1`, and the app must embed them as identifiers:
 
@@ -93,7 +98,7 @@ Use **statement** (or **block**) when the template is raw SQL such as DDL/GRANT 
 - Revoke parents: `REVOKE ${parent_roles} FROM ${loginname}` (comma-separated parent roles as unquoted identifiers)
 - Set comment: `COMMENT ON ROLE ${loginname} IS ${comment}` (comment embedded as an escaped string literal)
 
-Example (create role):
+Example of a **function**-mode override (create role) — the default is simply `CREATE ROLE ${loginname}`:
 
 ```text
 admin_access.create_role(${loginname}, NULL, ${fullname}, ${email}, ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_role})
@@ -140,8 +145,8 @@ active) avoids mistyped role names by searching first.
    SUPERUSER` / `… WITH NOSUPERUSER` via the `set_attribute` template.
    **Settings** (role GUCs from `pg_roles.rolconfig`) work the same way, keyed by
    `name = value`; **Add setting…** takes a name + value, and a setting can hold
-   different values on different clusters. They run hardcoded `ALTER ROLE … SET x = '…'`
-   / `RESET x` (no template).
+   different values on different clusters. They run `ALTER ROLE … SET x = '…'`
+   / `RESET x` via the configurable `set_config` / `reset_config` templates.
 4. **Comments** — the *View / edit comments* popup groups clusters by comment
    content (JSON compared by value), labels each group by scope, and lets you edit a
    comment and save it to all its clusters (writes `COMMENT ON ROLE` via the

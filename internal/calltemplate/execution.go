@@ -16,9 +16,14 @@ const (
 	fieldIdentifier     fieldKind = iota
 	fieldIdentifierList           // comma-separated role names (GRANT a, b TO …)
 	fieldKeywordList              // space-separated keywords (ALTER ROLE … WITH SUPERUSER NOLOGIN)
+	fieldConfigName               // a role-GUC name, emitted unquoted (ALTER ROLE … SET work_mem = …)
 	fieldLiteral
 	fieldBind // function mode only
 )
+
+// gucNameRE validates a role-GUC name (optionally namespaced, e.g. auto_explain.log_min_duration).
+// GUC names are case-insensitive bare identifiers, so they are embedded unquoted.
+var gucNameRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$`)
 
 // Build produces SQL for the given execution mode. useQuery is true for function mode (pgx Query).
 func Build(call string, args map[string]string, operation, execution string) (sql string, values []any, useQuery bool, err error) {
@@ -170,6 +175,22 @@ func placeholderKindForField(operation, field string) (fieldKind, error) {
 		case "fullname", "email":
 			return fieldLiteral, nil
 		}
+	case "set_config":
+		switch field {
+		case "loginname":
+			return fieldIdentifier, nil
+		case "config_name":
+			return fieldConfigName, nil
+		case "config_value":
+			return fieldLiteral, nil
+		}
+	case "reset_config":
+		switch field {
+		case "loginname":
+			return fieldIdentifier, nil
+		case "config_name":
+			return fieldConfigName, nil
+		}
 	}
 	return fieldBind, nil
 }
@@ -232,6 +253,17 @@ func quoteSQLKeywordList(value string) (string, error) {
 	return strings.Join(kws, " "), nil
 }
 
+// validConfigName returns a role-GUC name embedded unquoted after validating its syntax
+// (bare, optionally namespaced identifier). GUC names are case-insensitive, so they are not
+// double-quoted; validation is the injection guard.
+func validConfigName(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if !gucNameRE.MatchString(name) {
+		return "", fmt.Errorf("invalid setting name: %q", name)
+	}
+	return name, nil
+}
+
 func buildEmbedded(call string, args map[string]string, operation string) (string, error) {
 	var b strings.Builder
 	last := 0
@@ -272,6 +304,12 @@ func buildEmbedded(call string, args map[string]string, operation string) (strin
 				return "", err
 			}
 			b.WriteString(quoted)
+		case fieldConfigName:
+			name, err := validConfigName(v)
+			if err != nil {
+				return "", err
+			}
+			b.WriteString(name)
 		case fieldLiteral:
 			b.WriteString(quoteSQLLiteral(v))
 		}

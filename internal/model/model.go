@@ -60,6 +60,8 @@ type DBFunctions struct {
 	ChangePassword DBFunction `yaml:"change_password" json:"changePassword"`
 	SetComment     DBFunction `yaml:"set_comment" json:"setComment"`
 	SetAttribute   DBFunction `yaml:"set_attribute" json:"setAttribute"`
+	SetConfig      DBFunction `yaml:"set_config" json:"setConfig"`
+	ResetConfig    DBFunction `yaml:"reset_config" json:"resetConfig"`
 }
 
 type BatchSettings struct {

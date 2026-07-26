@@ -42,9 +42,16 @@ func TestExecuteOperationReturnsStatementSQL(t *testing.T) {
 	}
 }
 
+// set_config/reset_config now flow through the call-template path like every other op;
+// these use the vanilla default templates (matching config.DefaultConfig, inlined here to
+// avoid the pg→config import cycle).
+const setConfigTemplate = "ALTER ROLE ${loginname} SET ${config_name} = ${config_value}"
+const resetConfigTemplate = "ALTER ROLE ${loginname} RESET ${config_name}"
+
 func TestExecuteOperationReturnsConfigSQL(t *testing.T) {
 	q := &fakeQuerier{}
-	sql, _, err := ExecuteOperation(context.Background(), q, model.DBFunction{}, "set_config", map[string]string{
+	fnSet := model.DBFunction{Call: setConfigTemplate, Execution: "statement"}
+	sql, _, err := ExecuteOperation(context.Background(), q, fnSet, "set_config", map[string]string{
 		"loginname":    "x",
 		"config_name":  "search_path",
 		"config_value": "public",
@@ -57,7 +64,8 @@ func TestExecuteOperationReturnsConfigSQL(t *testing.T) {
 	}
 
 	q2 := &fakeQuerier{}
-	sql, _, err = ExecuteOperation(context.Background(), q2, model.DBFunction{}, "reset_config", map[string]string{
+	fnReset := model.DBFunction{Call: resetConfigTemplate, Execution: "statement"}
+	sql, _, err = ExecuteOperation(context.Background(), q2, fnReset, "reset_config", map[string]string{
 		"loginname":   "x",
 		"config_name": "search_path",
 	})
@@ -86,7 +94,8 @@ func TestExecuteOperationConfigValueHostileInput(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			q := &fakeQuerier{}
-			sql, _, err := ExecuteOperation(context.Background(), q, model.DBFunction{}, "set_config", map[string]string{
+			fn := model.DBFunction{Call: setConfigTemplate, Execution: "statement"}
+			sql, _, err := ExecuteOperation(context.Background(), q, fn, "set_config", map[string]string{
 				"loginname":    "x",
 				"config_name":  "search_path",
 				"config_value": tc.value,

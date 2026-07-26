@@ -22,15 +22,23 @@ categories:
     color: "#6eb5ff"
     confirm: false
 clusters: []
+# Defaults are vanilla PostgreSQL DDL (statement mode), shown below. Override any command
+# with a privileged wrapper function (execution: function) or a PL/pgSQL block — e.g. so a
+# low-privilege connect user can act through a SECURITY DEFINER function that also writes an
+# audit log or sends a notification. Commented variants illustrate the alternatives.
 db_functions:
   create_role:
-    call: "admin_access.create_role(${loginname}, NULL, ${fullname}, ${email}, ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_role})"
+    execution: statement
+    call: "CREATE ROLE ${loginname}"
+  # create_role:
+  #   execution: function   # fullname/email/parent_role available; ARRAY['grp'] || ${parent_role}
+  #   call: "admin_access.create_role(${loginname}, NULL, ${fullname}, ${email}, ARRAY['gr_personal_users'] || ${parent_role})"
   remove_role:
-    execution: function
-    call: "your_schema.remove_app_role(${loginname})"
+    execution: statement
+    call: "DROP ROLE ${loginname}"
   # remove_role:
-  #   execution: statement
-  #   call: "DROP ROLE ${loginname}"
+  #   execution: function
+  #   call: "your_schema.remove_app_role(${loginname})"
   # remove_role:
   #   execution: block   # a complete anonymous block, run verbatim (write your own DO/delimiter)
   #   call: |
@@ -38,11 +46,11 @@ db_functions:
   #       DROP ROLE ${loginname};
   #     END $do$;
   grant_parents:
-    execution: function
-    call: "your_schema.grant_role_parents(${loginname}, ${parent_roles})"
+    execution: statement
+    call: "GRANT ${parent_roles} TO ${loginname}"
   # grant_parents:
-  #   execution: statement
-  #   call: "GRANT ${parent_roles} TO ${loginname}"
+  #   execution: function
+  #   call: "your_schema.grant_role_parents(${loginname}, ${parent_roles})"
   revoke_parents:
     execution: statement
     call: "REVOKE ${parent_roles} FROM ${loginname}"
@@ -50,13 +58,23 @@ db_functions:
   #   execution: function
   #   call: "your_schema.revoke_role_parents(${loginname}, ${parent_roles})"
   change_password:
-    call: "your_schema.change_role_password(${loginname}, ${new_password})"
+    execution: statement
+    call: "ALTER ROLE ${loginname} PASSWORD ${new_password}"
+  # change_password:
+  #   execution: function
+  #   call: "your_schema.change_role_password(${loginname}, ${new_password})"
   set_comment:
     execution: statement
     call: "COMMENT ON ROLE ${loginname} IS ${comment}"
   set_attribute:
     execution: statement
     call: "ALTER ROLE ${loginname} WITH ${attribute}"
+  set_config:
+    execution: statement
+    call: "ALTER ROLE ${loginname} SET ${config_name} = ${config_value}"
+  reset_config:
+    execution: statement
+    call: "ALTER ROLE ${loginname} RESET ${config_name}"
 batch:
   max_concurrency: 5
 
