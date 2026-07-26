@@ -707,6 +707,15 @@ tr:last-child td { border-bottom: none; }
 .settings-group-head .settings-group-label { margin-bottom: 0; }
 .settings-num { width: 6rem; }
 
+/* Two side-by-side subsections (DB command templates | Introspection queries).
+   Collapses to one column when the panel is too narrow. */
+.settings-two-col {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem 2rem;
+  align-items: start;
+}
+
 /* Compact command list — one clickable row per operation. */
 #db-functions-editor {
   display: grid;
