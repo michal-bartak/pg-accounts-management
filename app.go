@@ -64,6 +64,10 @@ func (a *App) SaveDBFunctions(fn model.DBFunctions) error {
 	return a.store.UpdateDBFunctions(fn)
 }
 
+func (a *App) SaveDBReads(reads model.DBReads) error {
+	return a.store.UpdateDBReads(reads)
+}
+
 func (a *App) SaveBatchSettings(batch model.BatchSettings) error {
 	return a.store.UpdateBatch(batch)
 }

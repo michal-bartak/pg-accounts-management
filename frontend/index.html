@@ -163,6 +163,13 @@
           <div id="db-functions-editor"></div>
         </div>
 
+        <div class="settings-group">
+          <div class="settings-group-head">
+            <span class="settings-group-label">Introspection queries <button type="button" class="q-hint" tabindex="0" aria-label="Read-only catalog queries used by Alter role. Point one at a privileged wrapper function or view if the connect user cannot read the catalogs directly. Each must return its contract columns (shown in the editor); $1 is the search pattern or role name." data-hint="Read-only catalog queries used by Alter role. Point one at a privileged wrapper function or view if the connect user cannot read the catalogs directly. Each must return its contract columns (shown in the editor); $1 is the search pattern or role name.">?</button></span>
+          </div>
+          <div id="db-reads-editor"></div>
+        </div>
+
         <div class="settings-meta">
           <span class="settings-meta-label">Config file</span>
           <div class="config-path-line">
@@ -367,17 +374,17 @@
     <form method="dialog" id="fn-form" autocapitalize="none">
       <h2 id="fn-dialog-title">Command template</h2>
       <p id="fn-contract" class="fn-contract"></p>
-      <label>Execution
+      <label id="fn-execution-row">Execution
         <select id="fn-execution">
           <option value="function">Function call</option>
           <option value="statement">SQL statement</option>
           <option value="block">PL/pgSQL block</option>
         </select>
       </label>
-      <label>Call template
+      <label id="fn-call-label">Call template
         <textarea id="fn-call" rows="4" class="call-template" autocapitalize="none" autocomplete="off" spellcheck="false"></textarea>
       </label>
-      <div class="fn-placeholders">
+      <div class="fn-placeholders" id="fn-placeholders">
         <span class="picker-label">Placeholders (click to insert):</span>
         <span id="fn-placeholder-list"></span>
       </div>

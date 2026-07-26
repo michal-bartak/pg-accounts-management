@@ -110,6 +110,12 @@ admin_access.create_role(${loginname}, NULL, ${fullname}, ${email}, ARRAY['gr_pe
 
 Full syntax, whitelist, YAML examples, and common mistakes: [`sql/README.md`](sql/README.md).
 
+The **read** queries behind Alter-role search/detail are configurable too, under Settings →
+**Introspection queries** (config `db_reads`). They are plain SQL taking a single `$1` bind, with
+their result columns scanned by name against a fixed contract — so you can point one at a
+privileged wrapper function or view when the connect user cannot read the catalogs directly. See
+[`sql/README.md`](sql/README.md#introspection-queries-reads).
+
 ## Alter role
 
 The **Alter role** button (right side of the top tab bar, shown while Operations is

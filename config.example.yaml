@@ -75,6 +75,51 @@ db_functions:
   reset_config:
     execution: statement
     call: "ALTER ROLE ${loginname} RESET ${config_name}"
+
+# db_reads: the read/introspection queries used by Alter role. Plain SQL with a single $1 bind
+# (search pattern for search_roles; role name for role_detail/role_parents). Result columns are
+# scanned BY NAME against a fixed contract (see sql/README.md → Introspection queries): column
+# order is irrelevant, NULL comment/rolconfig is fine, an omitted contract column is treated as
+# zero, and an extra unmapped column is an error. Defaults are vanilla catalog queries; override a
+# read with a privileged wrapper function/view (e.g. SELECT rolname, comment FROM admin.search($1))
+# when the connect user cannot read the catalogs directly. Omit a key to use its default.
+db_reads:
+  search_roles:
+    # Contract columns: rolname (text), comment (text, nullable).
+    query: |
+      SELECT r.rolname AS rolname,
+             d.description AS comment
+      FROM pg_roles r
+      LEFT JOIN pg_shdescription d
+        ON d.objoid = r.oid AND d.classoid = 'pg_authid'::regclass
+      WHERE r.rolname ILIKE $1 OR d.description ILIKE $1
+      ORDER BY r.rolname
+  role_detail:
+    # Contract columns (one row): rolsuper, rolcreaterole, rolcreatedb, rolinherit, rolcanlogin,
+    # rolreplication, rolbypassrls (bool), comment (text, nullable), rolconfig (text[], nullable).
+    query: |
+      SELECT r.rolsuper AS rolsuper,
+             r.rolcreaterole AS rolcreaterole,
+             r.rolcreatedb AS rolcreatedb,
+             r.rolinherit AS rolinherit,
+             r.rolcanlogin AS rolcanlogin,
+             r.rolreplication AS rolreplication,
+             r.rolbypassrls AS rolbypassrls,
+             d.description AS comment,
+             r.rolconfig AS rolconfig
+      FROM pg_roles r
+      LEFT JOIN pg_shdescription d
+        ON d.objoid = r.oid AND d.classoid = 'pg_authid'::regclass
+      WHERE r.rolname = $1
+  role_parents:
+    # Contract columns (one row per parent): rolname (text).
+    query: |
+      SELECT g.rolname AS rolname
+      FROM pg_auth_members m
+      JOIN pg_roles g ON g.oid = m.roleid
+      JOIN pg_roles u ON u.oid = m.member
+      WHERE u.rolname = $1
+      ORDER BY g.rolname
 batch:
   max_concurrency: 5
 

@@ -14,77 +14,78 @@ type RoleRow struct {
 	Comment string
 }
 
-// searchRolesSQL matches on role name or the role's COMMENT ON ROLE (pg_shdescription).
-// The comment column may be NULL (no comment set); the scanner accepts NULL and normalizes
-// it to "" — so a user-supplied override query need not wrap it in COALESCE.
-const searchRolesSQL = `SELECT r.rolname,
-       d.description AS comment
-FROM pg_roles r
-LEFT JOIN pg_shdescription d
-  ON d.objoid = r.oid AND d.classoid = 'pg_authid'::regclass
-WHERE r.rolname ILIKE $1 OR d.description ILIKE $1
-ORDER BY r.rolname`
+// The introspection SQL is no longer hardcoded here — it comes from config.DBReads (with
+// vanilla catalog defaults) and is passed in by the batch runner. Result columns are scanned
+// BY NAME against these structs' `db` tags (pgx RowToStructByNameLax): column order is
+// irrelevant, a NULL comment/rolconfig scans cleanly (pointer / nil slice), and an omitted
+// contract column leaves its field zero-valued. A returned column with no matching field is
+// rejected by pgx with a clear "struct doesn't have corresponding row field" error.
 
-// roleDetailSQL reads one role. comment and rolconfig may be NULL (no comment / no GUCs);
-// the scanner accepts NULL for both, so an override query need not COALESCE them.
-const roleDetailSQL = `SELECT r.rolsuper, r.rolcreaterole, r.rolcreatedb, r.rolinherit,
-       r.rolcanlogin, r.rolreplication, r.rolbypassrls,
-       d.description AS comment,
-       r.rolconfig
-FROM pg_roles r
-LEFT JOIN pg_shdescription d
-  ON d.objoid = r.oid AND d.classoid = 'pg_authid'::regclass
-WHERE r.rolname = $1`
+// searchRoleRow is the row contract for the search_roles query.
+type searchRoleRow struct {
+	Rolname string  `db:"rolname"`
+	Comment *string `db:"comment"` // NULL when the role has no COMMENT ON ROLE
+}
 
-const roleParentsSQL = `SELECT g.rolname
-FROM pg_auth_members m
-JOIN pg_roles g ON g.oid = m.roleid
-JOIN pg_roles u ON u.oid = m.member
-WHERE u.rolname = $1
-ORDER BY g.rolname`
+// roleDetailRow is the single-row contract for the role_detail query.
+type roleDetailRow struct {
+	Rolsuper       bool     `db:"rolsuper"`
+	Rolcreaterole  bool     `db:"rolcreaterole"`
+	Rolcreatedb    bool     `db:"rolcreatedb"`
+	Rolinherit     bool     `db:"rolinherit"`
+	Rolcanlogin    bool     `db:"rolcanlogin"`
+	Rolreplication bool     `db:"rolreplication"`
+	Rolbypassrls   bool     `db:"rolbypassrls"`
+	Comment        *string  `db:"comment"`   // NULL when no comment
+	Rolconfig      []string `db:"rolconfig"` // NULL scans into a nil slice
+}
 
-// SearchRoles returns roles whose name or comment matches term (case-insensitive substring).
-func SearchRoles(ctx context.Context, conn *pgx.Conn, term string) ([]RoleRow, error) {
-	rows, err := conn.Query(ctx, searchRolesSQL, likePattern(term))
+// roleParentRow is the row contract for the role_parents query.
+type roleParentRow struct {
+	Rolname string `db:"rolname"`
+}
+
+// SearchRoles runs searchQuery ($1 = ILIKE pattern) and returns roles whose name or comment
+// matches term. searchQuery must return the search_roles contract columns (rolname, comment).
+func SearchRoles(ctx context.Context, conn *pgx.Conn, searchQuery, term string) ([]RoleRow, error) {
+	rows, err := conn.Query(ctx, searchQuery, likePattern(term))
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var out []RoleRow
-	for rows.Next() {
-		var r RoleRow
-		var comment *string // NULL when the role has no COMMENT ON ROLE
-		if err := rows.Scan(&r.Name, &comment); err != nil {
-			return nil, err
-		}
-		if comment != nil {
-			r.Comment = *comment
+	items, err := pgx.CollectRows(rows, pgx.RowToStructByNameLax[searchRoleRow])
+	if err != nil {
+		return nil, err
+	}
+	out := make([]RoleRow, 0, len(items))
+	for _, it := range items {
+		r := RoleRow{Name: it.Rolname}
+		if it.Comment != nil {
+			r.Comment = *it.Comment
 		}
 		out = append(out, r)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 // RoleDetailQueries returns the SQL that RoleDetail executes for loginName, with the $1 bind
 // inlined as a quoted literal — for display in the load-status popup (not re-executed).
-func RoleDetailQueries(loginName string) []string {
+func RoleDetailQueries(detailQuery, parentsQuery, loginName string) []string {
 	lit := "'" + strings.ReplaceAll(loginName, "'", "''") + "'"
 	return []string{
-		strings.ReplaceAll(roleDetailSQL, "$1", lit),
-		strings.ReplaceAll(roleParentsSQL, "$1", lit),
+		strings.ReplaceAll(detailQuery, "$1", lit),
+		strings.ReplaceAll(parentsQuery, "$1", lit),
 	}
 }
 
-// RoleDetail reads whether a login exists, its comment, attribute flags, role GUC
-// settings (rolconfig), and direct parent memberships.
-func RoleDetail(ctx context.Context, conn *pgx.Conn, loginName string) (exists bool, comment string, parents []string, attrs map[string]bool, settings map[string]string, err error) {
-	var super, createRole, createDB, inherit, canLogin, replication, bypassRLS bool
-	var rolconfig []string       // NULL rolconfig scans into a nil slice
-	var commentVal *string       // NULL when the role has no COMMENT ON ROLE
-	err = conn.QueryRow(ctx, roleDetailSQL, loginName).Scan(
-		&super, &createRole, &createDB, &inherit, &canLogin, &replication, &bypassRLS, &commentVal, &rolconfig,
-	)
+// RoleDetail reads whether a login exists, its comment, attribute flags, role GUC settings
+// (rolconfig), and direct parent memberships. detailQuery ($1 = role name) must return one
+// role_detail-contract row; parentsQuery ($1 = role name) returns the role_parents rows.
+func RoleDetail(ctx context.Context, conn *pgx.Conn, detailQuery, parentsQuery, loginName string) (exists bool, comment string, parents []string, attrs map[string]bool, settings map[string]string, err error) {
+	rows, err := conn.Query(ctx, detailQuery, loginName)
+	if err != nil {
+		return false, "", nil, nil, nil, err
+	}
+	d, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByNameLax[roleDetailRow])
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return false, "", nil, nil, nil, nil
@@ -92,33 +93,32 @@ func RoleDetail(ctx context.Context, conn *pgx.Conn, loginName string) (exists b
 		return false, "", nil, nil, nil, err
 	}
 	exists = true
-	if commentVal != nil {
-		comment = *commentVal
+	if d.Comment != nil {
+		comment = *d.Comment
 	}
 	attrs = map[string]bool{
-		"super":       super,
-		"createrole":  createRole,
-		"createdb":    createDB,
-		"inherit":     inherit,
-		"login":       canLogin,
-		"replication": replication,
-		"bypassrls":   bypassRLS,
+		"super":       d.Rolsuper,
+		"createrole":  d.Rolcreaterole,
+		"createdb":    d.Rolcreatedb,
+		"inherit":     d.Rolinherit,
+		"login":       d.Rolcanlogin,
+		"replication": d.Rolreplication,
+		"bypassrls":   d.Rolbypassrls,
 	}
-	settings = parseRoleConfig(rolconfig)
+	settings = parseRoleConfig(d.Rolconfig)
 
-	rows, err := conn.Query(ctx, roleParentsSQL, loginName)
+	prows, err := conn.Query(ctx, parentsQuery, loginName)
 	if err != nil {
 		return exists, comment, nil, attrs, settings, err
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var p string
-		if err := rows.Scan(&p); err != nil {
-			return exists, comment, parents, attrs, settings, err
-		}
-		parents = append(parents, p)
+	parentRows, err := pgx.CollectRows(prows, pgx.RowToStructByNameLax[roleParentRow])
+	if err != nil {
+		return exists, comment, nil, attrs, settings, err
 	}
-	return exists, comment, parents, attrs, settings, rows.Err()
+	for _, p := range parentRows {
+		parents = append(parents, p.Rolname)
+	}
+	return exists, comment, parents, attrs, settings, nil
 }
 
 // parseRoleConfig turns rolconfig entries ("name=value") into a name→value map.

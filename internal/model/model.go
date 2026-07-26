@@ -64,6 +64,30 @@ type DBFunctions struct {
 	ResetConfig    DBFunction `yaml:"reset_config" json:"resetConfig"`
 }
 
+// DBRead is one configurable introspection (read) query. Unlike DBFunction it has no
+// execution mode: it is always run as a pgx Query taking a single $1 bind, and its result
+// columns are scanned BY NAME against a fixed per-read contract (see DefaultConfig / sql/README).
+// A deployment can point it at a privileged wrapper function or view (e.g.
+// SELECT rolname, comment FROM admin.search_roles($1)) so a low-privilege connect user can
+// still introspect, or so the read can add audit logging — as long as it returns the
+// contract's named columns.
+type DBRead struct {
+	Query string `yaml:"query" json:"query"`
+}
+
+// DBReads holds the three introspection queries used by the Alter-role flow. $1 is the search
+// pattern (search_roles) or the role name (role_detail / role_parents).
+type DBReads struct {
+	// SearchRoles must return columns: rolname (text), comment (text, nullable).
+	SearchRoles DBRead `yaml:"search_roles" json:"searchRoles"`
+	// RoleDetail must return one row with columns: rolsuper, rolcreaterole, rolcreatedb,
+	// rolinherit, rolcanlogin, rolreplication, rolbypassrls (bool), comment (text, nullable),
+	// rolconfig (text[], nullable).
+	RoleDetail DBRead `yaml:"role_detail" json:"roleDetail"`
+	// RoleParents must return one row per direct parent: rolname (text).
+	RoleParents DBRead `yaml:"role_parents" json:"roleParents"`
+}
+
 type BatchSettings struct {
 	MaxConcurrency int `yaml:"max_concurrency" json:"maxConcurrency"`
 }
@@ -112,6 +136,7 @@ type Config struct {
 	Categories  []Category    `yaml:"categories" json:"categories"`
 	Clusters    []Cluster     `yaml:"clusters" json:"clusters"`
 	DBFunctions DBFunctions   `yaml:"db_functions" json:"dbFunctions"`
+	DBReads     DBReads       `yaml:"db_reads" json:"dbReads"`
 	Batch       BatchSettings `yaml:"batch" json:"batch"`
 	UI          UISettings    `yaml:"ui" json:"ui"`
 	// ParentRoles are preconfigured parent groups offered as pick-list choices when

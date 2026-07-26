@@ -68,6 +68,14 @@ func DefaultConfig() model.Config {
 				Call:      "ALTER ROLE ${loginname} RESET ${config_name}",
 			},
 		},
+		// Introspection reads. Defaults are vanilla catalog queries; result columns are
+		// scanned by name against the contract documented on model.DBReads. $1 is the search
+		// pattern (search_roles) or the role name (role_detail / role_parents).
+		DBReads: model.DBReads{
+			SearchRoles: model.DBRead{Query: defaultSearchRolesQuery},
+			RoleDetail:  model.DBRead{Query: defaultRoleDetailQuery},
+			RoleParents: model.DBRead{Query: defaultRoleParentsQuery},
+		},
 		Batch:         model.BatchSettings{MaxConcurrency: 5},
 		UI:            model.UISettings{Theme: model.ThemeSystem, CommentDefaultView: model.CommentViewFields},
 		CommentFields: defaultCommentFields(),
@@ -100,6 +108,7 @@ func NewStoreFromConfig(cfg model.Config) *Store {
 		cfg.Categories = DefaultConfig().Categories
 	}
 	migrateDBFunctions(&cfg.DBFunctions)
+	migrateDBReads(&cfg.DBReads)
 	return &Store{path: "", cfg: cfg}
 }
 
@@ -153,6 +162,7 @@ func (s *Store) Load() error {
 		cfg.CommentFields = defaultCommentFields()
 	}
 	migrateDBFunctions(&cfg.DBFunctions)
+	migrateDBReads(&cfg.DBReads)
 	s.cfg = cfg
 	return nil
 }
@@ -232,6 +242,17 @@ func (s *Store) UpdateDBFunctions(fn model.DBFunctions) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.cfg.DBFunctions = fn
+	return s.save()
+}
+
+func (s *Store) UpdateDBReads(reads model.DBReads) error {
+	migrateDBReads(&reads) // a blank query from the editor falls back to its default
+	if err := validateDBReads(reads); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cfg.DBReads = reads
 	return s.save()
 }
 

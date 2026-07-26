@@ -205,18 +205,30 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
    from `pg_roles.rolconfig` → `Settings` map), `ParseFullName` (JSON comment
    `full_name`), `likePattern` (escaped ILIKE). `batch.Runner.SearchRoles` /
    `LoadRoleDetails` fan out over the **resolved selected clusters** (not all) and
-   collect per-cluster errors instead of failing. The `comment` (and `rolconfig`)
-   columns are read **NULL-safe**: `comment` scans into a `*string` and is normalized to `""`
-   after fetch (a NULL `rolconfig` scans into a nil slice), so the read queries don't rely on
-   `COALESCE` — an override query that omits it still works. These three queries are still
-   hardcoded consts today; templating them (a `db_reads` section with a named-column contract) is
-   the planned **Step 2**.
+   collect per-cluster errors instead of failing. **These three queries are templatable**
+   (`Config.DBReads`, YAML `db_reads.<search_roles|role_detail|role_parents>.query`; vanilla
+   catalog defaults + migrate/validate in [internal/config/dbreads.go](internal/config/dbreads.go)).
+   The SQL is no longer hardcoded in `pg` — `batch.Runner` reads `cfg.DBReads` and passes each
+   query into `pg.SearchRoles(…, query, term)` / `pg.RoleDetail(…, detailQuery, parentsQuery, login)`
+   (import rules: `pg` still doesn't import `config`). Each read takes a single `$1` bind (search
+   pattern / role name) and its result columns are scanned **BY NAME** against a fixed contract
+   via `pgx.RowToStructByNameLax` into `db`-tagged structs (`searchRoleRow`/`roleDetailRow`/
+   `roleParentRow`): column **order is irrelevant**, a NULL `comment`/`rolconfig` scans cleanly
+   (`*string` → `""`, nil `[]string`), an **omitted** contract column leaves its field zero-valued
+   (lax), and an **extra** returned column with no matching struct field is **rejected** with a
+   clear pgx error. So a deployment can point a read at a privileged wrapper function/view (e.g.
+   `SELECT rolname, comment FROM admin.search_roles($1)`) as long as it returns the contract's
+   named columns. Contracts: `search_roles` → `rolname, comment`; `role_detail` → the 7
+   `rol*` bools + `comment` + `rolconfig`; `role_parents` → `rolname`. Editable in Settings →
+   **Introspection queries** (same `#fn-dialog` in read mode; **Default** button reverts to the
+   vanilla built-in). `validateDBReads` only checks non-empty + references `$1` (the column
+   contract is enforced at scan time). This was the planned **Step 2**, now done.
 
 ## Bound methods (`app.go` → `window.go.main.App`)
 
 Config/clusters/groups: `GetConfig`, `GetConfigPath`, `ReloadConfig`, `AddCluster`,
 `UpdateCluster`, `DeleteCluster`, `AddCategory`, `UpdateCategory`, `DeleteCategory`,
-`ImportFromEnvironment`, `SaveDBFunctions`, `SaveBatchSettings`, `SaveUISettings`,
+`ImportFromEnvironment`, `SaveDBFunctions`, `SaveDBReads` (introspection queries), `SaveBatchSettings`, `SaveUISettings`,
 `SaveParentRoles`, `SaveCommentFields`, `SaveTargetSelection`, `SaveClusters`
 (staged Clusters editor — replaces the whole clusters+categories set at once via
 `Store.SaveClustersAndCategories`; the per-item `Add/Update/Delete Cluster/Category` are kept
@@ -321,7 +333,12 @@ built from the shared `listRowHtml`/`wireListEditor` helpers (drag handle + remo
 button), staged in `parentRolesDraft` / `commentFieldsDraft` (`#parent-roles-editor` /
 `#comment-fields-editor`). DB templates are a compact list of command names; clicking one opens
 the `#fn-dialog` popup (execution type, call template, clickable placeholder chips — staged in
-`dbFnDraft`). The **Preferred comment view** toggle is `#comment-view-pref`
+`dbFnDraft`). A separate **Introspection queries** section (`#db-reads-editor`, driven by the
+`DB_READS` table) lists the three read queries and opens the **same** `#fn-dialog` in **read
+mode** (`fnDialogMode`/`openReadDialog`): the execution select and placeholder chips are hidden
+(`setFnDialogWriteControls`), the contract sentence + query textarea + **Default** button remain,
+and Done stages into `dbReadsDraft` (saved via `SaveDBReads`/`readDBReadsFromEditor`, dirty-tracked
+by `savedDBReads`). The **Preferred comment view** toggle is `#comment-view-pref`
 (`ui.comment_default_view`). All staged; the Settings panel uses the same padded-panel + inset
 footer as Clusters, with **Discard** (`btn-discard-settings` → `discardSettings`) + **Save**
 (`btn-save-settings`, enabled-when-dirty / disabled-when-clean) buttons.

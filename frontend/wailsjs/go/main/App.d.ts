@@ -36,6 +36,8 @@ export function SaveCommentFields(arg1:Array<model.CommentField>):Promise<void>;
 
 export function SaveDBFunctions(arg1:model.DBFunctions):Promise<void>;
 
+export function SaveDBReads(arg1:model.DBReads):Promise<void>;
+
 export function SaveParentRoles(arg1:Array<string>):Promise<void>;
 
 export function SaveTargetSelection(arg1:model.TargetSelection):Promise<void>;

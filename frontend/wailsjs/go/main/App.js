@@ -70,6 +70,10 @@ export function SaveDBFunctions(arg1) {
   return window['go']['main']['App']['SaveDBFunctions'](arg1);
 }
 
+export function SaveDBReads(arg1) {
+  return window['go']['main']['App']['SaveDBReads'](arg1);
+}
+
 export function SaveParentRoles(arg1) {
   return window['go']['main']['App']['SaveParentRoles'](arg1);
 }

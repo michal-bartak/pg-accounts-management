@@ -49,7 +49,16 @@ Example template: [`config.example.yaml`](config.example.yaml). Implemented in `
   create/update/remove path), `RunOperation` (legacy single-op, unused by the UI)
 - **Introspection (reads, for Alter role):** `SearchRoles`, `LoadRoleDetails` — scan the
   **selected** clusters concurrently (`internal/pg/introspect.go` + `batch.Runner`),
-  collecting per-cluster errors instead of failing.
+  collecting per-cluster errors instead of failing. The three read queries are **templatable**
+  (`Config.DBReads`, YAML `db_reads.<search_roles|role_detail|role_parents>.query`; vanilla
+  catalog defaults + migrate/validate in `internal/config/dbreads.go`). `batch.Runner` passes
+  each query into `pg` (which stays config-free); each takes one `$1` bind and its result columns
+  are scanned **by name** via `pgx.RowToStructByNameLax` (order-independent; NULL comment/rolconfig
+  OK; omitted contract column → zero; **extra** column → error). Contracts: search_roles →
+  `rolname, comment`; role_detail → 7 `rol*` bools + `comment` + `rolconfig`; role_parents →
+  `rolname`. Editable in Settings → **Introspection queries** (`#fn-dialog` read mode; Default
+  button reverts). Bound method `SaveDBReads`. Override a read with a privileged wrapper
+  function/view that returns the contract columns.
 
 ## Call templates (`internal/calltemplate/`)
 

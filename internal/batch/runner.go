@@ -133,13 +133,14 @@ func (r *Runner) SearchRoles(term string, categoryIDs, clusterIDs []string, auth
 	if err != nil {
 		return nil, err
 	}
+	searchQuery := r.store.Get().DBReads.SearchRoles.Query
 
 	var mu sync.Mutex
 	var out []model.RoleMatch
 
 	r.scanClusters(clusters, auth,
 		func(ctx context.Context, cl model.Cluster, conn *pgx.Conn) error {
-			rows, err := pg.SearchRoles(ctx, conn, term)
+			rows, err := pg.SearchRoles(ctx, conn, searchQuery, term)
 			if err != nil {
 				return err
 			}
@@ -179,6 +180,8 @@ func (r *Runner) LoadRoleDetails(loginName string, categoryIDs, clusterIDs []str
 	if err != nil {
 		return nil, err
 	}
+	reads := r.store.Get().DBReads
+	detailQuery, parentsQuery := reads.RoleDetail.Query, reads.RoleParents.Query
 
 	var mu sync.Mutex
 	var out []model.ClusterRoleDetail
@@ -186,7 +189,7 @@ func (r *Runner) LoadRoleDetails(loginName string, categoryIDs, clusterIDs []str
 	r.scanClusters(clusters, auth,
 		func(ctx context.Context, cl model.Cluster, conn *pgx.Conn) error {
 			start := time.Now()
-			exists, comment, parents, attrs, settings, err := pg.RoleDetail(ctx, conn, loginName)
+			exists, comment, parents, attrs, settings, err := pg.RoleDetail(ctx, conn, detailQuery, parentsQuery, loginName)
 			if err != nil {
 				return err
 			}
@@ -203,7 +206,7 @@ func (r *Runner) LoadRoleDetails(loginName string, categoryIDs, clusterIDs []str
 				Attributes: attrs,
 				Settings:   settings,
 				DurationMs: time.Since(start).Milliseconds(),
-				Queries:    pg.RoleDetailQueries(loginName),
+				Queries:    pg.RoleDetailQueries(detailQuery, parentsQuery, loginName),
 			})
 			mu.Unlock()
 			return nil
