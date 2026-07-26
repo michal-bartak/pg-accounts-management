@@ -21,6 +21,17 @@ type Querier interface {
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 }
 
+// quoteConfigValue renders a role-GUC value as a SQL string literal. A value with a
+// backslash is emitted as an E'…' escape string (both backslashes and single quotes
+// doubled) so the literal is safe even when the server has standard_conforming_strings off;
+// backslash-free values keep the plain '…' form.
+func quoteConfigValue(v string) string {
+	if strings.Contains(v, `\`) {
+		return `E'` + strings.NewReplacer(`\`, `\\`, `'`, `''`).Replace(v) + `'`
+	}
+	return `'` + strings.ReplaceAll(v, `'`, `''`) + `'`
+}
+
 // execRoleConfig runs ALTER ROLE <login> SET <name> = '<value>' / RESET <name>.
 // The role name is double-quoted (case preserved, special chars safe); the GUC name is a
 // validated bare identifier (unquoted — GUC names are case-insensitive and may be namespaced);
@@ -38,8 +49,7 @@ func execRoleConfig(ctx context.Context, q Querier, operation string, args map[s
 	if operation == "reset_config" {
 		sql = fmt.Sprintf("ALTER ROLE %s RESET %s", qlogin, name)
 	} else {
-		value := strings.ReplaceAll(args["config_value"], "'", "''")
-		sql = fmt.Sprintf("ALTER ROLE %s SET %s = '%s'", qlogin, name, value)
+		sql = fmt.Sprintf("ALTER ROLE %s SET %s = %s", qlogin, name, quoteConfigValue(args["config_value"]))
 	}
 	if _, err := q.Exec(ctx, sql); err != nil {
 		return sql, "", err // return the SQL even on failure so it can be surfaced

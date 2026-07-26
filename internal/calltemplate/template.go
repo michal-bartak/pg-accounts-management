@@ -126,7 +126,16 @@ func normalizeTemplate(call string) string {
 	return call
 }
 
+// quoteSQLLiteral renders a value as a single-quoted SQL string literal. A value containing
+// a backslash is emitted as an E'…' escape string with both backslashes and single quotes
+// doubled, so the result is safe regardless of the server's standard_conforming_strings
+// setting (with it off, a plain '…' literal treats backslash as an escape char and a lone
+// trailing backslash could swallow the closing quote). Backslash-free values keep the plain
+// '…' form.
 func quoteSQLLiteral(s string) string {
+	if strings.Contains(s, `\`) {
+		return `E'` + strings.NewReplacer(`\`, `\\`, `'`, `''`).Replace(s) + `'`
+	}
 	return `'` + strings.ReplaceAll(s, `'`, `''`) + `'`
 }
 

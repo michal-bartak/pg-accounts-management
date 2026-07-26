@@ -58,7 +58,7 @@ Config: `db_functions.<operation>.call` + optional `.execution` (`function` \| `
 | `operation` | Allowed `${...}` | Notes |
 |-------------|------------------|-------|
 | `create_role` | loginname, fullname, email, parent_role | `ARRAY \|\|` requires `execution: function` |
-| `remove_role` | loginname, rolename (alias) | `statement`: e.g. `DROP ROLE ${loginname}`; `block`: inner PL/pgSQL only |
+| `remove_role` | loginname, rolename (alias) | `statement`: e.g. `DROP ROLE ${loginname}`; `block`: a complete anonymous block (`DO $tag$ … $tag$;`), run verbatim |
 | `grant_parents` | loginname, parent_roles | `statement`: `GRANT ${parent_roles} TO ${loginname}` — identifiers, not quoted |
 | `revoke_parents` | loginname, parent_roles | Default `statement`: `REVOKE ${parent_roles} FROM ${loginname}` |
 | `change_password` | loginname, new_password | |

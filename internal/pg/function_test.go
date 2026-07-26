@@ -69,6 +69,41 @@ func TestExecuteOperationReturnsConfigSQL(t *testing.T) {
 	}
 }
 
+func TestExecuteOperationConfigValueHostileInput(t *testing.T) {
+	cases := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{"quote", "a'b", `ALTER ROLE "x" SET search_path = 'a''b'`},
+		{"quote injection attempt", "'; DROP ROLE y; --", `ALTER ROLE "x" SET search_path = '''; DROP ROLE y; --'`},
+		// Backslash-bearing values switch to an E'…' escape string so quoting holds even
+		// when the server has standard_conforming_strings off.
+		{"backslash", `a\b`, `ALTER ROLE "x" SET search_path = E'a\\b'`},
+		{"trailing backslash", `end\`, `ALTER ROLE "x" SET search_path = E'end\\'`},
+		{"backslash and quote", `a\'b`, `ALTER ROLE "x" SET search_path = E'a\\''b'`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			q := &fakeQuerier{}
+			sql, _, err := ExecuteOperation(context.Background(), q, model.DBFunction{}, "set_config", map[string]string{
+				"loginname":    "x",
+				"config_name":  "search_path",
+				"config_value": tc.value,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if sql != tc.want {
+				t.Fatalf("sql = %q, want %q", sql, tc.want)
+			}
+			if len(q.exec) != 1 || q.exec[0] != tc.want {
+				t.Fatalf("executed = %v, want [%q]", q.exec, tc.want)
+			}
+		})
+	}
+}
+
 func TestInlineParams(t *testing.T) {
 	// Simple string params (highest index replaced first so $10 isn't hit by $1).
 	got := inlineParams("SELECT f($1, $2)", []any{"a", "b'c"})

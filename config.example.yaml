@@ -32,8 +32,11 @@ db_functions:
   #   execution: statement
   #   call: "DROP ROLE ${loginname}"
   # remove_role:
-  #   execution: block
-  #   call: "DROP ROLE ${loginname};"
+  #   execution: block   # a complete anonymous block, run verbatim (write your own DO/delimiter)
+  #   call: |
+  #     DO $do$ BEGIN
+  #       DROP ROLE ${loginname};
+  #     END $do$;
   grant_parents:
     execution: function
     call: "your_schema.grant_role_parents(${loginname}, ${parent_roles})"

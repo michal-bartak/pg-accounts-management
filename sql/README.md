@@ -15,7 +15,7 @@ Each operation has:
 |-------------|-----------|----------|--------------|
 | **function** (default) | `schema.fn(${loginname}, …)` | `SELECT …` with `$1`, `$2` binds | Form values → bind parameters |
 | **statement** | `DROP ROLE ${loginname}` | Single statement via `Exec` | Role names **embedded** in SQL (see below) |
-| **block** | Inner PL/pgSQL only | `DO $dbaccounts$ BEGIN … END $dbaccounts$;` | Same embedding as statement |
+| **block** | A complete anonymous block, e.g. `DO $do$ BEGIN … END $do$;` | Your block, verbatim via `Exec` | Same embedding as statement |
 
 ### Why not `$1` in `DROP ROLE`?
 
@@ -71,15 +71,24 @@ Function mode always uses `$n` binds instead of embedding.
 
 ### Block mode
 
-Write only the statements that go inside `BEGIN … END`. The app adds the `DO $dbaccounts$` wrapper. Semicolons are allowed inside the body.
+Write the **complete** anonymous code block, including the `DO`, your own dollar-quote
+delimiter, and `BEGIN … END`. The app runs it **verbatim** (after embedding placeholders) — it
+adds no wrapper of its own. Semicolons are allowed. Pick a delimiter (e.g. `$do$`) that cannot
+appear in your embedded values.
 
 ```yaml
 remove_role:
   execution: block
-  call: "DROP ROLE ${loginname};"
+  call: |
+    DO $do$ BEGIN
+      DROP ROLE ${loginname};
+    END $do$;
 ```
 
-Prefer `DROP ROLE ${loginname};` inside the block rather than `format()` with a placeholder unless you know the required quoting.
+Because embedded literal values (e.g. `${comment}`, `${new_password}`) are inserted into your
+block as SQL string literals, a value that contains your chosen delimiter would end the block
+early. Choose an unusual delimiter, or use **function** mode (bind parameters) for untrusted
+values.
 
 ---
 
@@ -246,7 +255,7 @@ The Alter-role **Settings** section reads `pg_roles.rolconfig` and writes role G
 | `REVOKE 'role_name' FROM user` | Same as GRANT — use `revoke_parents` statement mode |
 | `${rolename}` without statement/block | Works as alias of login name when whitelisted |
 | `SELECT` in function template | Rejected on save |
-| `DO $dbaccounts$` inside block template | Rejected — app owns the wrapper |
+| Omitting `DO … BEGIN … END` in a block template | Block mode runs your text verbatim — write the complete anonymous block yourself |
 | Full call pasted into legacy `name` field | Migrated or reset on load |
 
 ---

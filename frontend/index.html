@@ -191,7 +191,7 @@
       <ul>
         <li><strong>Function call</strong> — Write the call only (no SELECT). Placeholders become <code>$1</code>, <code>$2</code>, … For remove_role, <code>${rolename}</code> is an alias for <code>${loginname}</code>.</li>
         <li><strong>SQL statement</strong> — Single statement, no SELECT. Role names are embedded as identifiers (not quoted). Examples: <code>DROP ROLE ${loginname}</code>; <code>GRANT ${parent_roles} TO ${loginname}</code>.</li>
-        <li><strong>PL/pgSQL block</strong> — Inner statements only; the app wraps <code>DO $dbaccounts$ BEGIN … END</code>. Semicolons allowed inside.</li>
+        <li><strong>PL/pgSQL block</strong> — Write the complete anonymous block yourself (<code>DO $do$ BEGIN … END $do$;</code>), including your own dollar-quote delimiter; the app runs it verbatim. Semicolons allowed. Pick a delimiter that can't appear in embedded values.</li>
       </ul>
 
       <h3>Placeholders</h3>

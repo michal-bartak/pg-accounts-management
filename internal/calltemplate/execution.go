@@ -33,12 +33,12 @@ func Build(call string, args map[string]string, operation, execution string) (sq
 		sql, err = buildEmbedded(call, args, operation)
 		return sql, nil, false, err
 	case model.ExecutionBlock:
-		body, err := buildEmbedded(call, args, operation)
-		if err != nil {
-			return "", nil, false, err
-		}
-		sql = "DO $dbaccounts$\nBEGIN\n" + body + "\nEND\n$dbaccounts$;"
-		return sql, nil, false, nil
+		// The template is a complete anonymous code block (e.g. DO $tag$ … $tag$;) written
+		// by the user. The app runs it verbatim after embedding placeholder values; it adds
+		// no DO/delimiter wrapper of its own. Delimiter choice and block structure are the
+		// template author's responsibility.
+		sql, err = buildEmbedded(call, args, operation)
+		return sql, nil, false, err
 	default:
 		sql, values, err = buildFunctionQuery(call, args, operation)
 		return sql, values, true, err
@@ -80,10 +80,9 @@ func validateCallTemplate(call, operation, execution string) error {
 			return fmt.Errorf("statement template must not contain semicolons")
 		}
 	case model.ExecutionBlock:
-		lower := strings.ToLower(call)
-		if strings.Contains(lower, "do $dbaccounts") || strings.HasPrefix(strings.TrimSpace(lower), "do ") {
-			return fmt.Errorf("block template must not include DO; the app wraps your statements")
-		}
+		// A block template is a complete anonymous code block supplied by the user (DO $tag$
+		// … $tag$;). The app runs it verbatim, so semicolons and the DO wrapper are allowed
+		// and expected; nothing block-specific to reject here beyond the shared checks below.
 	}
 
 	if execution != model.ExecutionFunction && operation == "create_role" {

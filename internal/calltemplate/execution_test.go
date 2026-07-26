@@ -45,6 +45,34 @@ func TestBuild_statement_setComment(t *testing.T) {
 	}
 }
 
+// A backslash in a comment must be emitted as an E'…' escape string so the literal is safe
+// even when the server has standard_conforming_strings off (otherwise a trailing backslash
+// could escape the closing quote and swallow following SQL).
+func TestBuild_statement_setComment_backslashUsesEString(t *testing.T) {
+	cases := []struct {
+		comment string
+		want    string
+	}{
+		{`domain\user`, `COMMENT ON ROLE "jdoe" IS E'domain\\user'`},
+		{`ends with backslash \`, `COMMENT ON ROLE "jdoe" IS E'ends with backslash \\'`},
+		{`quote'and\slash`, `COMMENT ON ROLE "jdoe" IS E'quote''and\\slash'`},
+	}
+	for _, tc := range cases {
+		sql, _, _, err := Build(
+			"COMMENT ON ROLE ${loginname} IS ${comment}",
+			map[string]string{"loginname": "jdoe", "comment": tc.comment},
+			"set_comment",
+			model.ExecutionStatement,
+		)
+		if err != nil {
+			t.Fatalf("comment %q: %v", tc.comment, err)
+		}
+		if sql != tc.want {
+			t.Fatalf("comment %q:\ngot:  %s\nwant: %s", tc.comment, sql, tc.want)
+		}
+	}
+}
+
 func TestBuild_statement_setComment_empty(t *testing.T) {
 	sql, _, _, err := Build(
 		"COMMENT ON ROLE ${loginname} IS ${comment}",
@@ -118,9 +146,12 @@ func TestBuild_statement_rolenameAlias(t *testing.T) {
 	}
 }
 
-func TestBuild_block_wrapsBody(t *testing.T) {
+// Block mode runs the user's complete anonymous code block verbatim, only embedding
+// placeholder values — the app adds no DO/delimiter wrapper of its own.
+func TestBuild_block_runsVerbatim(t *testing.T) {
+	call := "DO $do$ BEGIN\n  DROP ROLE ${loginname};\nEND $do$;"
 	sql, _, useQuery, err := Build(
-		"DROP ROLE ${loginname};",
+		call,
 		map[string]string{"loginname": "jdoe"},
 		"remove_role",
 		model.ExecutionBlock,
@@ -131,8 +162,10 @@ func TestBuild_block_wrapsBody(t *testing.T) {
 	if useQuery {
 		t.Fatal("expected Exec mode")
 	}
-	if !strings.HasPrefix(sql, "DO $dbaccounts$") || !strings.Contains(sql, `DROP ROLE "jdoe"`) {
-		t.Fatalf("got: %s", sql)
+	// The user's DO wrapper is preserved; only ${loginname} is substituted (as an identifier).
+	want := "DO $do$ BEGIN\n  DROP ROLE \"jdoe\";\nEND $do$;"
+	if sql != want {
+		t.Fatalf("got:  %s\nwant: %s", sql, want)
 	}
 }
 
@@ -162,10 +195,11 @@ func TestValidate_rejectsRawDollarParams(t *testing.T) {
 	}
 }
 
-func TestValidate_block_rejectsOuterDO(t *testing.T) {
-	err := ValidateCallTemplateWithExecution("DO $$ BEGIN NULL; END $$", "remove_role", model.ExecutionBlock)
-	if err == nil {
-		t.Fatal("expected error")
+// Block mode now runs a complete user-authored anonymous block, so an outer DO with its own
+// delimiter is accepted (the app no longer owns the wrapper).
+func TestValidate_block_acceptsOuterDO(t *testing.T) {
+	if err := ValidateCallTemplateWithExecution("DO $$ BEGIN NULL; END $$", "remove_role", model.ExecutionBlock); err != nil {
+		t.Fatalf("outer DO should be allowed in block mode: %v", err)
 	}
 }
 

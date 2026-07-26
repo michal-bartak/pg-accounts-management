@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/michalbartak/dbaccounts/internal/model"
@@ -68,6 +70,9 @@ func defaultCommentFields() []model.CommentField {
 }
 
 type Store struct {
+	// mu guards cfg. Wails dispatches every bound method on its own goroutine, so config
+	// reads (Get/ClusterByID/…) can race writes (Save*/Update*/Add*/Delete*) without it.
+	mu   sync.RWMutex
 	path string
 	cfg  model.Config
 }
@@ -104,6 +109,8 @@ func NewStore() (*Store, error) {
 }
 
 func (s *Store) Load() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	data, err := os.ReadFile(s.path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -136,16 +143,68 @@ func (s *Store) Load() error {
 	return nil
 }
 
+// Save marshals and atomically persists the config. Callers that already hold the write
+// lock (the Update*/Add*/Delete* methods) use the unlocked save() instead to avoid a
+// re-entrant deadlock.
 func (s *Store) Save() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.save()
+}
+
+// save persists s.cfg. The caller must hold s.mu. It writes to a temp file in the same
+// directory and renames it over the target, so a crash / full disk / interrupted write
+// never leaves a truncated or empty config.yaml (os.WriteFile truncates in place).
+func (s *Store) save() error {
 	data, err := yaml.Marshal(s.cfg)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(s.path, data, 0o600)
+	return atomicWriteFile(s.path, data, 0o600)
 }
 
+// atomicWriteFile writes data to a sibling temp file, fsyncs it, and renames it over path.
+func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName) // no-op once the rename below succeeds
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(perm); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
+}
+
+// Get returns a deep-ish copy of the config: the slice fields are cloned so a caller
+// iterating the result is never affected by a concurrent in-place write to s.cfg.
 func (s *Store) Get() model.Config {
-	return s.cfg
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return cloneConfig(s.cfg)
+}
+
+func cloneConfig(c model.Config) model.Config {
+	c.Categories = append([]model.Category(nil), c.Categories...)
+	c.Clusters = append([]model.Cluster(nil), c.Clusters...)
+	c.ParentRoles = append([]string(nil), c.ParentRoles...)
+	c.CommentFields = append([]model.CommentField(nil), c.CommentFields...)
+	c.Targets.CategoryIDs = append([]string(nil), c.Targets.CategoryIDs...)
+	c.Targets.ClusterIDs = append([]string(nil), c.Targets.ClusterIDs...)
+	return c
 }
 
 func (s *Store) ConfigPath() string {
@@ -156,30 +215,38 @@ func (s *Store) UpdateDBFunctions(fn model.DBFunctions) error {
 	if err := validateDBFunctions(fn); err != nil {
 		return err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.cfg.DBFunctions = fn
-	return s.Save()
+	return s.save()
 }
 
 func (s *Store) UpdateBatch(batch model.BatchSettings) error {
 	if batch.MaxConcurrency <= 0 {
 		batch.MaxConcurrency = 5
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.cfg.Batch = batch
-	return s.Save()
+	return s.save()
 }
 
 func (s *Store) UpdateUI(ui model.UISettings) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.cfg.UI = model.UISettings{
 		Theme:              model.NormalizeTheme(ui.Theme),
 		CommentDefaultView: model.NormalizeCommentView(ui.CommentDefaultView),
 	}
-	return s.Save()
+	return s.save()
 }
 
 // UpdateTargets persists the Operations-page target selection (cluster groups / clusters).
 func (s *Store) UpdateTargets(t model.TargetSelection) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.cfg.Targets = t
-	return s.Save()
+	return s.save()
 }
 
 func (s *Store) UpdateParentRoles(roles []string) error {
@@ -187,8 +254,10 @@ func (s *Store) UpdateParentRoles(roles []string) error {
 	if err != nil {
 		return err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.cfg.ParentRoles = cleaned
-	return s.Save()
+	return s.save()
 }
 
 func (s *Store) UpdateCommentFields(fields []model.CommentField) error {
@@ -196,8 +265,10 @@ func (s *Store) UpdateCommentFields(fields []model.CommentField) error {
 	if err != nil {
 		return err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.cfg.CommentFields = cleaned
-	return s.Save()
+	return s.save()
 }
 
 func (s *Store) AddCluster(in model.ClusterInput) (model.Cluster, error) {
@@ -214,8 +285,10 @@ func (s *Store) AddCluster(in model.ClusterInput) (model.Cluster, error) {
 		SSLMode:     defaultSSLMode(in.SSLMode),
 		ConnectUser: in.ConnectUser,
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.cfg.Clusters = append(s.cfg.Clusters, c)
-	if err := s.Save(); err != nil {
+	if err := s.save(); err != nil {
 		return model.Cluster{}, err
 	}
 	return c, nil
@@ -225,6 +298,8 @@ func (s *Store) UpdateCluster(id string, in model.ClusterInput) (model.Cluster, 
 	if err := validateClusterInput(in); err != nil {
 		return model.Cluster{}, err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for i, c := range s.cfg.Clusters {
 		if c.ID != id {
 			continue
@@ -239,7 +314,7 @@ func (s *Store) UpdateCluster(id string, in model.ClusterInput) (model.Cluster, 
 			SSLMode:     defaultSSLMode(in.SSLMode),
 			ConnectUser: in.ConnectUser,
 		}
-		if err := s.Save(); err != nil {
+		if err := s.save(); err != nil {
 			return model.Cluster{}, err
 		}
 		return s.cfg.Clusters[i], nil
@@ -248,16 +323,20 @@ func (s *Store) UpdateCluster(id string, in model.ClusterInput) (model.Cluster, 
 }
 
 func (s *Store) DeleteCluster(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for i, c := range s.cfg.Clusters {
 		if c.ID == id {
 			s.cfg.Clusters = append(s.cfg.Clusters[:i], s.cfg.Clusters[i+1:]...)
-			return s.Save()
+			return s.save()
 		}
 	}
 	return fmt.Errorf("cluster not found: %s", id)
 }
 
 func (s *Store) ClusterByID(id string) (model.Cluster, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	for _, c := range s.cfg.Clusters {
 		if c.ID == id {
 			return c, true
@@ -274,6 +353,8 @@ func (s *Store) ClustersByCategories(categoryIDs []string) []model.Cluster {
 	for _, id := range categoryIDs {
 		set[id] = struct{}{}
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	var out []model.Cluster
 	for _, c := range s.cfg.Clusters {
 		if _, ok := set[c.Category]; ok {
@@ -284,6 +365,8 @@ func (s *Store) ClustersByCategories(categoryIDs []string) []model.Cluster {
 }
 
 func (s *Store) CategoryByID(id string) (model.Category, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	for _, c := range s.cfg.Categories {
 		if c.ID == id {
 			return c, true
@@ -301,6 +384,8 @@ func (s *Store) AddCategory(in model.CategoryInput) (model.Category, error) {
 	if id == "" {
 		return model.Category{}, errors.New("label must contain a letter or digit")
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for _, c := range s.cfg.Categories {
 		if c.ID == id {
 			return model.Category{}, fmt.Errorf("a group with id %q already exists", id)
@@ -308,7 +393,7 @@ func (s *Store) AddCategory(in model.CategoryInput) (model.Category, error) {
 	}
 	c := model.Category{ID: id, Label: label, Color: normalizeColor(in.Color), Confirm: in.Confirm}
 	s.cfg.Categories = append(s.cfg.Categories, c)
-	if err := s.Save(); err != nil {
+	if err := s.save(); err != nil {
 		return model.Category{}, err
 	}
 	return c, nil
@@ -319,12 +404,14 @@ func (s *Store) UpdateCategory(id string, in model.CategoryInput) (model.Categor
 	if label == "" {
 		return model.Category{}, errors.New("label is required")
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for i, c := range s.cfg.Categories {
 		if c.ID != id {
 			continue
 		}
 		s.cfg.Categories[i] = model.Category{ID: id, Label: label, Color: normalizeColor(in.Color), Confirm: in.Confirm}
-		if err := s.Save(); err != nil {
+		if err := s.save(); err != nil {
 			return model.Category{}, err
 		}
 		return s.cfg.Categories[i], nil
@@ -333,6 +420,8 @@ func (s *Store) UpdateCategory(id string, in model.CategoryInput) (model.Categor
 }
 
 func (s *Store) DeleteCategory(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for _, cl := range s.cfg.Clusters {
 		if cl.Category == id {
 			return fmt.Errorf("group %q is in use by cluster %q", id, cl.Alias)
@@ -341,7 +430,7 @@ func (s *Store) DeleteCategory(id string) error {
 	for i, c := range s.cfg.Categories {
 		if c.ID == id {
 			s.cfg.Categories = append(s.cfg.Categories[:i], s.cfg.Categories[i+1:]...)
-			return s.Save()
+			return s.save()
 		}
 	}
 	return fmt.Errorf("group not found: %s", id)
@@ -401,9 +490,11 @@ func (s *Store) SaveClustersAndCategories(clusters []model.Cluster, categories [
 		})
 	}
 
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.cfg.Categories = cats
 	s.cfg.Clusters = out
-	return s.Save()
+	return s.save()
 }
 
 // slugify turns a label into a lowercase [a-z0-9_] id.

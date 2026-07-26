@@ -272,3 +272,38 @@ test('buildAlterClusterOps: a pending grant emits grant_parents', () => {
     alterAdd.set('gr_new', new Set(['c1']));`);
   assert.deepEqual(ops, [{ clusterId: 'c1', ops: ['grant_parents'] }]);
 });
+
+// addPrivilegeScope: "Add privilege" is additive — it must never revoke where the privilege
+// already lives. Regression for the bug where adding P1 to cluster D revoked it from A/B/C.
+test('addPrivilegeScope: adding an existing privilege to a new cluster grants D and revokes nothing', () => {
+  const r = evalJSON(`(() => {
+    alterDetails = [
+      { clusterId:'A', exists:true, parents:['P1'], attributes:{}, settings:{}, comment:'' },
+      { clusterId:'B', exists:true, parents:['P1'], attributes:{}, settings:{}, comment:'' },
+      { clusterId:'C', exists:true, parents:['P1'], attributes:{}, settings:{}, comment:'' },
+      { clusterId:'D', exists:true, parents:[],     attributes:{}, settings:{}, comment:'' },
+    ];
+    alterAdd = new Map(); alterRevoke = new Map();
+    addPrivilegeScope(['P1'], new Set(['D']));
+    return { add:[...(alterAdd.get('P1')||[])].sort(), rev:[...(alterRevoke.get('P1')||[])].sort() };
+  })()`);
+  assert.deepEqual(r.add, ['D']); // only D newly granted
+  assert.deepEqual(r.rev, []);    // A/B/C stay granted — nothing revoked
+});
+
+// Adding a cluster that had a pending revoke cancels that revoke (grant wins), still no over-revoke.
+test('addPrivilegeScope: granting a cluster clears its pending revoke and merges with prior adds', () => {
+  const r = evalJSON(`(() => {
+    alterDetails = [
+      { clusterId:'A', exists:true, parents:['P1'], attributes:{}, settings:{}, comment:'' },
+      { clusterId:'B', exists:true, parents:[],     attributes:{}, settings:{}, comment:'' },
+      { clusterId:'C', exists:true, parents:[],     attributes:{}, settings:{}, comment:'' },
+    ];
+    alterAdd = new Map([['P1', new Set(['B'])]]);
+    alterRevoke = new Map([['P1', new Set(['A'])]]);
+    addPrivilegeScope(['P1'], new Set(['A','C']));
+    return { add:[...(alterAdd.get('P1')||[])].sort(), rev:[...(alterRevoke.get('P1')||[])].sort() };
+  })()`);
+  assert.deepEqual(r.add, ['B', 'C']); // prior add B kept; C newly granted; A already present so not re-added
+  assert.deepEqual(r.rev, []);         // pending revoke of A cancelled by granting A
+});
