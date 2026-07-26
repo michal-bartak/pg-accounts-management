@@ -760,14 +760,18 @@ tr:last-child td { border-bottom: none; }
 #fn-form menu { display: flex; gap: 0.5rem; justify-content: flex-end; margin: 0.5rem 0 0; padding: 0; }
 /* Default (revert-to-vanilla) sits on the far left, away from Cancel/Done. */
 #fn-dialog-default { margin-right: auto; }
-.fn-contract { margin: 0 0 0.75rem; color: var(--muted); font-size: var(--fs-sm); }
+.fn-contract { margin: 0 0 0.75rem; color: var(--muted); font-size: var(--fs-sm); padding-right: 2.5rem; }
 
-/* Popup titlebar: title on the left, square help button top-right, top edges aligned. */
-.fn-titlebar { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; }
-.fn-titlebar h2 { margin: 0; }
+/* Popup titlebar: title on the left, square help button in the top-right corner. The button
+   is absolutely positioned so it does NOT add to the titlebar's height — otherwise it would
+   push the description down. Its top aligns with the title's top. */
+.fn-titlebar { position: relative; }
+.fn-titlebar h2 { margin: 0; padding-right: 2.5rem; }
 /* Square, standard-height icon button. */
 .icon-btn {
-  flex: none;
+  position: absolute;
+  top: 0;
+  right: 0;
   width: var(--control-h);
   height: var(--control-h);
   min-height: 0;
