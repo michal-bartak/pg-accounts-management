@@ -9,14 +9,16 @@ import (
 
 // Default introspection queries — vanilla PostgreSQL catalog reads. Result columns are
 // scanned BY NAME (see internal/pg/introspect.go), so column aliases matter and order does
-// not. $1 is the search pattern (search_roles) or the role name (role_detail/role_parents).
-// A NULL comment / rolconfig is fine — the scanner is NULL-safe, so no COALESCE is required.
+// not. The single bind is written as the named placeholder ${rolename} (converted to $1 before
+// execution) for consistency with the write templates; it carries the search pattern
+// (search_roles) or the role name (role_detail/role_parents). A NULL comment / rolconfig is
+// fine — the scanner is NULL-safe, so no COALESCE is required.
 const defaultSearchRolesQuery = `SELECT r.rolname AS rolname,
        d.description AS comment
 FROM pg_roles r
 LEFT JOIN pg_shdescription d
   ON d.objoid = r.oid AND d.classoid = 'pg_authid'::regclass
-WHERE r.rolname ILIKE $1 OR d.description ILIKE $1
+WHERE r.rolname ILIKE ${rolename} OR d.description ILIKE ${rolename}
 ORDER BY r.rolname`
 
 const defaultRoleDetailQuery = `SELECT r.rolsuper AS rolsuper,
@@ -31,13 +33,13 @@ const defaultRoleDetailQuery = `SELECT r.rolsuper AS rolsuper,
 FROM pg_roles r
 LEFT JOIN pg_shdescription d
   ON d.objoid = r.oid AND d.classoid = 'pg_authid'::regclass
-WHERE r.rolname = $1`
+WHERE r.rolname = ${rolename}`
 
 const defaultRoleParentsQuery = `SELECT g.rolname AS rolname
 FROM pg_auth_members m
 JOIN pg_roles g ON g.oid = m.roleid
 JOIN pg_roles u ON u.oid = m.member
-WHERE u.rolname = $1
+WHERE u.rolname = ${rolename}
 ORDER BY g.rolname`
 
 // migrateDBReads fills any blank read query with its built-in default, so an older config
@@ -57,9 +59,10 @@ func migrateReadOne(read, def model.DBRead) model.DBRead {
 	return read
 }
 
-// validateDBReads checks each read query is non-empty and references the $1 bind (the search
-// pattern / role name). It cannot verify the returned columns without executing the query —
-// that contract is enforced at scan time (scan-by-name errors clearly on a mismatch).
+// validateDBReads checks each read query is non-empty and references the bind — written as the
+// named placeholder ${rolename} (converted to $1 at execution) or the raw $1 for legacy configs.
+// It cannot verify the returned columns without executing the query — that contract is enforced
+// at scan time (scan-by-name errors clearly on a mismatch).
 func validateDBReads(reads model.DBReads) error {
 	checks := []struct {
 		op   string
@@ -74,8 +77,8 @@ func validateDBReads(reads model.DBReads) error {
 		if q == "" {
 			return fmt.Errorf("%s: query is required", c.op)
 		}
-		if !strings.Contains(q, "$1") {
-			return fmt.Errorf("%s: query must reference the $1 parameter", c.op)
+		if !strings.Contains(q, "${rolename}") && !strings.Contains(q, "$1") {
+			return fmt.Errorf("%s: query must reference the ${rolename} parameter", c.op)
 		}
 	}
 	return nil

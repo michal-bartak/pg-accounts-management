@@ -57,7 +57,7 @@ func DefaultConfig() model.Config {
 			},
 			SetAttribute: model.DBFunction{
 				Execution: model.ExecutionStatement,
-				Call:      "ALTER ROLE ${loginname} WITH ${attribute}",
+				Call:      "ALTER ROLE ${loginname} WITH ${attributes}",
 			},
 			SetConfig: model.DBFunction{
 				Execution: model.ExecutionStatement,

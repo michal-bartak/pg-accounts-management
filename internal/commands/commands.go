@@ -98,8 +98,9 @@ func BuildArgs(cfg model.Config, op model.OperationSpec) (model.DBFunction, map[
 			return model.DBFunction{}, nil, fmt.Errorf("set attribute parameters missing")
 		}
 		return cfg.DBFunctions.SetAttribute, map[string]string{
-			"loginname": op.SetAttribute.LoginName,
-			"attribute": op.SetAttribute.Attribute,
+			"loginname":  op.SetAttribute.LoginName,
+			"attributes": op.SetAttribute.Attribute, // ${attributes} (plural)
+			"attribute":  op.SetAttribute.Attribute, // legacy alias
 		}, nil
 	case OpSetConfig:
 		if op.SetConfig == nil {

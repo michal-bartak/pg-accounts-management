@@ -160,7 +160,6 @@
             <div class="settings-col">
               <div class="settings-group-head">
                 <span class="settings-group-label">DB command templates</span>
-                <button type="button" id="btn-template-help">Template syntax help</button>
               </div>
               <div id="db-functions-editor"></div>
             </div>
@@ -375,7 +374,16 @@
 
   <dialog id="fn-dialog">
     <form method="dialog" id="fn-form" autocapitalize="none">
-      <h2 id="fn-dialog-title">Command template</h2>
+      <div class="fn-titlebar">
+        <h2 id="fn-dialog-title">Command template</h2>
+        <button type="button" id="fn-help" class="icon-btn" title="Template syntax help" aria-label="Template syntax help">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4.5 1.5h4l3.5 3.5v8a1 1 0 0 1-1 1h-6.5a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1Z"/>
+            <path d="M8.5 1.5v3.5h3.5"/>
+            <path d="M5.75 8.5h4.5M5.75 11h4.5"/>
+          </svg>
+        </button>
+      </div>
       <p id="fn-contract" class="fn-contract"></p>
       <label id="fn-execution-row">Execution
         <select id="fn-execution">

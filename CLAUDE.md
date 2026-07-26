@@ -210,19 +210,21 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
    catalog defaults + migrate/validate in [internal/config/dbreads.go](internal/config/dbreads.go)).
    The SQL is no longer hardcoded in `pg` — `batch.Runner` reads `cfg.DBReads` and passes each
    query into `pg.SearchRoles(…, query, term)` / `pg.RoleDetail(…, detailQuery, parentsQuery, login)`
-   (import rules: `pg` still doesn't import `config`). Each read takes a single `$1` bind (search
-   pattern / role name) and its result columns are scanned **BY NAME** against a fixed contract
+   (import rules: `pg` still doesn't import `config`). Each read takes a single named bind written
+   as **`${rolename}`** (search pattern / role name); `pg.bindRoleName` rewrites `${rolename}` → `$1`
+   before the pgx `Query` so it stays a bind (a legacy raw `$1` still works). Result columns are
+   scanned **BY NAME** against a fixed contract
    via `pgx.RowToStructByNameLax` into `db`-tagged structs (`searchRoleRow`/`roleDetailRow`/
    `roleParentRow`): column **order is irrelevant**, a NULL `comment`/`rolconfig` scans cleanly
    (`*string` → `""`, nil `[]string`), an **omitted** contract column leaves its field zero-valued
    (lax), and an **extra** returned column with no matching struct field is **rejected** with a
    clear pgx error. So a deployment can point a read at a privileged wrapper function/view (e.g.
-   `SELECT rolname, comment FROM admin.search_roles($1)`) as long as it returns the contract's
-   named columns. Contracts: `search_roles` → `rolname, comment`; `role_detail` → the 7
+   `SELECT rolname, comment FROM admin.search_roles(${rolename})`) as long as it returns the
+   contract's named columns. Contracts: `search_roles` → `rolname, comment`; `role_detail` → the 7
    `rol*` bools + `comment` + `rolconfig`; `role_parents` → `rolname`. Editable in Settings →
    **Introspection queries** (same `#fn-dialog` in read mode; **Default** button reverts to the
-   vanilla built-in). `validateDBReads` only checks non-empty + references `$1` (the column
-   contract is enforced at scan time). This was the planned **Step 2**, now done.
+   vanilla built-in). `validateDBReads` only checks non-empty + references `${rolename}` (or legacy
+   `$1`); the column contract is enforced at scan time. This was the planned **Step 2**, now done.
 
 ## Bound methods (`app.go` → `window.go.main.App`)
 
@@ -256,7 +258,7 @@ All defaults are **statement** mode, vanilla PostgreSQL DDL:
 | `revoke_parents` | loginname, parent_roles | `REVOKE ${parent_roles} FROM ${loginname}` |
 | `change_password` | loginname, new_password | `ALTER ROLE ${loginname} PASSWORD ${new_password}` |
 | `set_comment` | loginname, **comment** | `COMMENT ON ROLE ${loginname} IS ${comment}` |
-| `set_attribute` | loginname, **attribute** (space-separated keyword list) | `ALTER ROLE ${loginname} WITH ${attribute}` |
+| `set_attribute` | loginname, **attributes** (space-separated keyword list; `attribute` singular kept as an alias) | `ALTER ROLE ${loginname} WITH ${attributes}` |
 | `set_config` | loginname, **config_name**, config_value | `ALTER ROLE ${loginname} SET ${config_name} = ${config_value}` |
 | `reset_config` | loginname, **config_name** | `ALTER ROLE ${loginname} RESET ${config_name}` |
 
@@ -269,8 +271,8 @@ list, each element double-quoted (`fieldIdentifierList` → `"a", "b"`);
 `config_name` → a **bare, unquoted GUC name** (`fieldConfigName`, validated by `gucNameRE` in
 `calltemplate/execution.go` — GUC names are case-insensitive, optionally namespaced, so they are
 not double-quoted; validation is the injection guard);
-`attribute` → a **space-separated keyword list** (`fieldKeywordList`) so the frontend combines
-all of a cluster's attribute changes into ONE `ALTER ROLE … WITH kw1 kw2 …`; each keyword is
+`attributes` (alias `attribute`) → a **space-separated keyword list** (`fieldKeywordList`) so the
+frontend combines all of a cluster's attribute changes into ONE `ALTER ROLE … WITH kw1 kw2 …`; each keyword is
 whitelisted (`SUPERUSER`/`NOSUPERUSER`, `CREATEROLE`/…, `LOGIN`, `REPLICATION`, `BYPASSRLS`) in
 `commands.ValidateOperation`.
 
@@ -333,12 +335,17 @@ built from the shared `listRowHtml`/`wireListEditor` helpers (drag handle + remo
 button), staged in `parentRolesDraft` / `commentFieldsDraft` (`#parent-roles-editor` /
 `#comment-fields-editor`). DB templates are a compact list of command names; clicking one opens
 the `#fn-dialog` popup (execution type, call template, clickable placeholder chips — staged in
-`dbFnDraft`). A separate **Introspection queries** section (`#db-reads-editor`, driven by the
-`DB_READS` table) lists the three read queries and opens the **same** `#fn-dialog` in **read
-mode** (`fnDialogMode`/`openReadDialog`): the execution select and placeholder chips are hidden
-(`setFnDialogWriteControls`), the contract sentence + query textarea + **Default** button remain,
-and Done stages into `dbReadsDraft` (saved via `SaveDBReads`/`readDBReadsFromEditor`, dirty-tracked
-by `savedDBReads`). The **Preferred comment view** toggle is `#comment-view-pref`
+`dbFnDraft`). The popup's titlebar (`.fn-titlebar`) has a square **help icon button** (`#fn-help`,
+`.icon-btn`, top-right, top-aligned with the title) that opens the `#template-help-dialog` syntax
+reference — the old Settings-level *Template syntax help* button was removed, so the help now lives
+in **every** template editor popup. An **Introspection queries** section (`#db-reads-editor`,
+driven by `DB_READS`) sits in a two-column grid (`.settings-two-col`) beside DB command templates;
+it lists the three read queries and opens the **same** `#fn-dialog` in **read mode**
+(`fnDialogMode`/`openReadDialog`): the execution select is hidden (`setFnDialogExecutionRow`),
+the placeholder chips show a single **`${rolename}`** chip (`renderFnPlaceholders(['rolename'])`),
+and the contract sentence + query textarea + **Default** button remain; Done stages into
+`dbReadsDraft` (saved via `SaveDBReads`/`readDBReadsFromEditor`, dirty-tracked by `savedDBReads`).
+The **Preferred comment view** toggle is `#comment-view-pref`
 (`ui.comment_default_view`). All staged; the Settings panel uses the same padded-panel + inset
 footer as Clusters, with **Discard** (`btn-discard-settings` → `discardSettings`) + **Save**
 (`btn-save-settings`, enabled-when-dirty / disabled-when-clean) buttons.

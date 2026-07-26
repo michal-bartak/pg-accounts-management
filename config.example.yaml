@@ -68,7 +68,7 @@ db_functions:
     call: "COMMENT ON ROLE ${loginname} IS ${comment}"
   set_attribute:
     execution: statement
-    call: "ALTER ROLE ${loginname} WITH ${attribute}"
+    call: "ALTER ROLE ${loginname} WITH ${attributes}"
   set_config:
     execution: statement
     call: "ALTER ROLE ${loginname} SET ${config_name} = ${config_value}"
@@ -76,12 +76,13 @@ db_functions:
     execution: statement
     call: "ALTER ROLE ${loginname} RESET ${config_name}"
 
-# db_reads: the read/introspection queries used by Alter role. Plain SQL with a single $1 bind
-# (search pattern for search_roles; role name for role_detail/role_parents). Result columns are
-# scanned BY NAME against a fixed contract (see sql/README.md → Introspection queries): column
-# order is irrelevant, NULL comment/rolconfig is fine, an omitted contract column is treated as
-# zero, and an extra unmapped column is an error. Defaults are vanilla catalog queries; override a
-# read with a privileged wrapper function/view (e.g. SELECT rolname, comment FROM admin.search($1))
+# db_reads: the read/introspection queries used by Alter role. Plain SQL with a single named bind
+# ${rolename} (converted to $1 before execution; a legacy $1 also works) — the search pattern for
+# search_roles; the role name for role_detail/role_parents. Result columns are scanned BY NAME
+# against a fixed contract (see sql/README.md → Introspection queries): column order is irrelevant,
+# NULL comment/rolconfig is fine, an omitted contract column is treated as zero, and an extra
+# unmapped column is an error. Defaults are vanilla catalog queries; override a read with a
+# privileged wrapper function/view (e.g. SELECT rolname, comment FROM admin.search(${rolename}))
 # when the connect user cannot read the catalogs directly. Omit a key to use its default.
 db_reads:
   search_roles:
@@ -92,7 +93,7 @@ db_reads:
       FROM pg_roles r
       LEFT JOIN pg_shdescription d
         ON d.objoid = r.oid AND d.classoid = 'pg_authid'::regclass
-      WHERE r.rolname ILIKE $1 OR d.description ILIKE $1
+      WHERE r.rolname ILIKE ${rolename} OR d.description ILIKE ${rolename}
       ORDER BY r.rolname
   role_detail:
     # Contract columns (one row): rolsuper, rolcreaterole, rolcreatedb, rolinherit, rolcanlogin,
@@ -110,7 +111,7 @@ db_reads:
       FROM pg_roles r
       LEFT JOIN pg_shdescription d
         ON d.objoid = r.oid AND d.classoid = 'pg_authid'::regclass
-      WHERE r.rolname = $1
+      WHERE r.rolname = ${rolename}
   role_parents:
     # Contract columns (one row per parent): rolname (text).
     query: |
@@ -118,7 +119,7 @@ db_reads:
       FROM pg_auth_members m
       JOIN pg_roles g ON g.oid = m.roleid
       JOIN pg_roles u ON u.oid = m.member
-      WHERE u.rolname = $1
+      WHERE u.rolname = ${rolename}
       ORDER BY g.rolname
 batch:
   max_concurrency: 5

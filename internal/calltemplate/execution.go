@@ -164,8 +164,9 @@ func placeholderKindForField(operation, field string) (fieldKind, error) {
 		switch field {
 		case "loginname":
 			return fieldIdentifier, nil
-		case "attribute":
+		case "attributes", "attribute":
 			// One or more keywords (SUPERUSER NOLOGIN …): embedded unquoted, whitelisted upstream.
+			// ${attribute} is the legacy alias for ${attributes}.
 			return fieldKeywordList, nil
 		}
 	case "create_role":

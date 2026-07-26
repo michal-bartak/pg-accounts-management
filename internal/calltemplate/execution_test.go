@@ -89,9 +89,10 @@ func TestBuild_statement_setComment_empty(t *testing.T) {
 }
 
 func TestBuild_statement_setAttribute(t *testing.T) {
+	// ${attribute} (singular) is kept as a backward-compat alias for ${attributes}.
 	sql, _, _, err := Build(
 		"ALTER ROLE ${loginname} WITH ${attribute}",
-		map[string]string{"loginname": "jdoe", "attribute": "NOSUPERUSER"},
+		map[string]string{"loginname": "jdoe", "attribute": "NOSUPERUSER", "attributes": "NOSUPERUSER"},
 		"set_attribute",
 		model.ExecutionStatement,
 	)
@@ -100,6 +101,21 @@ func TestBuild_statement_setAttribute(t *testing.T) {
 	}
 	// Login is double-quoted; the attribute keyword is embedded unquoted.
 	if sql != `ALTER ROLE "jdoe" WITH NOSUPERUSER` {
+		t.Fatalf("got: %s", sql)
+	}
+}
+
+func TestBuild_statement_setAttributes_plural(t *testing.T) {
+	sql, _, _, err := Build(
+		"ALTER ROLE ${loginname} WITH ${attributes}",
+		map[string]string{"loginname": "jdoe", "attributes": "NOSUPERUSER NOLOGIN", "attribute": "NOSUPERUSER NOLOGIN"},
+		"set_attribute",
+		model.ExecutionStatement,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sql != `ALTER ROLE "jdoe" WITH NOSUPERUSER NOLOGIN` {
 		t.Fatalf("got: %s", sql)
 	}
 }

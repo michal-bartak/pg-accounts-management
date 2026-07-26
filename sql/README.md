@@ -217,10 +217,10 @@ Used by the **Alter user** attributes section to toggle role flags. Default in t
 ```yaml
 set_attribute:
   execution: statement
-  call: "ALTER ROLE ${loginname} WITH ${attribute}"
+  call: "ALTER ROLE ${loginname} WITH ${attributes}"
 ```
 
-`${attribute}` is a **whitelisted keyword** embedded unquoted — one of `SUPERUSER`/`NOSUPERUSER`, `CREATEROLE`/`NOCREATEROLE`, `CREATEDB`/`NOCREATEDB`, `INHERIT`/`NOINHERIT`, `LOGIN`/`NOLOGIN`, `REPLICATION`/`NOREPLICATION`, `BYPASSRLS`/`NOBYPASSRLS`. The app sends one keyword per call (e.g. `ALTER ROLE jdoe WITH NOSUPERUSER`).
+`${attributes}` is a **space-separated list of whitelisted keywords** embedded unquoted — each one of `SUPERUSER`/`NOSUPERUSER`, `CREATEROLE`/`NOCREATEROLE`, `CREATEDB`/`NOCREATEDB`, `INHERIT`/`NOINHERIT`, `LOGIN`/`NOLOGIN`, `REPLICATION`/`NOREPLICATION`, `BYPASSRLS`/`NOBYPASSRLS`. The app combines all of a cluster's attribute changes into one call (e.g. `ALTER ROLE jdoe WITH NOSUPERUSER NOLOGIN`). (`${attribute}`, singular, is still accepted as an alias.)
 
 ---
 
@@ -239,11 +239,13 @@ is a single-quote-escaped literal (`E'…'` when it contains a backslash).
 
 The Alter-role flow (search + per-cluster detail) uses three **read** queries, configurable under
 Settings → **Introspection queries** or in config `db_reads.<name>.query`. Unlike command
-templates they have **no execution mode** and **no `${…}` placeholders**: each is plain SQL with a
-single **`$1`** bind, and its result columns are scanned **by name** against a fixed contract.
+templates they have **no execution mode**: each is plain SQL with a single named bind
+**`${rolename}`** (rewritten to `$1` before execution — it stays a bind, so it is injection-safe;
+a legacy raw `$1` also works), and its result columns are scanned **by name** against a fixed
+contract.
 
-| Read | `$1` | Must return columns (by name) |
-|------|------|-------------------------------|
+| Read | `${rolename}` | Must return columns (by name) |
+|------|---------------|-------------------------------|
 | `search_roles` | ILIKE pattern | `rolname` (text), `comment` (text, nullable) |
 | `role_detail` | role name | one row: `rolsuper`, `rolcreaterole`, `rolcreatedb`, `rolinherit`, `rolcanlogin`, `rolreplication`, `rolbypassrls` (bool), `comment` (text, nullable), `rolconfig` (text[], nullable) |
 | `role_parents` | role name | one row per parent: `rolname` (text) |
@@ -252,7 +254,7 @@ Scan-by-name rules: **column order does not matter**; a NULL `comment`/`rolconfi
 `COALESCE` needed); a contract column your query **omits** is treated as its zero value; a column
 your query returns that is **not** in the contract is an **error**. Defaults are vanilla catalog
 queries. Point a read at a **privileged wrapper function or view** (e.g.
-`SELECT rolname, comment FROM admin.search_roles($1)`) when the connect user cannot read the
+`SELECT rolname, comment FROM admin.search_roles(${rolename})`) when the connect user cannot read the
 catalogs directly, or to add audit logging — as long as it returns the contract columns. The
 editor's **Default** button reverts a read to its vanilla built-in.
 
@@ -268,7 +270,7 @@ editor's **Default** button reverts a read to its vanilla built-in.
 | `revoke_parents` | `loginname`, `parent_roles` | Same as grant_parents |
 | `change_password` | `loginname`, `new_password` | Identifier + literal (password) |
 | `set_comment` | `loginname`, `comment` | Identifier + literal (comment) |
-| `set_attribute` | `loginname`, `attribute` | Identifier + whitelisted keyword (e.g. `NOLOGIN`) |
+| `set_attribute` | `loginname`, `attributes` (alias `attribute`) | Identifier + space-separated whitelisted keywords (e.g. `NOLOGIN`) |
 | `set_config` | `loginname`, `config_name`, `config_value` | Identifier + bare GUC name (unquoted) + literal |
 | `reset_config` | `loginname`, `config_name` | Identifier + bare GUC name (unquoted) |
 

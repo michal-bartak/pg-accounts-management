@@ -45,10 +45,18 @@ type roleParentRow struct {
 	Rolname string `db:"rolname"`
 }
 
-// SearchRoles runs searchQuery ($1 = ILIKE pattern) and returns roles whose name or comment
-// matches term. searchQuery must return the search_roles contract columns (rolname, comment).
+// bindRoleName rewrites the named ${rolename} placeholder to pgx's positional $1 bind. The
+// value stays a bind (never string-interpolated), so it is injection-safe. A legacy query that
+// already uses $1 is left untouched.
+func bindRoleName(query string) string {
+	return strings.ReplaceAll(query, "${rolename}", "$1")
+}
+
+// SearchRoles runs searchQuery (${rolename} = ILIKE pattern) and returns roles whose name or
+// comment matches term. searchQuery must return the search_roles contract columns (rolname,
+// comment).
 func SearchRoles(ctx context.Context, conn *pgx.Conn, searchQuery, term string) ([]RoleRow, error) {
-	rows, err := conn.Query(ctx, searchQuery, likePattern(term))
+	rows, err := conn.Query(ctx, bindRoleName(searchQuery), likePattern(term))
 	if err != nil {
 		return nil, err
 	}
@@ -67,21 +75,22 @@ func SearchRoles(ctx context.Context, conn *pgx.Conn, searchQuery, term string) 
 	return out, nil
 }
 
-// RoleDetailQueries returns the SQL that RoleDetail executes for loginName, with the $1 bind
-// inlined as a quoted literal — for display in the load-status popup (not re-executed).
+// RoleDetailQueries returns the SQL that RoleDetail executes for loginName, with the bind
+// (${rolename}, or legacy $1) inlined as a quoted literal — for display in the load-status
+// popup (not re-executed).
 func RoleDetailQueries(detailQuery, parentsQuery, loginName string) []string {
 	lit := "'" + strings.ReplaceAll(loginName, "'", "''") + "'"
-	return []string{
-		strings.ReplaceAll(detailQuery, "$1", lit),
-		strings.ReplaceAll(parentsQuery, "$1", lit),
+	inline := func(q string) string {
+		return strings.ReplaceAll(strings.ReplaceAll(q, "${rolename}", lit), "$1", lit)
 	}
+	return []string{inline(detailQuery), inline(parentsQuery)}
 }
 
 // RoleDetail reads whether a login exists, its comment, attribute flags, role GUC settings
 // (rolconfig), and direct parent memberships. detailQuery ($1 = role name) must return one
 // role_detail-contract row; parentsQuery ($1 = role name) returns the role_parents rows.
 func RoleDetail(ctx context.Context, conn *pgx.Conn, detailQuery, parentsQuery, loginName string) (exists bool, comment string, parents []string, attrs map[string]bool, settings map[string]string, err error) {
-	rows, err := conn.Query(ctx, detailQuery, loginName)
+	rows, err := conn.Query(ctx, bindRoleName(detailQuery), loginName)
 	if err != nil {
 		return false, "", nil, nil, nil, err
 	}
@@ -107,7 +116,7 @@ func RoleDetail(ctx context.Context, conn *pgx.Conn, detailQuery, parentsQuery, 
 	}
 	settings = parseRoleConfig(d.Rolconfig)
 
-	prows, err := conn.Query(ctx, parentsQuery, loginName)
+	prows, err := conn.Query(ctx, bindRoleName(parentsQuery), loginName)
 	if err != nil {
 		return exists, comment, nil, attrs, settings, err
 	}

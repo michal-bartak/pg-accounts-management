@@ -28,8 +28,8 @@ func TestDefaultDBReads_contract(t *testing.T) {
 		if strings.TrimSpace(c.query) == "" {
 			t.Fatalf("%s: default query is empty", c.name)
 		}
-		if !strings.Contains(c.query, "$1") {
-			t.Fatalf("%s: default query missing $1", c.name)
+		if !strings.Contains(c.query, "${rolename}") {
+			t.Fatalf("%s: default query missing ${rolename}", c.name)
 		}
 		for _, col := range c.cols {
 			if !strings.Contains(c.query, col) {

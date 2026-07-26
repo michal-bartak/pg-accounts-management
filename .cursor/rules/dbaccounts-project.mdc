@@ -52,7 +52,8 @@ Example template: [`config.example.yaml`](config.example.yaml). Implemented in `
   collecting per-cluster errors instead of failing. The three read queries are **templatable**
   (`Config.DBReads`, YAML `db_reads.<search_roles|role_detail|role_parents>.query`; vanilla
   catalog defaults + migrate/validate in `internal/config/dbreads.go`). `batch.Runner` passes
-  each query into `pg` (which stays config-free); each takes one `$1` bind and its result columns
+  each query into `pg` (which stays config-free); each takes one named `${rolename}` bind (rewritten
+  to `$1` before Query; legacy `$1` still works) and its result columns
   are scanned **by name** via `pgx.RowToStructByNameLax` (order-independent; NULL comment/rolconfig
   OK; omitted contract column → zero; **extra** column → error). Contracts: search_roles →
   `rolname, comment`; role_detail → 7 `rol*` bools + `comment` + `rolconfig`; role_parents →
@@ -72,7 +73,7 @@ Config: `db_functions.<operation>.call` + optional `.execution` (`function` \| `
 | `revoke_parents` | loginname, parent_roles | Default `statement`: `REVOKE ${parent_roles} FROM ${loginname}` |
 | `change_password` | loginname, new_password | |
 | `set_comment` | loginname, comment | Default `statement`: `COMMENT ON ROLE ${loginname} IS ${comment}` — comment as escaped literal |
-| `set_attribute` | loginname, attribute | Default `statement`: `ALTER ROLE ${loginname} WITH ${attribute}` — attribute is a whitelisted keyword (SUPERUSER/NOSUPERUSER/…), embedded unquoted |
+| `set_attribute` | loginname, attributes (alias: attribute) | Default `statement`: `ALTER ROLE ${loginname} WITH ${attributes}` — space-separated whitelisted keywords (SUPERUSER/NOSUPERUSER/…), embedded unquoted |
 | `set_config` | loginname, config_name, config_value | Default `statement`: `ALTER ROLE ${loginname} SET ${config_name} = ${config_value}` — `config_name` is a bare unquoted GUC name (`fieldConfigName`, `gucNameRE`-validated), value a literal. Role GUCs read from `pg_roles.rolconfig`. |
 | `reset_config` | loginname, config_name | Default `statement`: `ALTER ROLE ${loginname} RESET ${config_name}` |
 

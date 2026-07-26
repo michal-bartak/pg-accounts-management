@@ -47,7 +47,9 @@ func AllowedPlaceholders(operation string) map[string]bool {
 	case "set_comment":
 		names = []string{"loginname", "comment"}
 	case "set_attribute":
-		names = []string{"loginname", "attribute"}
+		// ${attributes} (plural) is the current name; ${attribute} kept as an alias for
+		// backward compatibility with older configs.
+		names = []string{"loginname", "attributes", "attribute"}
 	case "set_config":
 		names = []string{"loginname", "config_name", "config_value"}
 	case "reset_config":
