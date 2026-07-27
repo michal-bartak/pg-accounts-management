@@ -1,4 +1,4 @@
-.PHONY: version sync-wails-version ensure-wails test test-frontend test-vet build build-ci package package-ci clean dist docs-install docs-dev docs-build docs-preview docs-clean
+.PHONY: version sync-wails-version ensure-wails test test-frontend test-vet build build-ci package package-ci clean dist docs-install docs-dev docs-build docs-preview docs-clean docs-lint
 
 VERSION := $(shell tr -d ' \n\r' < VERSION)
 VERSION_PKG := github.com/michalbartak/dbaccounts/internal/version
@@ -113,3 +113,10 @@ docs-preview: docs-build
 
 docs-clean:
 	rm -rf $(DOCS_DIR)/dist $(DOCS_DIR)/.astro
+
+# Lint the docs prose (Vale) and structure (markdownlint). Config: .vale.ini,
+# .markdownlint.yaml. One-time setup: `brew install vale && vale sync`.
+docs-lint:
+	@command -v vale >/dev/null 2>&1 || { echo "Vale not found — run: brew install vale && vale sync"; exit 1; }
+	vale docs/src/content/docs
+	npx --yes markdownlint-cli2 "docs/src/content/docs/**/*.md"

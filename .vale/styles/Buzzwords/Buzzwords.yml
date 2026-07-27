@@ -1,0 +1,30 @@
+extends: existence
+message: "'%s' reads as a buzzword — use plain, concrete wording."
+link: https://vale.sh
+level: warning
+ignorecase: true
+tokens:
+  - leverage
+  - seamless(ly)?
+  - robust
+  - powerful
+  - cutting[- ]edge
+  - state[- ]of[- ]the[- ]art
+  - best[- ]in[- ]class
+  - world[- ]class
+  - enterprise[- ]grade
+  - next[- ]gen(eration)?
+  - revolutionary
+  - game[- ]?changer
+  - synergy
+  - streamline[ds]?
+  - empower(s|ed)?
+  - unlock(s|ed)?
+  - effortless(ly)?
+  - frictionless
+  - turnkey
+  - holistic
+  - blazing(ly)?[- ]fast
+  - lightning[- ]fast
+  - one[- ]stop[- ]shop
+  - supercharge[ds]?

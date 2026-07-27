@@ -1,0 +1,13 @@
+# markdownlint — mechanical structure hygiene for the docs.
+# Run:  npx markdownlint-cli2 "docs/src/content/docs/**/*.md"
+default: true
+
+# Prose wraps at natural lengths; line length is Vale's concern, not this.
+MD013: false
+# Starlight frontmatter provides the page title (H1), so bodies start at H2.
+MD041: false
+# Allow inline HTML (Starlight components, <details>).
+MD033: false
+# Duplicate headings are fine when nested under different sections.
+MD024:
+  siblings_only: true

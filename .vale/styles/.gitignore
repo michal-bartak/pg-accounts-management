@@ -1,0 +1,8 @@
+# Style packages are downloaded by `vale sync` — don't commit them.
+# Keep only the custom rule (Buzzwords/) and the project vocabulary (config/).
+*
+!.gitignore
+!Buzzwords/
+!Buzzwords/**
+!config/
+!config/**
