@@ -716,28 +716,12 @@ tr:last-child td { border-bottom: none; }
   align-items: start;
 }
 
-/* Compact command list — one clickable row per operation. */
-#db-functions-editor {
-  display: grid;
-  gap: 0.35rem;
-  max-width: 32rem;
-}
-.fn-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  width: 100%;
-  min-height: var(--control-h);
-  padding: 0.4rem 0.7rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  cursor: pointer;
-  text-align: left;
-}
+/* Compact command lists (DB command templates + Introspection queries) reuse the Operations
+   page's .scope-rows/.scope-row layout so the three lists look identical. .fn-list only caps
+   the width; .fn-row only adds the whole-row-is-a-button behaviour on top of .scope-row. */
+.fn-list { max-width: 32rem; }
+.fn-row { width: 100%; cursor: pointer; text-align: left; }
 .fn-row:hover { border-color: var(--muted); }
-.fn-row-name { font-size: var(--fs-base); }
 .fn-row-exec { font-size: var(--fs-xs); color: var(--muted); }
 
 /* Template popup */
