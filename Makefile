@@ -1,4 +1,4 @@
-.PHONY: version sync-wails-version ensure-wails test test-frontend test-vet build build-ci package package-ci clean dist
+.PHONY: version sync-wails-version ensure-wails test test-frontend test-vet build build-ci package package-ci clean dist docs-install docs-dev docs-build docs-preview docs-clean
 
 VERSION := $(shell tr -d ' \n\r' < VERSION)
 VERSION_PKG := github.com/michalbartak/dbaccounts/internal/version
@@ -88,3 +88,28 @@ dist: package
 
 clean:
 	rm -rf build/bin dist/*.tar.gz dist/*.exe dist/*.zip
+
+# ---- Docs (Astro + Starlight): read them offline, or let CI publish to GitHub Pages ----
+DOCS_DIR := docs
+
+# Install docs dependencies only when they're missing (Node + npm required).
+$(DOCS_DIR)/node_modules:
+	cd $(DOCS_DIR) && npm install
+
+# Explicit one-time install target.
+docs-install: $(DOCS_DIR)/node_modules
+
+# Live-reload dev server at http://localhost:4321/pg-accounts-management
+docs-dev: $(DOCS_DIR)/node_modules
+	cd $(DOCS_DIR) && npm run dev
+
+# Static build into docs/dist/
+docs-build: $(DOCS_DIR)/node_modules
+	cd $(DOCS_DIR) && npm run build
+
+# Serve the built site locally (build first if needed)
+docs-preview: docs-build
+	cd $(DOCS_DIR) && npm run preview
+
+docs-clean:
+	rm -rf $(DOCS_DIR)/dist $(DOCS_DIR)/.astro

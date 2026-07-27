@@ -1,0 +1,40 @@
+:root {
+  --sl-color-accent: #3a73e8 !important;
+  --sl-color-accent-high: var(--sl-color-accent) !important;
+}
+
+a[href="#_top"] {
+  display: none;
+}
+
+/* Click a screenshot in the docs body to view it full-size in a lightbox. */
+.sl-markdown-content img {
+  cursor: zoom-in;
+  border-radius: 6px;
+}
+
+.img-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: rgba(0, 0, 0, 0.85);
+  cursor: zoom-out;
+}
+
+.img-lightbox.open {
+  display: flex;
+}
+
+.img-lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
