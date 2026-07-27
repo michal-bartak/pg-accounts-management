@@ -175,17 +175,56 @@ body {
 }
 
 .app-header {
-  padding: 1rem 1.25rem 0.5rem;
+  padding: 0.7rem 1.25rem;
   border-bottom: 1px solid var(--border);
 }
-
+/* Brand row: accent dot + (smaller) title + version chip + About button. */
+.brand { display: flex; align-items: center; gap: 0.5rem; }
 .app-header h1 {
   margin: 0;
-  font-size: var(--fs-title);
+  font-size: var(--fs-h2);
   font-weight: 600;
 }
+.brand-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--primary); box-shadow: 0 0 8px var(--primary);
+  flex: 0 0 auto;
+}
+.app-ver {
+  font-size: var(--fs-xs); color: var(--muted);
+  background: var(--field); border: 1px solid var(--field-border);
+  border-radius: 10px; padding: 1px 7px;
+}
+/* Round, icon-only "About" (ⓘ) button; quiet until hovered. */
+.info-btn {
+  width: 22px; height: 22px; min-height: 0; padding: 0; line-height: 1;
+  border-radius: 50%; font-size: 0.95rem;
+  background: transparent; border: 1px solid transparent; color: var(--muted);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.info-btn:not(:disabled):hover { color: var(--text); background: var(--field); border-color: transparent; }
 
-.subtitle { margin: 0.25rem 0 0; color: var(--muted); font-size: var(--fs-sm); }
+/* About dialog — appearance adapted from the audits project. The base `dialog` has
+   padding:0, so (like the other dialog bodies) this one supplies its own. */
+.about-dialog-body { position: relative; width: min(440px, calc(100vw - 3rem)); padding: 1.35rem 1.5rem; }
+.about-x {
+  position: absolute; top: 0.7rem; right: 0.7rem;
+  width: 26px; height: 26px; min-height: 0; padding: 0; line-height: 1;
+  border-radius: 6px; background: transparent; border: 1px solid transparent; color: var(--muted);
+}
+.about-x:not(:disabled):hover { background: var(--field); color: var(--text); }
+.about-head { display: flex; align-items: center; gap: 0.5rem; font-size: 1.15rem; }
+.about-desc { margin: 0.9rem 0 0; font-size: var(--fs-base); line-height: 1.55; color: var(--text); }
+.about-links { display: flex; gap: 0.6rem; margin: 1.1rem 0 0.25rem; }
+.about-links .about-link { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; }
+.about-links .about-link svg { flex: 0 0 auto; }
+.about-section { margin-top: 1rem; }
+.about-section .about-lbl {
+  font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
+}
+.about-section p { margin: 0.25rem 0 0; font-size: var(--fs-sm); line-height: 1.5; }
+.about-ai { font-size: var(--fs-sm); color: var(--muted); }
+.about-link-inline { color: var(--primary); }
 
 .tabs {
   display: flex;
@@ -1012,8 +1051,9 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 /* Keep the value labels next to the "Present on" text (not pushed to the right edge like
    the scope rows, which is where .alter-cluster-badges' margin-left:auto is meant for). */
 .alter-present .alter-cluster-badges { margin-left: 0; }
-/* The presence ✎ edit button sits at the far right of the "Present on" row. */
-.alter-present #btn-present-edit { margin-left: auto; }
+/* The presence ✎ edit button sits immediately after the "Present on" title, before the
+   cluster labels. */
+.alter-present #btn-present-edit { margin-right: 0.2rem; }
 .alter-meta-label,
 .alter-privs-label {
   font-size: var(--fs-xs);

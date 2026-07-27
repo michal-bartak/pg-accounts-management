@@ -125,9 +125,20 @@ persisted `Config.Targets`, re-render keeps it, persisted via `SaveTargetSelecti
 survives Settings-save and restarts. **Cluster groups** are edited from
 the Clusters toolbar (right-aligned `btn-manage-groups` → `#groups-dialog` list →
 `#group-dialog` form; no Save button, so not in Settings). Feature descriptions live
-behind a **`?` help badge** (`.q-hint`, via
-`hintBadge(text)`); hover/focus shows a shared `position:fixed`, viewport-clamped popover
-(`.q-hint-pop`) driven by one delegated handler so JS-rendered badges work too.
+behind a **`?` help badge** (`.q-hint`, via `hintBadge(text)`); mouse hover shows a shared
+`position:fixed`, viewport-clamped popover (`.q-hint-pop`) driven by delegated
+`mouseover`/`keydown` handlers (no forced `tabindex`; opens on Enter/Space when
+keyboard-focused, not on plain focus).
+
+**Shared UI conventions (solve once, don't re-patch per popup):** open every `<dialog>` via
+the `openModal(dlgOrId)` helper (never bare `.showModal()`) — it drops `showModal()`'s
+auto-focus ring on the first Close/OK button unless the dialog has an `[autofocus]` element.
+Focus indicators are keyboard-only (`:focus-visible`) and **inset** (border + `inset`
+box-shadow; light ring on primary-filled controls) so scroll/`overflow:hidden` containers
+can't clip them — one `styles.css` rule for text fields/buttons/checkboxes. Base `dialog` is
+`padding:0`; each `*-dialog-body` sets its own padding. Header `.brand` row (dot + smaller
+title + version chip + `ⓘ #btn-about`) opens `#about-dialog` (`GetAppVersion`;
+`runtime.BrowserOpenURL` links).
 
 **Alter role** (search-then-edit): clicking the **Alter role** op-tab opens a search
 dialog (no separate "Find user" button) that searches the *selected*

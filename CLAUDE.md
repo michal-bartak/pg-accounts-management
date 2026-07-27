@@ -352,12 +352,31 @@ footer as Clusters, with **Discard** (`btn-discard-settings` → `discardSetting
 
 Feature descriptions are not shown inline — they live behind a **`?` help badge**
 (`.q-hint`; markup via `hintBadge(text)` in JS, or hand-written next to a static heading).
-Hovering/focusing the badge reveals the text in a single shared, `position:fixed`
-popover (`.q-hint-pop`) that is positioned in JS (centred, viewport-clamped, flips above
-when it would overflow) so `overflow:hidden` panels never clip it. One delegated
-mouseover/focusin handler drives it, so JS-rendered badges (e.g. the Alter-role sections)
-work without per-element wiring. Used on Privileges/Attributes/Settings (Alter role),
-and the Cluster-groups / Find-role / Comments dialogs.
+Mouse **hover** reveals the text in a single shared, `position:fixed` popover
+(`.q-hint-pop`) that is positioned in JS (centred, viewport-clamped, flips above when it
+would overflow) so `overflow:hidden` panels never clip it. The badges carry **no forced
+`tabindex`** (they follow the OS keyboard-navigation setting like every other control); when
+keyboard-focusable they open on an explicit **Enter/Space** press (toggle) and close on
+blur/Escape — **not** on plain focus (which used to flash the hint while tabbing past).
+Delegated `mouseover` + `keydown` handlers drive it, so JS-rendered badges (e.g. the
+Alter-role sections) work without per-element wiring. Used on Privileges/Attributes/Settings
+(Alter role), and the Cluster-groups / Find-role / Comments dialogs.
+
+**Shared UI conventions (solve once, apply everywhere — don't re-patch per popup).**
+Open every `<dialog>` via the **`openModal(dlgOrId)`** helper in
+[frontend/app.js](frontend/app.js), never a bare `.showModal()`: it drops `showModal()`'s
+auto-focus (which otherwise leaves a keyboard focus ring on the first Close/OK button, or
+pops a `?` hint) **unless** the dialog declares intentional initial focus via an `[autofocus]`
+element (e.g. the Find-role search input, the Add-group button). Focus indicators are
+**keyboard-only** (`:focus-visible`) and **inset** (border-colour + `inset` box-shadow; a
+light ring on primary-filled controls where a primary ring would vanish) so scroll containers
+/ `overflow:hidden` never clip them — one rule in `styles.css` covers text fields, buttons and
+checkboxes, and new controls inherit it rather than adding their own. The base `dialog` is
+`padding:0`, so each `*-dialog-body` supplies its own padding (`1.25rem`-ish). Non-text
+controls carry no forced `tabindex`, so Tab order follows the OS keyboard-navigation setting.
+The header is a `.brand` row (accent dot + smaller title + version chip + round `ⓘ`
+`#btn-about`) opening `#about-dialog` (version from `GetAppVersion`; links open via
+`runtime.BrowserOpenURL`).
 
 **Role form flow** (all in [frontend/app.js](frontend/app.js), styles in
 [frontend/styles.css](frontend/styles.css)) — shared by Create and Alter:
