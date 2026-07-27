@@ -83,6 +83,30 @@ textarea {
   background: var(--field);
   color: var(--text);
 }
+/* Keep the focus indicator INSIDE the control's box (border colour + inset ring) instead of
+   a native outer outline. Scroll containers such as .ops-body (and the overflow:hidden
+   .segmented) are edge-to-edge and clip overflow, so an outer ring on a flush-edge control
+   would be sliced off; an inset ring never extends past the control and can't be clipped.
+   One appearance for every control — text fields, buttons, checkboxes. (.q-hint badges keep
+   their own hover-style focus.) */
+input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:not(.q-hint):focus-visible,
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+/* Controls whose own fill is already --primary (primary buttons, the active segmented tab, a
+   checked checkbox): a primary ring would vanish into the fill, so use a light ring instead. */
+button.primary:focus-visible,
+.segmented .seg-btn.active:focus-visible,
+input[type="checkbox"]:checked:focus-visible {
+  border-color: #fff;
+  box-shadow: inset 0 0 0 1px #fff;
+}
 
 /* Radios: one size everywhere, themed accent. */
 input[type="radio"] {
@@ -299,9 +323,10 @@ tr:last-child td { border-bottom: none; }
   display: inline-flex; align-items: center; justify-content: center;
   vertical-align: middle; position: relative; top: -1px;
 }
-/* Focus looks identical to hover — no jarring OS "selected" ring on the badge. */
+/* Hover and keyboard focus look identical — no jarring OS "selected" ring. Gated on
+   :focus-visible (not plain :focus) so a mouse click doesn't leave the badge stuck
+   highlighted; the indicator only shows for keyboard (Tab) navigation. */
 .q-hint:hover,
-.q-hint:focus,
 .q-hint:focus-visible { color: #fff; background: var(--primary-hover); border-color: var(--primary-hover); outline: none; }
 .q-hint-pop {
   position: fixed; max-width: 280px;
@@ -316,7 +341,6 @@ tr:last-child td { border-bottom: none; }
    shared hover/focus hint popover — no circular badge chrome. */
 .q-hint.q-warn,
 .q-hint.q-warn:hover,
-.q-hint.q-warn:focus,
 .q-hint.q-warn:focus-visible {
   width: 16px; height: 16px; border-radius: 0; border: none;
   background: transparent; color: var(--warn, #e8a838); font-size: 1.15rem;
