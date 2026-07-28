@@ -134,21 +134,21 @@
             </div>
           </div>
           <div class="settings-row settings-row-gap">
-            <div class="settings-field">
-              <span class="settings-field-label">Adding targets in Alter role <button type="button" class="q-hint" aria-label="When you add a target cluster in Alter role and the role does not exist there: on = stage creating it on that cluster; off = only bring it into scope (you can still add it via Present on)." data-hint="When you add a target cluster in Alter role and the role does not exist there: on = stage creating it on that cluster; off = only bring it into scope (you can still add it via Present on).">?</button></span>
+            <div class="settings-check-line">
               <label class="settings-check">
                 <input type="checkbox" id="ui-stage-create" />
                 <span>Stage role creation when an added target doesn't yet have the role</span>
               </label>
+              <button type="button" class="q-hint" aria-label="In Alter role, when you add a target where the role doesn't exist yet: on stages its creation on that cluster (a CREATE on Save); off just brings the cluster into view — you can still create it there from Present on." data-hint="In Alter role, when you add a target where the role doesn't exist yet: on stages its creation on that cluster (a CREATE on Save); off just brings the cluster into view — you can still create it there from Present on.">?</button>
             </div>
           </div>
           <div class="settings-row settings-row-gap">
-            <div class="settings-field">
-              <span class="settings-field-label">Updates <button type="button" class="q-hint" aria-label="On startup, check the project's GitHub Releases and show a popup if a newer version is available. Manual check is always available in About." data-hint="On startup, check the project's GitHub Releases and show a popup if a newer version is available. Manual check is always available in About.">?</button></span>
+            <div class="settings-check-line">
               <label class="settings-check">
                 <input type="checkbox" id="ui-check-updates" />
-                <span>Automatically check for updates on startup</span>
+                <span>Check for updates on startup</span>
               </label>
+              <button type="button" class="q-hint" aria-label="On startup, check the project's GitHub Releases and show a popup if a newer version is available. A manual check is always available in the About dialog." data-hint="On startup, check the project's GitHub Releases and show a popup if a newer version is available. A manual check is always available in the About dialog.">?</button>
             </div>
           </div>
         </div>

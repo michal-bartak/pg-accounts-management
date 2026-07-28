@@ -780,7 +780,11 @@ tr:last-child td { border-bottom: none; }
 .settings-group-head .settings-group-label { margin-bottom: 0; }
 .settings-num { width: 6rem; }
 /* Inline checkbox + label (overrides the column layout of .settings-row label). */
-.settings-field .settings-check { flex-direction: row; align-items: center; gap: 0.45rem; font-size: var(--fs-base); cursor: pointer; }
+.settings-field .settings-check,
+.settings-check-line .settings-check { flex-direction: row; align-items: center; gap: 0.45rem; font-size: var(--fs-base); cursor: pointer; }
+/* Checkbox + its "?" hint on one line (the hint sits OUTSIDE the label so clicking it
+   doesn't toggle the box). */
+.settings-check-line { display: flex; align-items: center; gap: 0.4rem; }
 /* Extra breathing room above a row that follows another within the same settings group. */
 .settings-row-gap { margin-top: 0.9rem; }
 
