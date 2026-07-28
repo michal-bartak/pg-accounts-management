@@ -328,6 +328,8 @@ type AppVersion struct {
 	Version   string `json:"version"`
 	Commit    string `json:"commit"`
 	BuildDate string `json:"buildDate"`
+	RepoURL   string `json:"repoURL"`
+	DocsURL   string `json:"docsURL"`
 }
 
 // RoleSearchRequest searches roles by a substring matched against role name and

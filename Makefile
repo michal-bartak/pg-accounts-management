@@ -4,6 +4,9 @@ VERSION := $(shell tr -d ' \n\r' < VERSION)
 VERSION_PKG := github.com/michalbartak/dbaccounts/internal/version
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+# Repo URL from the git remote (any form); version.normalizeRepo canonicalizes it, and the
+# GitHub Pages docs URL is derived from it. Empty (no remote) → the built-in default is kept.
+GIT_REMOTE := $(shell git config --get remote.origin.url 2>/dev/null)
 GOOS := $(shell go env GOOS)
 GOARCH := $(shell go env GOARCH)
 GOPATH_DIR := $(subst \,/,$(shell go env GOPATH))
@@ -24,6 +27,9 @@ LDFLAGS := -s -w \
 	-X $(VERSION_PKG).Version=$(VERSION) \
 	-X $(VERSION_PKG).Commit=$(GIT_COMMIT) \
 	-X $(VERSION_PKG).BuildDate=$(BUILD_DATE)
+ifneq ($(strip $(GIT_REMOTE)),)
+LDFLAGS += -X $(VERSION_PKG).Repo=$(GIT_REMOTE)
+endif
 
 define package_dist
 	@mkdir -p dist

@@ -4,6 +4,8 @@ export namespace model {
 	    version: string;
 	    commit: string;
 	    buildDate: string;
+	    repoURL: string;
+	    docsURL: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppVersion(source);
@@ -14,6 +16,8 @@ export namespace model {
 	        this.version = source["version"];
 	        this.commit = source["commit"];
 	        this.buildDate = source["buildDate"];
+	        this.repoURL = source["repoURL"];
+	        this.docsURL = source["docsURL"];
 	    }
 	}
 	export class AuthContext {

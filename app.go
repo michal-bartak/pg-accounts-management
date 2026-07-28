@@ -50,6 +50,8 @@ func (a *App) GetAppVersion() model.AppVersion {
 		Version:   i.Version,
 		Commit:    i.Commit,
 		BuildDate: i.BuildDate,
+		RepoURL:   i.RepoURL,
+		DocsURL:   i.DocsURL,
 	}
 }
 
