@@ -10,6 +10,10 @@ export function AddCluster(arg1) {
   return window['go']['main']['App']['AddCluster'](arg1);
 }
 
+export function CheckForUpdate() {
+  return window['go']['main']['App']['CheckForUpdate']();
+}
+
 export function DeleteCategory(arg1) {
   return window['go']['main']['App']['DeleteCategory'](arg1);
 }
@@ -92,6 +96,10 @@ export function SaveWindowSize(arg1, arg2) {
 
 export function SearchRoles(arg1) {
   return window['go']['main']['App']['SearchRoles'](arg1);
+}
+
+export function SetUpdateSeenVersion(arg1) {
+  return window['go']['main']['App']['SetUpdateSeenVersion'](arg1);
 }
 
 export function TestConnection(arg1) {

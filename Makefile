@@ -23,8 +23,9 @@ WAILS_BUILD_FLAGS := -tags webkit2_41
 endif
 endif
 
+# Version comes from the embedded VERSION file (main.go //go:embed), not ldflags — so it's
+# correct for go run / wails dev too. ldflags supply only the build metadata.
 LDFLAGS := -s -w \
-	-X $(VERSION_PKG).Version=$(VERSION) \
 	-X $(VERSION_PKG).Commit=$(GIT_COMMIT) \
 	-X $(VERSION_PKG).BuildDate=$(BUILD_DATE)
 ifneq ($(strip $(GIT_REMOTE)),)

@@ -229,6 +229,11 @@ body {
 .about-section p { margin: 0.25rem 0 0; font-size: var(--fs-sm); line-height: 1.5; }
 .about-ai { font-size: var(--fs-sm); color: var(--muted); }
 .about-link-inline { color: var(--primary); }
+/* Update status line + "Check for updates" button in the About dialog. */
+.about-update { margin: 0.25rem 0 0.5rem; font-size: var(--fs-sm); line-height: 1.5; color: var(--muted); }
+.about-update:empty { display: none; }
+.about-update .about-link-inline { color: var(--primary); }
+.about-check { min-height: 0; padding: 0.3rem 0.7rem; font-size: var(--fs-sm); }
 
 .tabs {
   display: flex;
@@ -775,7 +780,11 @@ tr:last-child td { border-bottom: none; }
 .settings-group-head .settings-group-label { margin-bottom: 0; }
 .settings-num { width: 6rem; }
 /* Inline checkbox + label (overrides the column layout of .settings-row label). */
-.settings-field .settings-check { flex-direction: row; align-items: center; gap: 0.45rem; font-size: var(--fs-base); cursor: pointer; }
+.settings-field .settings-check,
+.settings-check-line .settings-check { flex-direction: row; align-items: center; gap: 0.45rem; font-size: var(--fs-base); cursor: pointer; }
+/* Checkbox + its "?" hint on one line (the hint sits OUTSIDE the label so clicking it
+   doesn't toggle the box). */
+.settings-check-line { display: flex; align-items: center; gap: 0.4rem; }
 /* Extra breathing room above a row that follows another within the same settings group. */
 .settings-row-gap { margin-top: 0.9rem; }
 
@@ -1037,7 +1046,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .scope-act:disabled { opacity: 0.25; cursor: default; pointer-events: none; }
 .scope-act:disabled:hover { border-color: var(--border); }
 /* "off" indicator for an attribute that's enabled nowhere — de-emphasised (~50% less visible). */
-.scope-off { opacity: 0.5; }
+.scope-off { opacity: 0.3; }
 
 .alter-add-priv { display: flex; gap: 0.4rem; margin-top: 0.7rem; }
 
@@ -1156,7 +1165,8 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .comments-dialog-body h2 { margin: 0 0 0.75rem; }
 .search-dialog-body .alter-results { margin-top: 0.75rem; max-height: 50vh; overflow-y: auto; }
 .search-dialog-body menu,
-.comments-dialog-body menu {
+.comments-dialog-body menu,
+.about-dialog-body menu {
   margin: 1rem 0 0;
   padding: 0;
   display: flex;

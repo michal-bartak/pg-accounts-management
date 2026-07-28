@@ -234,7 +234,10 @@ Config/clusters/groups: `GetConfig`, `GetConfigPath`, `ReloadConfig`, `AddCluste
 `SaveParentRoles`, `SaveCommentFields`, `SaveTargetSelection`, `SaveClusters`
 (staged Clusters editor — replaces the whole clusters+categories set at once via
 `Store.SaveClustersAndCategories`; the per-item `Add/Update/Delete Cluster/Category` are kept
-but no longer used by the UI), `GetAppVersion`.
+but no longer used by the UI), `GetAppVersion`, `CheckForUpdate` (GitHub-Releases version check →
+`internal/update`; opt-in auto-check on startup gated by `ui.check_for_updates`, default ON via
+`UISettings.AutoCheck()`), `SetUpdateSeenVersion` (suppresses the startup popup for an
+already-dismissed version; the About dialog still shows it).
 Run/test: `TestConnection` (by saved cluster id), `TestConnectionInput` (ad-hoc
 `ClusterInput`+`Auth`, used by the cluster editor to test on-screen values),
 `PreviewTargets`, `RunRoleBatch(RoleBatchRequest)` (per-cluster transactional batch; the UI's
@@ -443,6 +446,8 @@ internal/pg/              DSN, auth, Connect, CallFunction, introspect.go (reads
 internal/batch/           Concurrent executor + all-cluster scan
 internal/commands/        Op validation + arg maps + attribute keyword whitelist
 internal/envimport/       PG* env import
+internal/update/          GitHub-Releases version check (stdlib http + semver compare)
+internal/version/         App version + git-remote-derived RepoURL/DocsURL (ldflags)
 frontend/                 Vanilla JS UI (app.js via backend())
 sql/README.md             Docs for the user's PostgreSQL functions / templates
 ```
@@ -457,6 +462,7 @@ sql/README.md             Docs for the user's PostgreSQL functions / templates
 | `internal/pg` | `model`, `calltemplate`, pgx | `config` |
 | `internal/commands` | `model`, `config` | — |
 | `internal/batch` | `model`, `config`, `commands`, `pg` | — |
+| `internal/update` | `model`, `version`, stdlib | `config`, `pg`, `commands`, `batch` |
 
 `internal/pg` **tests must not import `internal/config`** (config → calltemplate ← pg
 test → config cycle). Test SQL via `calltemplate` alone or with `commands`.
@@ -489,9 +495,12 @@ make package         # build/bin/DbAccounts.app + dist/*.tar.gz
 
 ## Versioning
 
-[VERSION](VERSION) is app semver (git tag `v$(cat VERSION)`). `internal/version`
-defaults must match; `make sync-wails-version` aligns `wails.json` `productVersion`;
-`GetAppVersion()` surfaces it. Config YAML `version:` is the **schema** version only.
+[VERSION](VERSION) is app semver (git tag `v$(cat VERSION)`) and the **single source** of the
+runtime version: `main.go` embeds it (`//go:embed VERSION`) and sets `version.Version` at startup,
+so `go run` / `wails dev` / `make` all reflect it without ldflags (the `internal/version.Version`
+literal is only an empty-embed fallback). `-ldflags` inject only `Commit`/`BuildDate`/`Repo`.
+`make sync-wails-version` aligns `wails.json` `productVersion` (packaging metadata);
+`GetAppVersion()` surfaces the version. Config YAML `version:` is the **schema** version only.
 
 ## Out of scope (v1)
 

@@ -10,6 +10,7 @@ import (
 	"github.com/michalbartak/dbaccounts/internal/envimport"
 	"github.com/michalbartak/dbaccounts/internal/model"
 	"github.com/michalbartak/dbaccounts/internal/pg"
+	"github.com/michalbartak/dbaccounts/internal/update"
 	"github.com/michalbartak/dbaccounts/internal/version"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -53,6 +54,20 @@ func (a *App) GetAppVersion() model.AppVersion {
 		RepoURL:   i.RepoURL,
 		DocsURL:   i.DocsURL,
 	}
+}
+
+// CheckForUpdate looks up the project's latest published GitHub Release and compares it against
+// the running version. Best-effort: a repo with no releases reports "up to date"; network errors
+// surface to the caller (the UI reports them without blocking).
+func (a *App) CheckForUpdate() (model.UpdateInfo, error) {
+	v := version.Get()
+	return update.Check(a.ctx, v.Version, v.RepoURL)
+}
+
+// SetUpdateSeenVersion records the release version the startup popup last showed, so it isn't
+// shown again for a version the user already dismissed.
+func (a *App) SetUpdateSeenVersion(v string) error {
+	return a.store.SetUpdateSeenVersion(v)
 }
 
 func (a *App) ReloadConfig() (model.Config, error) {

@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"log"
+	"strings"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -15,6 +16,13 @@ import (
 //go:embed all:frontend
 var assets embed.FS
 
+// versionFile is the repo-root VERSION, baked into the binary. It is the single source of the
+// app version for every build (go run / wails dev / make), so a VERSION change is reflected
+// without ldflags. Build metadata (commit, date) still comes from -ldflags.
+//
+//go:embed VERSION
+var versionFile string
+
 // Window sizing: defaults and floor. The persisted size is the OS window size (via Wails
 // WindowGetSize), so save/restore round-trips without shrinking each launch.
 const (
@@ -25,6 +33,11 @@ const (
 )
 
 func main() {
+	// The embedded VERSION file is the source of truth for the app version.
+	if v := strings.TrimSpace(versionFile); v != "" {
+		version.Version = v
+	}
+
 	app, err := NewApp()
 	if err != nil {
 		log.Fatal(err)
