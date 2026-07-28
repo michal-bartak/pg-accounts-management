@@ -390,3 +390,13 @@ test('clusterHasStagedEdits: true for any staged map / pending-create row, false
   })()`);
   assert.deepEqual(r, { grant:true, attr:true, cfg:true, drop:true, cmt:true, create:true, clean:false });
 });
+
+// ---------------------------------------------------------------------------------------------
+test('openSearchDialog clears cached results (no stale matches from a prior scope)', () => {
+  const r = evalJSON(`(() => {
+    alterGroups = [{ login:'stale', details:[] }];
+    openSearchDialog();          // must not throw; must drop cached results
+    return { cleared: alterGroups.length };
+  })()`);
+  assert.equal(r.cleared, 0);
+});
