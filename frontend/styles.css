@@ -10,6 +10,8 @@
   --field-border: #464c5d;
   --text: #e8eaef;
   --muted: #9aa3b5;
+  /* Help "?" / About "i" badges: --muted, softened (lighter on dark). */
+  --hint-color: color-mix(in srgb, var(--muted) 60%, transparent);
   --primary: #4f8cff;
   --primary-hover: #6ba0ff;
   --danger: #f07178;
@@ -41,6 +43,7 @@
   --field-border: #cbd2de;
   --text: #1a1d24;
   --muted: #5c6578;
+  --hint-color: color-mix(in srgb, var(--muted) 50%, transparent);
   --primary: #3a73e8;
   --primary-hover: #2f62cc;
   --danger: #c53030;
@@ -195,14 +198,15 @@ body {
   background: var(--field); border: 1px solid var(--field-border);
   border-radius: 10px; padding: 1px 7px;
 }
-/* Round, icon-only "About" (ⓘ) button; quiet until hovered. */
+/* Round, icon-only "About" button — matches the "?" hint badges (size, colour, 1px ring). */
 .info-btn {
-  width: 22px; height: 22px; min-height: 0; padding: 0; line-height: 1;
-  border-radius: 50%; font-size: 0.95rem;
-  background: transparent; border: 1px solid transparent; color: var(--muted);
+  width: 16px; height: 16px; min-height: 0; padding: 0; line-height: 1;
+  border-radius: 50%; font-size: 0.72rem; cursor: pointer;
+  background: transparent; border: 1px solid var(--hint-color); color: var(--hint-color);
   display: inline-flex; align-items: center; justify-content: center;
 }
-.info-btn:not(:disabled):hover { color: var(--text); background: var(--field); border-color: transparent; }
+.info-btn:not(:disabled):hover,
+.info-btn:focus-visible { color: var(--hint-color); background: transparent; border-color: var(--hint-color); outline: none; }
 
 /* About dialog — appearance adapted from the audits project. The base `dialog` has
    padding:0, so (like the other dialog bodies) this one supplies its own. */
@@ -358,15 +362,16 @@ tr:last-child td { border-bottom: none; }
 .q-hint {
   width: 16px; height: 16px; min-height: 0; padding: 0; line-height: 1;
   flex: 0 0 auto; border-radius: 50%; font-size: 0.72rem; cursor: help;
-  color: #fff; background: var(--primary); border: 1px solid var(--primary);
+  color: var(--hint-color); background: transparent; border: 1px solid var(--hint-color);
   display: inline-flex; align-items: center; justify-content: center;
   vertical-align: middle; position: relative; top: -1px;
 }
-/* Hover and keyboard focus look identical — no jarring OS "selected" ring. Gated on
-   :focus-visible (not plain :focus) so a mouse click doesn't leave the badge stuck
-   highlighted; the indicator only shows for keyboard (Tab) navigation. */
-.q-hint:hover,
-.q-hint:focus-visible { color: #fff; background: var(--primary-hover); border-color: var(--primary-hover); outline: none; }
+/* Deliberately understated and the SAME in every state: a muted glyph in a matching 1px ring
+   on a transparent fill. --hint-color is --muted softened (per theme, via color-mix).
+   Hover/focus don't change it (they only pin the values over the base button:hover and drop
+   the OS focus ring). The tooltip on hover/focus is the affordance. */
+.q-hint:hover:not(:disabled),
+.q-hint:focus-visible { color: var(--hint-color); background: transparent; border-color: var(--hint-color); outline: none; }
 .q-hint-pop {
   position: fixed; max-width: 280px;
   background: var(--surface); color: var(--text);
