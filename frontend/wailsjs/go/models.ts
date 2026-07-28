@@ -4,6 +4,8 @@ export namespace model {
 	    version: string;
 	    commit: string;
 	    buildDate: string;
+	    repoURL: string;
+	    docsURL: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppVersion(source);
@@ -14,6 +16,8 @@ export namespace model {
 	        this.version = source["version"];
 	        this.commit = source["commit"];
 	        this.buildDate = source["buildDate"];
+	        this.repoURL = source["repoURL"];
+	        this.docsURL = source["docsURL"];
 	    }
 	}
 	export class AuthContext {
@@ -461,6 +465,7 @@ export namespace model {
 	export class UISettings {
 	    theme: string;
 	    commentDefaultView: string;
+	    stageCreateOnTargetAdd: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new UISettings(source);
@@ -470,6 +475,7 @@ export namespace model {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.theme = source["theme"];
 	        this.commentDefaultView = source["commentDefaultView"];
+	        this.stageCreateOnTargetAdd = source["stageCreateOnTargetAdd"];
 	    }
 	}
 	export class DBRead {
@@ -593,6 +599,8 @@ export namespace model {
 	    parentRoles: string[];
 	    commentFields: CommentField[];
 	    targets: TargetSelection;
+	    windowWidth?: number;
+	    windowHeight?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -610,6 +618,8 @@ export namespace model {
 	        this.parentRoles = source["parentRoles"];
 	        this.commentFields = this.convertValues(source["commentFields"], CommentField);
 	        this.targets = this.convertValues(source["targets"], TargetSelection);
+	        this.windowWidth = source["windowWidth"];
+	        this.windowHeight = source["windowHeight"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

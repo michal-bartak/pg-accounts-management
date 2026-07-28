@@ -50,6 +50,8 @@ func (a *App) GetAppVersion() model.AppVersion {
 		Version:   i.Version,
 		Commit:    i.Commit,
 		BuildDate: i.BuildDate,
+		RepoURL:   i.RepoURL,
+		DocsURL:   i.DocsURL,
 	}
 }
 
@@ -88,6 +90,13 @@ func (a *App) SaveCommentFields(fields []model.CommentField) error {
 // re-renders (e.g. after saving Settings) and app restarts.
 func (a *App) SaveTargetSelection(t model.TargetSelection) error {
 	return a.store.UpdateTargets(t)
+}
+
+// SaveWindowSize persists the current OS window size so it can be restored on next launch.
+// The frontend passes Wails' WindowGetSize (the OS window size, NOT the webview viewport) —
+// otherwise the window would shrink by the chrome height on every launch.
+func (a *App) SaveWindowSize(width, height int) error {
+	return a.store.UpdateWindowSize(width, height)
 }
 
 func (a *App) AddCluster(in model.ClusterInput) (model.Cluster, error) {

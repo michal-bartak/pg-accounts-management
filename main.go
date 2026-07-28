@@ -15,18 +15,37 @@ import (
 //go:embed all:frontend
 var assets embed.FS
 
+// Window sizing: defaults and floor. The persisted size is the OS window size (via Wails
+// WindowGetSize), so save/restore round-trips without shrinking each launch.
+const (
+	defaultWinW = 1100
+	defaultWinH = 780
+	minWinW     = 900
+	minWinH     = 600
+)
+
 func main() {
 	app, err := NewApp()
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// Restore the last window size (floored at the minimum); fall back to the default.
+	width, height := defaultWinW, defaultWinH
+	cfg := app.store.Get()
+	if cfg.WindowWidth >= minWinW {
+		width = cfg.WindowWidth
+	}
+	if cfg.WindowHeight >= minWinH {
+		height = cfg.WindowHeight
+	}
+
 	err = wails.Run(&options.App{
-		Title:  "DbAccounts " + version.Get().Version,
-		Width:  1100,
-		Height: 780,
-		MinWidth:  900,
-		MinHeight: 600,
+		Title:     "DbAccounts " + version.Get().Version,
+		Width:     width,
+		Height:    height,
+		MinWidth:  minWinW,
+		MinHeight: minWinH,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

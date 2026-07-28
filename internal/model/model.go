@@ -109,6 +109,11 @@ type UISettings struct {
 	// (create role / a role with no comment): fields | raw. Content-bearing comments always
 	// auto-detect (JSON -> fields, plain text -> raw).
 	CommentDefaultView string `yaml:"comment_default_view,omitempty" json:"commentDefaultView"`
+	// StageCreateOnTargetAdd controls Alter-role behaviour when the user adds a target
+	// cluster on which the role does not yet exist: when true, the role's creation is
+	// auto-staged for that cluster; when false (default), the cluster is only brought into
+	// scope (offered in the "Present on" editor) without staging a create.
+	StageCreateOnTargetAdd bool `yaml:"stage_create_on_target_add,omitempty" json:"stageCreateOnTargetAdd"`
 }
 
 // NormalizeTheme returns a valid theme preference; unknown values become system.
@@ -149,6 +154,10 @@ type Config struct {
 	// Targets is the last target selection on the Operations page (cluster groups and/or
 	// specific clusters), remembered across re-renders and restarts. Empty = "all groups".
 	Targets TargetSelection `yaml:"targets,omitempty" json:"targets"`
+	// WindowWidth/WindowHeight are the last OS window size (Wails WindowGetSize, not the
+	// webview viewport), restored on next launch. 0 = use the built-in default.
+	WindowWidth  int `yaml:"window_width,omitempty" json:"windowWidth,omitempty"`
+	WindowHeight int `yaml:"window_height,omitempty" json:"windowHeight,omitempty"`
 }
 
 // TargetSelection remembers the Operations-page target selection. An empty selection
@@ -319,6 +328,8 @@ type AppVersion struct {
 	Version   string `json:"version"`
 	Commit    string `json:"commit"`
 	BuildDate string `json:"buildDate"`
+	RepoURL   string `json:"repoURL"`
+	DocsURL   string `json:"docsURL"`
 }
 
 // RoleSearchRequest searches roles by a substring matched against role name and

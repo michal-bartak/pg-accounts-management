@@ -19,3 +19,28 @@ func TestInfo_String(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestRepoAndDocsURLDerivation(t *testing.T) {
+	cases := []struct{ repo, wantRepo, wantDocs string }{
+		{
+			"https://github.com/michal-bartak/pg-accounts-management",
+			"https://github.com/michal-bartak/pg-accounts-management",
+			"https://michal-bartak.github.io/pg-accounts-management/",
+		},
+		{"git@github.com:acme/widgets.git", "https://github.com/acme/widgets", "https://acme.github.io/widgets/"},
+		{"https://github.com/o/r.git/", "https://github.com/o/r", "https://o.github.io/r/"},
+		{"", "", ""},
+	}
+	for _, c := range cases {
+		old := Repo
+		Repo = c.repo
+		got := Get()
+		Repo = old
+		if got.RepoURL != c.wantRepo {
+			t.Errorf("Repo %q → RepoURL %q, want %q", c.repo, got.RepoURL, c.wantRepo)
+		}
+		if got.DocsURL != c.wantDocs {
+			t.Errorf("Repo %q → DocsURL %q, want %q", c.repo, got.DocsURL, c.wantDocs)
+		}
+	}
+}

@@ -362,3 +362,41 @@ test('applyConfigScope: editing a value SETs desired and RESETs clusters leaving
   assert.deepEqual(r.set, ['A']);   // A moved to the new value
   assert.deepEqual(r.reset, ['B']); // B left 64MB and wasn't re-selected → reset
 });
+
+// ---------------------------------------------------------------------------------------------
+test('clusterHasStagedEdits: true for any staged map / pending-create row, false when clean', () => {
+  const r = evalJSON(`(() => {
+    resetEditMaps();
+    alterDetails = [
+      { clusterId:'grant', exists:true }, { clusterId:'attr', exists:true },
+      { clusterId:'cfg', exists:true }, { clusterId:'drop', exists:true },
+      { clusterId:'cmt', exists:true }, { clusterId:'create', exists:false },
+      { clusterId:'clean', exists:true },
+    ];
+    alterAdd.set('parent', new Set(['grant']));
+    alterAttrRemove.set('LOGIN', new Set(['attr']));
+    alterConfigSet.set('work_mem=128MB', new Set(['cfg']));
+    roleRemoveClusters.add('drop');
+    commentOverrides.set('cmt', 'hello');
+    return {
+      grant: clusterHasStagedEdits('grant'),
+      attr: clusterHasStagedEdits('attr'),
+      cfg: clusterHasStagedEdits('cfg'),
+      drop: clusterHasStagedEdits('drop'),
+      cmt: clusterHasStagedEdits('cmt'),
+      create: clusterHasStagedEdits('create'),
+      clean: clusterHasStagedEdits('clean'),
+    };
+  })()`);
+  assert.deepEqual(r, { grant:true, attr:true, cfg:true, drop:true, cmt:true, create:true, clean:false });
+});
+
+// ---------------------------------------------------------------------------------------------
+test('openSearchDialog clears cached results (no stale matches from a prior scope)', () => {
+  const r = evalJSON(`(() => {
+    alterGroups = [{ login:'stale', details:[] }];
+    openSearchDialog();          // must not throw; must drop cached results
+    return { cleared: alterGroups.length };
+  })()`);
+  assert.equal(r.cleared, 0);
+});

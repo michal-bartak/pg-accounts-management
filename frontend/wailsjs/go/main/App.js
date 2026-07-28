@@ -86,6 +86,10 @@ export function SaveUISettings(arg1) {
   return window['go']['main']['App']['SaveUISettings'](arg1);
 }
 
+export function SaveWindowSize(arg1, arg2) {
+  return window['go']['main']['App']['SaveWindowSize'](arg1, arg2);
+}
+
 export function SearchRoles(arg1) {
   return window['go']['main']['App']['SearchRoles'](arg1);
 }
