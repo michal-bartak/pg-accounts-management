@@ -273,6 +273,7 @@ func (s *Store) UpdateUI(ui model.UISettings) error {
 		Theme:                  model.NormalizeTheme(ui.Theme),
 		CommentDefaultView:     model.NormalizeCommentView(ui.CommentDefaultView),
 		StageCreateOnTargetAdd: ui.StageCreateOnTargetAdd,
+		CheckForUpdates:        ui.CheckForUpdates,
 	}
 	return s.save()
 }
@@ -282,6 +283,15 @@ func (s *Store) UpdateTargets(t model.TargetSelection) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.cfg.Targets = t
+	return s.save()
+}
+
+// SetUpdateSeenVersion records the latest release version the update popup last showed, so it
+// isn't shown again for a version the user already dismissed.
+func (s *Store) SetUpdateSeenVersion(v string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cfg.UpdateSeenVersion = v
 	return s.save()
 }
 

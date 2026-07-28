@@ -142,6 +142,15 @@
               </label>
             </div>
           </div>
+          <div class="settings-row settings-row-gap">
+            <div class="settings-field">
+              <span class="settings-field-label">Updates <button type="button" class="q-hint" aria-label="On startup, check the project's GitHub Releases and show a popup if a newer version is available. Manual check is always available in About." data-hint="On startup, check the project's GitHub Releases and show a popup if a newer version is available. Manual check is always available in About.">?</button></span>
+              <label class="settings-check">
+                <input type="checkbox" id="ui-check-updates" />
+                <span>Automatically check for updates on startup</span>
+              </label>
+            </div>
+          </div>
         </div>
 
         <div class="settings-group">
@@ -449,6 +458,11 @@
         </button>
       </div>
       <div class="about-section">
+        <span class="about-lbl">Version</span>
+        <p id="about-update" class="about-update"></p>
+        <button type="button" id="btn-check-update" class="about-check">Check for updates</button>
+      </div>
+      <div class="about-section">
         <span class="about-lbl">Credits</span>
         <p>Created by Michal Bartak<br /><span class="about-ai">assisted by <a href="#" class="about-link-inline" data-url="https://claude.ai">Claude</a></span></p>
       </div>
@@ -456,6 +470,29 @@
         <span class="about-lbl">License</span>
         <p>Released under the MIT License. © 2026 Michal Bartak.</p>
       </div>
+    </div>
+  </dialog>
+
+  <dialog id="update-dialog">
+    <div class="about-dialog-body">
+      <button type="button" class="about-x" id="update-close" aria-label="Close">✕</button>
+      <div class="about-head">
+        <span class="brand-dot"></span>
+        <strong>Update available</strong>
+      </div>
+      <p class="about-desc" id="update-message"></p>
+      <div class="about-links">
+        <button type="button" class="about-link" id="update-release-link" data-url="">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 8h4M8 6v4"/>
+            <path d="M2.5 4.5h11v9h-11z"/>
+          </svg>
+          View release
+        </button>
+      </div>
+      <menu>
+        <button type="button" id="update-dismiss" class="primary">Dismiss</button>
+      </menu>
     </div>
   </dialog>
 

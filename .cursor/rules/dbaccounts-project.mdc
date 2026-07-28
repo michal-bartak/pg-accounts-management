@@ -228,6 +228,7 @@ internal/pg/              DSN, auth, Connect, CallFunction, introspect.go (role 
 internal/batch/           Concurrent executor + all-cluster scan (Search/LoadRoleDetails)
 internal/commands/        Op validation + arg maps
 internal/envimport/       PG* env import
+internal/update/          GitHub-Releases version check (stdlib http + semver compare)
 frontend/                 UI (app.js uses backend())
 sql/README.md             Docs for user's PostgreSQL functions
 ```
@@ -256,7 +257,9 @@ SSH tunnels, encrypted config vault, audit log file, reading remote `pg_hba.conf
 | `internal/config` | `model`, `calltemplate` | `pg` |
 | `internal/pg` | `model`, `calltemplate`, pgx | `config` |
 | `internal/commands` | `model`, `config` | — |
+| `internal/update` | `model`, `version`, stdlib | `config`, `pg`, `commands`, `batch` |
 
+- `internal/update` checks GitHub Releases (`CheckForUpdate` binding); opt-in auto-check on startup via `ui.check_for_updates` (default ON, `UISettings.AutoCheck()`); `SetUpdateSeenVersion` suppresses repeat startup popups.
 - Config validates templates via `calltemplate.ValidateCallTemplate`, not `pg`.
 - **`internal/pg` tests must not import `internal/config`** (creates cycle: config → calltemplate ← pg test → config).
 - Cross-package SQL tests: `commands` + `calltemplate`, or `calltemplate` alone.

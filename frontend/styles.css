@@ -229,6 +229,11 @@ body {
 .about-section p { margin: 0.25rem 0 0; font-size: var(--fs-sm); line-height: 1.5; }
 .about-ai { font-size: var(--fs-sm); color: var(--muted); }
 .about-link-inline { color: var(--primary); }
+/* Update status line + "Check for updates" button in the About dialog. */
+.about-update { margin: 0.25rem 0 0.5rem; font-size: var(--fs-sm); line-height: 1.5; color: var(--muted); }
+.about-update:empty { display: none; }
+.about-update .about-link-inline { color: var(--primary); }
+.about-check { min-height: 0; padding: 0.3rem 0.7rem; font-size: var(--fs-sm); }
 
 .tabs {
   display: flex;

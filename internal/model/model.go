@@ -114,6 +114,14 @@ type UISettings struct {
 	// auto-staged for that cluster; when false (default), the cluster is only brought into
 	// scope (offered in the "Present on" editor) without staging a create.
 	StageCreateOnTargetAdd bool `yaml:"stage_create_on_target_add,omitempty" json:"stageCreateOnTargetAdd"`
+	// CheckForUpdates opts into the on-startup GitHub-Releases version check. Pointer so a
+	// missing value (nil) defaults to ON, including for existing configs — use AutoCheck().
+	CheckForUpdates *bool `yaml:"check_for_updates,omitempty" json:"checkForUpdates,omitempty"`
+}
+
+// AutoCheck reports whether the on-startup update check is enabled (nil = default ON).
+func (u UISettings) AutoCheck() bool {
+	return u.CheckForUpdates == nil || *u.CheckForUpdates
 }
 
 // NormalizeTheme returns a valid theme preference; unknown values become system.
@@ -158,6 +166,10 @@ type Config struct {
 	// webview viewport), restored on next launch. 0 = use the built-in default.
 	WindowWidth  int `yaml:"window_width,omitempty" json:"windowWidth,omitempty"`
 	WindowHeight int `yaml:"window_height,omitempty" json:"windowHeight,omitempty"`
+	// UpdateSeenVersion is the latest release version the startup update popup last showed;
+	// used to suppress re-popping for a version the user already dismissed (the About dialog
+	// still surfaces it). Manual checks ignore this.
+	UpdateSeenVersion string `yaml:"update_seen_version,omitempty" json:"updateSeenVersion,omitempty"`
 }
 
 // TargetSelection remembers the Operations-page target selection. An empty selection
@@ -330,6 +342,16 @@ type AppVersion struct {
 	BuildDate string `json:"buildDate"`
 	RepoURL   string `json:"repoURL"`
 	DocsURL   string `json:"docsURL"`
+}
+
+// UpdateInfo is the result of a GitHub-Releases version check.
+type UpdateInfo struct {
+	CurrentVersion  string `json:"currentVersion"`
+	LatestVersion   string `json:"latestVersion"`   // bare (no leading v); "" if no release found
+	UpdateAvailable bool   `json:"updateAvailable"` // LatestVersion is newer than CurrentVersion
+	ReleaseURL      string `json:"releaseURL"`      // GitHub release page (html_url)
+	ReleaseName     string `json:"releaseName,omitempty"`
+	Notes           string `json:"notes,omitempty"` // release body (may be truncated for display)
 }
 
 // RoleSearchRequest searches roles by a substring matched against role name and

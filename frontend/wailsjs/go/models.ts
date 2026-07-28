@@ -466,6 +466,7 @@ export namespace model {
 	    theme: string;
 	    commentDefaultView: string;
 	    stageCreateOnTargetAdd: boolean;
+	    checkForUpdates?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new UISettings(source);
@@ -476,6 +477,7 @@ export namespace model {
 	        this.theme = source["theme"];
 	        this.commentDefaultView = source["commentDefaultView"];
 	        this.stageCreateOnTargetAdd = source["stageCreateOnTargetAdd"];
+	        this.checkForUpdates = source["checkForUpdates"];
 	    }
 	}
 	export class DBRead {
@@ -601,6 +603,7 @@ export namespace model {
 	    targets: TargetSelection;
 	    windowWidth?: number;
 	    windowHeight?: number;
+	    updateSeenVersion?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -620,6 +623,7 @@ export namespace model {
 	        this.targets = this.convertValues(source["targets"], TargetSelection);
 	        this.windowWidth = source["windowWidth"];
 	        this.windowHeight = source["windowHeight"];
+	        this.updateSeenVersion = source["updateSeenVersion"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -891,6 +895,29 @@ export namespace model {
 		    }
 		    return a;
 		}
+	}
+	
+	export class UpdateInfo {
+	    currentVersion: string;
+	    latestVersion: string;
+	    updateAvailable: boolean;
+	    releaseURL: string;
+	    releaseName?: string;
+	    notes?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.currentVersion = source["currentVersion"];
+	        this.latestVersion = source["latestVersion"];
+	        this.updateAvailable = source["updateAvailable"];
+	        this.releaseURL = source["releaseURL"];
+	        this.releaseName = source["releaseName"];
+	        this.notes = source["notes"];
+	    }
 	}
 
 }

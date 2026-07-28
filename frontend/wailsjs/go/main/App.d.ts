@@ -6,6 +6,8 @@ export function AddCategory(arg1:model.CategoryInput):Promise<model.Category>;
 
 export function AddCluster(arg1:model.ClusterInput):Promise<model.Cluster>;
 
+export function CheckForUpdate():Promise<model.UpdateInfo>;
+
 export function DeleteCategory(arg1:string):Promise<void>;
 
 export function DeleteCluster(arg1:string):Promise<void>;
@@ -47,6 +49,8 @@ export function SaveUISettings(arg1:model.UISettings):Promise<void>;
 export function SaveWindowSize(arg1:number,arg2:number):Promise<void>;
 
 export function SearchRoles(arg1:model.RoleSearchRequest):Promise<Array<model.RoleMatch>>;
+
+export function SetUpdateSeenVersion(arg1:string):Promise<void>;
 
 export function TestConnection(arg1:model.TestConnectionRequest):Promise<void>;
 

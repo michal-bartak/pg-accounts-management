@@ -58,6 +58,30 @@ func TestUpdateUIPersistsStageCreateOnTargetAdd(t *testing.T) {
 	}
 }
 
+func TestUICheckForUpdatesAndSeenVersion(t *testing.T) {
+	s := tmpStore(t)
+	// nil pointer (never set) → AutoCheck defaults ON.
+	if !s.Get().UI.AutoCheck() {
+		t.Fatal("AutoCheck should default to true when CheckForUpdates is nil")
+	}
+	// Explicit false round-trips and disables AutoCheck.
+	off := false
+	if err := s.UpdateUI(model.UISettings{Theme: "dark", CheckForUpdates: &off}); err != nil {
+		t.Fatal(err)
+	}
+	got := s.Get().UI
+	if got.CheckForUpdates == nil || *got.CheckForUpdates != false || got.AutoCheck() {
+		t.Fatalf("CheckForUpdates=false not persisted / AutoCheck not off: %+v", got.CheckForUpdates)
+	}
+	// SetUpdateSeenVersion persists.
+	if err := s.SetUpdateSeenVersion("0.4.0"); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Get().UpdateSeenVersion; got != "0.4.0" {
+		t.Fatalf("update_seen_version not persisted: %q", got)
+	}
+}
+
 func TestNormalizeTheme(t *testing.T) {
 	tests := []struct {
 		in, want string
