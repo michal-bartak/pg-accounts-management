@@ -461,6 +461,7 @@ export namespace model {
 	export class UISettings {
 	    theme: string;
 	    commentDefaultView: string;
+	    stageCreateOnTargetAdd: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new UISettings(source);
@@ -470,6 +471,7 @@ export namespace model {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.theme = source["theme"];
 	        this.commentDefaultView = source["commentDefaultView"];
+	        this.stageCreateOnTargetAdd = source["stageCreateOnTargetAdd"];
 	    }
 	}
 	export class DBRead {

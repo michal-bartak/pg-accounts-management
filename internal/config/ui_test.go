@@ -45,6 +45,19 @@ func TestUpdateUIPersistsCommentView(t *testing.T) {
 	}
 }
 
+func TestUpdateUIPersistsStageCreateOnTargetAdd(t *testing.T) {
+	s := tmpStore(t)
+	if got := s.Get().UI.StageCreateOnTargetAdd; got != false {
+		t.Fatalf("default stage_create_on_target_add = %v, want false", got)
+	}
+	if err := s.UpdateUI(model.UISettings{Theme: "dark", StageCreateOnTargetAdd: true}); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Get().UI.StageCreateOnTargetAdd; got != true {
+		t.Fatalf("stage_create_on_target_add not persisted: %v", got)
+	}
+}
+
 func TestNormalizeTheme(t *testing.T) {
 	tests := []struct {
 		in, want string

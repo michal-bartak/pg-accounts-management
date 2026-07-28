@@ -109,6 +109,11 @@ type UISettings struct {
 	// (create role / a role with no comment): fields | raw. Content-bearing comments always
 	// auto-detect (JSON -> fields, plain text -> raw).
 	CommentDefaultView string `yaml:"comment_default_view,omitempty" json:"commentDefaultView"`
+	// StageCreateOnTargetAdd controls Alter-role behaviour when the user adds a target
+	// cluster on which the role does not yet exist: when true, the role's creation is
+	// auto-staged for that cluster; when false (default), the cluster is only brought into
+	// scope (offered in the "Present on" editor) without staging a create.
+	StageCreateOnTargetAdd bool `yaml:"stage_create_on_target_add,omitempty" json:"stageCreateOnTargetAdd"`
 }
 
 // NormalizeTheme returns a valid theme preference; unknown values become system.

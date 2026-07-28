@@ -270,8 +270,9 @@ func (s *Store) UpdateUI(ui model.UISettings) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.cfg.UI = model.UISettings{
-		Theme:              model.NormalizeTheme(ui.Theme),
-		CommentDefaultView: model.NormalizeCommentView(ui.CommentDefaultView),
+		Theme:                  model.NormalizeTheme(ui.Theme),
+		CommentDefaultView:     model.NormalizeCommentView(ui.CommentDefaultView),
+		StageCreateOnTargetAdd: ui.StageCreateOnTargetAdd,
 	}
 	return s.save()
 }
