@@ -1046,7 +1046,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .scope-act:disabled { opacity: 0.25; cursor: default; pointer-events: none; }
 .scope-act:disabled:hover { border-color: var(--border); }
 /* "off" indicator for an attribute that's enabled nowhere — de-emphasised (~50% less visible). */
-.scope-off { opacity: 0.5; }
+.scope-off { opacity: 0.3; }
 
 .alter-add-priv { display: flex; gap: 0.4rem; margin-top: 0.7rem; }
 
@@ -1165,7 +1165,8 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .comments-dialog-body h2 { margin: 0 0 0.75rem; }
 .search-dialog-body .alter-results { margin-top: 0.75rem; max-height: 50vh; overflow-y: auto; }
 .search-dialog-body menu,
-.comments-dialog-body menu {
+.comments-dialog-body menu,
+.about-dialog-body menu {
   margin: 1rem 0 0;
   padding: 0;
   display: flex;
