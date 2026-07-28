@@ -776,6 +776,8 @@ tr:last-child td { border-bottom: none; }
 .settings-num { width: 6rem; }
 /* Inline checkbox + label (overrides the column layout of .settings-row label). */
 .settings-field .settings-check { flex-direction: row; align-items: center; gap: 0.45rem; font-size: var(--fs-base); cursor: pointer; }
+/* Extra breathing room above a row that follows another within the same settings group. */
+.settings-row-gap { margin-top: 0.9rem; }
 
 /* Two side-by-side subsections (DB command templates | Introspection queries).
    Collapses to one column when the panel is too narrow. */
