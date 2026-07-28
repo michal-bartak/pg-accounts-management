@@ -285,6 +285,20 @@ func (s *Store) UpdateTargets(t model.TargetSelection) error {
 	return s.save()
 }
 
+// UpdateWindowSize persists the last OS window size (restored on next launch). Ignores
+// non-positive values so a transient 0 during teardown can't wipe a good size.
+func (s *Store) UpdateWindowSize(width, height int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if width > 0 {
+		s.cfg.WindowWidth = width
+	}
+	if height > 0 {
+		s.cfg.WindowHeight = height
+	}
+	return s.save()
+}
+
 func (s *Store) UpdateParentRoles(roles []string) error {
 	cleaned, err := validateParentRoles(roles)
 	if err != nil {

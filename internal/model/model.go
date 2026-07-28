@@ -154,6 +154,10 @@ type Config struct {
 	// Targets is the last target selection on the Operations page (cluster groups and/or
 	// specific clusters), remembered across re-renders and restarts. Empty = "all groups".
 	Targets TargetSelection `yaml:"targets,omitempty" json:"targets"`
+	// WindowWidth/WindowHeight are the last OS window size (Wails WindowGetSize, not the
+	// webview viewport), restored on next launch. 0 = use the built-in default.
+	WindowWidth  int `yaml:"window_width,omitempty" json:"windowWidth,omitempty"`
+	WindowHeight int `yaml:"window_height,omitempty" json:"windowHeight,omitempty"`
 }
 
 // TargetSelection remembers the Operations-page target selection. An empty selection

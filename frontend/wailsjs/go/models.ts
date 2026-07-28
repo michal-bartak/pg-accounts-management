@@ -595,6 +595,8 @@ export namespace model {
 	    parentRoles: string[];
 	    commentFields: CommentField[];
 	    targets: TargetSelection;
+	    windowWidth?: number;
+	    windowHeight?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -612,6 +614,8 @@ export namespace model {
 	        this.parentRoles = source["parentRoles"];
 	        this.commentFields = this.convertValues(source["commentFields"], CommentField);
 	        this.targets = this.convertValues(source["targets"], TargetSelection);
+	        this.windowWidth = source["windowWidth"];
+	        this.windowHeight = source["windowHeight"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

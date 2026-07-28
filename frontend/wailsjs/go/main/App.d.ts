@@ -44,6 +44,8 @@ export function SaveTargetSelection(arg1:model.TargetSelection):Promise<void>;
 
 export function SaveUISettings(arg1:model.UISettings):Promise<void>;
 
+export function SaveWindowSize(arg1:number,arg2:number):Promise<void>;
+
 export function SearchRoles(arg1:model.RoleSearchRequest):Promise<Array<model.RoleMatch>>;
 
 export function TestConnection(arg1:model.TestConnectionRequest):Promise<void>;
