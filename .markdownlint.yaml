@@ -11,3 +11,5 @@ MD033: false
 # Duplicate headings are fine when nested under different sections.
 MD024:
   siblings_only: true
+# Table pipe spacing is cosmetic and editors reformat it; not worth gating on.
+MD060: false

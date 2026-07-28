@@ -25,8 +25,8 @@ button is active only when there are unsaved changes.
 ## Target selection
 
 On the **Operations** tab, the left sidebar is **Target selection**. Tick the groups you want,
-or expand **Or pick clusters** to choose individual clusters. Everything you do on this tab —
-searching, creating, altering — applies to exactly this selection, and the selection is
+or expand **Or pick clusters** to choose individual clusters. Everything you do on this
+tab — searching, creating, altering — applies to exactly this selection, and the selection is
 remembered between sessions.
 
 ## Create a role
@@ -59,9 +59,8 @@ Anywhere clusters are listed (Present on, privileges, attributes, comments), the
 same **scope labels**, coloured by group. Completeness is judged per group relative to your
 selection:
 
-- if **every** selected cluster in a group matches, you see one filled group label (e.g.
-  `PRODUCTION`);
-- otherwise you see one label per matching cluster (e.g. `PRODUCTION` plus `UAT-1`), so a
+- if **every** selected cluster in a group matches, you see one filled group label (for example `PRODUCTION`);
+- otherwise you see one label per matching cluster (for example `PRODUCTION` plus `UAT-1`), so a
   partial match is never hidden behind a group name.
 
 ### Privileges, attributes, and settings

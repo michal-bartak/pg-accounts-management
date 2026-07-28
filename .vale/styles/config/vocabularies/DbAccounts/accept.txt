@@ -12,8 +12,6 @@ GUCs
 UAT
 YAML
 DDL
-GRANT
-REVOKE
 sslmode
 rolconfig
 Astro
@@ -23,3 +21,9 @@ SmartScreen
 webkit2gtk
 [Mm]arkdownlint
 Diátaxis
+Xcode
+Michal
+Bartak
+[Cc]onfig
+[Pp]repended?
+[Pp]reconfigured

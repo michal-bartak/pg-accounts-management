@@ -14,16 +14,18 @@ The defaults are plain PostgreSQL statements; you can point any of them at a wra
 function or view so a low-privilege connection can act through it.
 
 :::note[Requirements]{icon="information"}
+
 - A reachable PostgreSQL server (or several) that the connecting user can act on.
 - Credentials come from the cluster's connect user, the `PG*` environment variables, or
-  `~/.pgpass` — there are no password fields in the app's configuration.
+  `~/.pgpass`. The app has no password fields in its configuration.
+
 :::
 
 ![DbAccounts — Operations tab](../../assets/screenshot-operations.png)
 
 ## What it does
 
-- **Group clusters** and pick targets. A cluster belongs to a group (e.g. Production, UAT);
+- **Group clusters** and pick targets. A cluster belongs to a group (for example Production, UAT);
   each group has a colour and an optional *require confirmation* flag. You select whole
   groups and/or individual clusters, and that selection is remembered between sessions.
 - **Create a role** on every selected cluster at once — login name, and (via your template)
