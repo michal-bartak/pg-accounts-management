@@ -495,9 +495,12 @@ make package         # build/bin/DbAccounts.app + dist/*.tar.gz
 
 ## Versioning
 
-[VERSION](VERSION) is app semver (git tag `v$(cat VERSION)`). `internal/version`
-defaults must match; `make sync-wails-version` aligns `wails.json` `productVersion`;
-`GetAppVersion()` surfaces it. Config YAML `version:` is the **schema** version only.
+[VERSION](VERSION) is app semver (git tag `v$(cat VERSION)`) and the **single source** of the
+runtime version: `main.go` embeds it (`//go:embed VERSION`) and sets `version.Version` at startup,
+so `go run` / `wails dev` / `make` all reflect it without ldflags (the `internal/version.Version`
+literal is only an empty-embed fallback). `-ldflags` inject only `Commit`/`BuildDate`/`Repo`.
+`make sync-wails-version` aligns `wails.json` `productVersion` (packaging metadata);
+`GetAppVersion()` surfaces the version. Config YAML `version:` is the **schema** version only.
 
 ## Out of scope (v1)
 

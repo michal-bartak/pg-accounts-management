@@ -3,9 +3,11 @@ package version
 
 import "strings"
 
-// Defaults match VERSION at repo root; release builds set these via Makefile / wails build -ldflags.
+// Version is the app version. main.go overwrites it from the embedded VERSION file at startup
+// (the real source of truth); this literal is only a fallback if that embed is empty. Commit and
+// BuildDate come from -ldflags at build time (Makefile).
 var (
-	Version   = "0.3.0"
+	Version   = "0.0.0"
 	Commit    = "dev"
 	BuildDate = ""
 	// Repo is the canonical GitHub repository URL. Release builds inject the actual git
