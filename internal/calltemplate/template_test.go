@@ -6,15 +6,15 @@ import (
 )
 
 func TestBuildQueryFromTemplate_arrayOrNullWithParent(t *testing.T) {
-	call := "admin_access.create_role(${loginname}, NULL, ${fullname}, ${email}, ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_role})"
+	call := "admin_access.create_role(${loginname}, NULL, ${full_name}, ${e_mail}, ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_roles})"
 	args := map[string]string{
-		"loginname":   "jdoe",
-		"fullname":    "John Doe",
-		"email":       "j@example.com",
-		"parent_role": "gr_parent",
+		"loginname":    "jdoe",
+		"full_name":    `"John Doe"`,
+		"e_mail":       `"j@example.com"`,
+		"parent_roles": "gr_parent",
 	}
 
-	q, vals, err := BuildQueryFromTemplate(call, args, "create_role")
+	q, vals, err := BuildQueryFromTemplate(call, args, "create_role", "full_name", "e_mail")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,8 +38,8 @@ func TestBuildQueryFromTemplate_arrayOrNullWithParent(t *testing.T) {
 }
 
 func TestBuildQueryFromTemplate_arrayOrNullMultipleParents(t *testing.T) {
-	call := "fn(ARRAY['gr_a'] || ${parent_role})"
-	q, vals, err := BuildQueryFromTemplate(call, map[string]string{"parent_role": "gr_x, gr_y ,gr_z"}, "create_role")
+	call := "fn(ARRAY['gr_a'] || ${parent_roles})"
+	q, vals, err := BuildQueryFromTemplate(call, map[string]string{"parent_roles": "gr_x, gr_y ,gr_z"}, "create_role")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,8 +58,8 @@ func TestBuildQueryFromTemplate_arrayOrNullMultipleParents(t *testing.T) {
 }
 
 func TestBuildQueryFromTemplate_arrayOrNullEmptyParent(t *testing.T) {
-	call := "fn(ARRAY['gr_a', 'gr_b'] || ${parent_role})"
-	q, vals, err := BuildQueryFromTemplate(call, map[string]string{"parent_role": ""}, "create_role")
+	call := "fn(ARRAY['gr_a', 'gr_b'] || ${parent_roles})"
+	q, vals, err := BuildQueryFromTemplate(call, map[string]string{"parent_roles": ""}, "create_role")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,9 +72,9 @@ func TestBuildQueryFromTemplate_arrayOrNullEmptyParent(t *testing.T) {
 }
 
 func TestNormalizeTemplate_arrayLiteralForm(t *testing.T) {
-	in := "fn(ARRAY[${parent_role}, 'gr_a', 'gr_b'])"
+	in := "fn(ARRAY[${parent_roles}, 'gr_a', 'gr_b'])"
 	out := normalizeTemplate(in)
-	if !strings.Contains(out, "ARRAY['gr_a', 'gr_b'] || ${parent_role}") {
+	if !strings.Contains(out, "ARRAY['gr_a', 'gr_b'] || ${parent_roles}") {
 		t.Fatalf("got: %s", out)
 	}
 }

@@ -273,6 +273,56 @@ test('buildAlterClusterOps: a pending grant emits grant_parents', () => {
   assert.deepEqual(ops, [{ clusterId: 'c1', ops: ['grant_parents'] }]);
 });
 
+// Regression: the parents selected for a newly-created role must reach BOTH the create_role
+// template's ${parent_roles} AND the follow-up grant_parents (per cluster).
+test('buildCreateClusterOps: create_role and grant_parents both carry the selected parents', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    const _origResolve = resolveSelectedClusters; // shared vm context — restore to avoid leaking
+    try {
+      state.clusters = [{id:'c1',alias:'c1',category:'p'},{id:'c2',alias:'c2',category:'p'}];
+      currentOp = 'create_role';
+      resetEditMaps();
+      resolveSelectedClusters = () => state.clusters;   // stub the DOM-checkbox read
+      alterDetails = state.clusters.map((c) => ({ clusterId:c.id, exists:false, comment:'', parents:[], attributes:{}, settings:{} }));
+      alterSelected = 'bob';
+      alterAdd.set('gr_admin', new Set(['c1','c2']));
+      alterAdd.set('gr_ro', new Set(['c1']));           // c1 gets two parents, c2 gets one
+      return buildCreateClusterOps({ loginName:'bob' }).map((c) => ({
+        id: c.clusterId,
+        create: c.operations.find((o) => o.operation === 'create_role').createRole.parentRoles,
+        grant: (c.operations.find((o) => o.operation === 'grant_parents') || {}).grantParents.parentRoles,
+      }));
+    } finally { resolveSelectedClusters = _origResolve; }
+  })()`);
+  assert.deepEqual(r, [
+    { id: 'c1', create: 'gr_admin,gr_ro', grant: 'gr_admin,gr_ro' },
+    { id: 'c2', create: 'gr_admin', grant: 'gr_admin' },
+  ]);
+});
+
+// Alter presence-add: create_role for a newly-added cluster also carries that cluster's parents.
+test('buildAlterClusterOps: presence-add create_role carries the granted parents', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    currentOp = 'alter_user';
+    alterSelected = 'bob';
+    resetEditMaps();
+    alterDetails = [{ clusterId:'cX', exists:false, comment:'', parents:[], attributes:{}, settings:{} }];
+    commentEditor = editorFromComment('', true); /* varies → created bare, no comment */
+    alterAdd.set('gr_new', new Set(['cX']));
+    const ops = buildAlterClusterOps().find((c) => c.clusterId === 'cX').operations;
+    return {
+      order: ops.map((o) => o.operation),
+      create: ops.find((o) => o.operation === 'create_role').createRole.parentRoles,
+      grant: ops.find((o) => o.operation === 'grant_parents').grantParents.parentRoles,
+    };
+  })()`);
+  assert.deepEqual(r.order, ['create_role', 'grant_parents']);
+  assert.equal(r.create, 'gr_new');
+  assert.equal(r.grant, 'gr_new');
+});
+
 // addPrivilegeScope: "Add privilege" is additive — it must never revoke where the privilege
 // already lives. Regression for the bug where adding P1 to cluster D revoked it from A/B/C.
 test('addPrivilegeScope: adding an existing privilege to a new cluster grants D and revokes nothing', () => {
@@ -399,4 +449,56 @@ test('openSearchDialog clears cached results (no stale matches from a prior scop
     return { cleared: alterGroups.length };
   })()`);
   assert.equal(r.cleared, 0);
+});
+
+// --- commentFieldArgs: per-cluster create_role / set_comment placeholder values ---------------
+test('commentFieldArgs: JSON-encodes each configured field present in the comment (typed)', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    state.commentFields = [{key:'full_name'},{key:'e_mail'},{key:'age'},{key:'active'}];
+    return commentFieldArgs('{"full_name":"John","age":42,"active":true,"e_mail":null}');
+  })()`);
+  // Values are JSON encodings so the backend can recover their type; null encodes as "null".
+  assert.deepEqual(r, { full_name: '"John"', e_mail: 'null', age: '42', active: 'true' });
+});
+
+test('commentFieldArgs: an empty-string field is kept, encoded as "" (backend maps it to NULL)', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    state.commentFields = [{key:'full_name'}];
+    return commentFieldArgs('{"full_name":""}');
+  })()`);
+  // Present (not omitted) and JSON-encoded as the two-char string "" — renderCommentFieldSQL /
+  // commentFieldBindValue then turn "" into SQL NULL. Distinct from an absent key (also NULL).
+  assert.deepEqual(r, { full_name: '""' });
+});
+
+test('commentFieldArgs: keys absent from the comment are omitted (→ backend NULL)', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    return commentFieldArgs('{"full_name":"Jane"}');
+  })()`);
+  assert.deepEqual(r, { full_name: '"Jane"' }); // e_mail omitted
+});
+
+test('commentFieldArgs: a plain-text (non-object) comment yields no field args', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    return commentFieldArgs('just some text');
+  })()`);
+  assert.deepEqual(r, {});
+});
+
+test('fnPlaceholderNames: create_role / set_comment inject configured fields; other ops unchanged', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    return {
+      create: fnPlaceholderNames('create_role', ['loginname','parent_roles']),
+      comment: fnPlaceholderNames('set_comment', ['loginname','comment']),
+      other: fnPlaceholderNames('change_password', ['loginname','new_password']),
+    };
+  })()`);
+  assert.deepEqual(r.create, ['loginname', 'full_name', 'e_mail', 'parent_roles']);
+  assert.deepEqual(r.comment, ['loginname', 'full_name', 'e_mail', 'comment']);
+  assert.deepEqual(r.other, ['loginname', 'new_password']);
 });

@@ -247,7 +247,7 @@ func (r *Runner) runOne(cluster model.Cluster, operation string, fn model.DBFunc
 	}
 	defer conn.Close(ctx)
 
-	_, msg, err := pg.CallFunction(ctx, conn, fn, operation, args)
+	_, msg, err := pg.CallFunction(ctx, conn, fn, operation, args, r.store.Get().CommentFieldKeys()...)
 	res.DurationMs = time.Since(start).Milliseconds()
 	if err != nil {
 		res.Message = err.Error()
@@ -361,7 +361,7 @@ func (r *Runner) runClusterTx(cfg model.Config, cluster model.Cluster, ops []mod
 		fn, args, berr := commands.BuildArgs(cfg, op)
 		var sqlText string
 		if berr == nil {
-			sqlText, _, berr = pg.ExecuteOperation(ctx, tx, fn, op.Operation, args)
+			sqlText, _, berr = pg.ExecuteOperation(ctx, tx, fn, op.Operation, args, cfg.CommentFieldKeys()...)
 		}
 		if sqlText != "" {
 			res.Queries = append(res.Queries, sqlText) // include the failing op's SQL too

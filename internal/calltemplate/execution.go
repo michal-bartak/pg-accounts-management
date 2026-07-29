@@ -1,6 +1,7 @@
 package calltemplate
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -18,7 +19,8 @@ const (
 	fieldKeywordList              // space-separated keywords (ALTER ROLE … WITH SUPERUSER NOLOGIN)
 	fieldConfigName               // a role-GUC name, emitted unquoted (ALTER ROLE … SET work_mem = …)
 	fieldLiteral
-	fieldBind // function mode only
+	fieldCommentValue // a configured comment field: JSON-encoded value → typed SQL (NULL / number / bool / literal)
+	fieldBind         // function mode only
 )
 
 // gucNameRE validates a role-GUC name (optionally namespaced, e.g. auto_explain.log_min_duration).
@@ -26,33 +28,35 @@ const (
 var gucNameRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$`)
 
 // Build produces SQL for the given execution mode. useQuery is true for function mode (pgx Query).
-func Build(call string, args map[string]string, operation, execution string) (sql string, values []any, useQuery bool, err error) {
+// commentFields are the configured comment-field keys additionally allowed as placeholders for
+// create_role / set_comment (nil for other operations / callers that don't offer them).
+func Build(call string, args map[string]string, operation, execution string, commentFields ...string) (sql string, values []any, useQuery bool, err error) {
 	execution = model.NormalizeExecution(execution)
 	call = normalizeTemplate(call)
-	if err := validateCallTemplate(call, operation, execution); err != nil {
+	if err := validateCallTemplate(call, operation, execution, commentFields); err != nil {
 		return "", nil, false, err
 	}
 
 	switch execution {
 	case model.ExecutionStatement:
-		sql, err = buildEmbedded(call, args, operation)
+		sql, err = buildEmbedded(call, args, operation, commentFields)
 		return sql, nil, false, err
 	case model.ExecutionBlock:
 		// The template is a complete anonymous code block (e.g. DO $tag$ … $tag$;) written
 		// by the user. The app runs it verbatim after embedding placeholder values; it adds
 		// no DO/delimiter wrapper of its own. Delimiter choice and block structure are the
 		// template author's responsibility.
-		sql, err = buildEmbedded(call, args, operation)
+		sql, err = buildEmbedded(call, args, operation, commentFields)
 		return sql, nil, false, err
 	default:
-		sql, values, err = buildFunctionQuery(call, args, operation)
+		sql, values, err = buildFunctionQuery(call, args, operation, commentFields)
 		return sql, values, true, err
 	}
 }
 
 // BuildQueryFromTemplate builds function-mode SQL (SELECT + binds). Kept for tests and clarity.
-func BuildQueryFromTemplate(call string, args map[string]string, operation string) (query string, values []any, err error) {
-	query, values, useQuery, err := Build(call, args, operation, model.ExecutionFunction)
+func BuildQueryFromTemplate(call string, args map[string]string, operation string, commentFields ...string) (query string, values []any, err error) {
+	query, values, useQuery, err := Build(call, args, operation, model.ExecutionFunction, commentFields...)
 	if err != nil {
 		return "", nil, err
 	}
@@ -62,7 +66,7 @@ func BuildQueryFromTemplate(call string, args map[string]string, operation strin
 	return query, values, nil
 }
 
-func validateCallTemplate(call, operation, execution string) error {
+func validateCallTemplate(call, operation, execution string, commentFields []string) error {
 	execution = model.NormalizeExecution(execution)
 	call = normalizeTemplate(call)
 	if call == "" {
@@ -96,12 +100,12 @@ func validateCallTemplate(call, operation, execution string) error {
 		}
 	}
 
-	allowed := allowedPlaceholderNames(operation)
+	allowed := allowedPlaceholderNames(operation, commentFields)
 	if allowed == nil {
 		return fmt.Errorf("unknown operation: %s", operation)
 	}
 	for _, m := range placeholderTokenRE.FindAllStringSubmatch(call, -1) {
-		ph, perr := parsePlaceholderToken(m[1], operation)
+		ph, perr := parsePlaceholderToken(m[1], operation, commentFields)
 		if perr != nil {
 			return perr
 		}
@@ -114,23 +118,30 @@ func validateCallTemplate(call, operation, execution string) error {
 
 // ValidateCallTemplate validates a function-mode template (config save default).
 func ValidateCallTemplate(call, operation string) error {
-	return validateCallTemplate(call, operation, model.ExecutionFunction)
+	return validateCallTemplate(call, operation, model.ExecutionFunction, nil)
 }
 
-// ValidateCallTemplateWithExecution validates for the given execution mode.
-func ValidateCallTemplateWithExecution(call, operation, execution string) error {
-	return validateCallTemplate(call, operation, execution)
+// ValidateCallTemplateWithExecution validates for the given execution mode. commentFields are the
+// configured comment-field keys allowed as placeholders for create_role / set_comment.
+func ValidateCallTemplateWithExecution(call, operation, execution string, commentFields ...string) error {
+	return validateCallTemplate(call, operation, execution, commentFields)
 }
 
-func allowedPlaceholderNames(operation string) map[string]bool {
+func allowedPlaceholderNames(operation string, commentFields []string) map[string]bool {
 	out := AllowedPlaceholders(operation)
-	if operation == "remove_role" && out != nil {
+	if out == nil {
+		return nil
+	}
+	if operation == "remove_role" {
 		out["rolename"] = true
+	}
+	for f := range commentFieldSet(operation, commentFields) {
+		out[f] = true
 	}
 	return out
 }
 
-func placeholderKindForField(operation, field string) (fieldKind, error) {
+func placeholderKindForField(operation, field string, commentFields []string) (fieldKind, error) {
 	if field == "rolename" {
 		field = "loginname"
 	}
@@ -160,6 +171,9 @@ func placeholderKindForField(operation, field string) (fieldKind, error) {
 		case "comment":
 			return fieldLiteral, nil
 		}
+		if commentFieldSet(operation, commentFields)[field] {
+			return fieldCommentValue, nil
+		}
 	case "set_attribute":
 		switch field {
 		case "loginname":
@@ -171,10 +185,15 @@ func placeholderKindForField(operation, field string) (fieldKind, error) {
 		}
 	case "create_role":
 		switch field {
-		case "loginname", "parent_role":
+		case "loginname":
 			return fieldIdentifier, nil
-		case "fullname", "email":
-			return fieldLiteral, nil
+		case "parent_roles":
+			// Same field as grant/revoke: statement → double-quoted identifier list; function →
+			// inline ARRAY['a','b'] literal (buildFunctionQuery special-cases fieldIdentifierList).
+			return fieldIdentifierList, nil
+		}
+		if commentFieldSet(operation, commentFields)[field] {
+			return fieldCommentValue, nil
 		}
 	case "set_config":
 		switch field {
@@ -238,6 +257,26 @@ func quoteSQLIdentifierList(value string) (string, error) {
 	return strings.Join(quoted, ", "), nil
 }
 
+// renderRoleArrayVerbatim renders a comma-separated role list as an inline text[] array literal for
+// FUNCTION mode: ARRAY['gr_a', 'gr_b']. Elements are single-quoted but placed VERBATIM — no `'`→`''`
+// doubling and no identifier double-quoting (per the ${parent_roles} function-mode contract). A
+// value containing a single quote or NUL is rejected rather than embedded, as the only guard against
+// producing broken / injectable SQL. An empty list becomes bare NULL.
+func renderRoleArrayVerbatim(value string) (string, error) {
+	parts := splitList(value)
+	if len(parts) == 0 {
+		return "NULL", nil
+	}
+	quoted := make([]string, len(parts))
+	for i, p := range parts {
+		if strings.ContainsAny(p, "'\x00") {
+			return "", fmt.Errorf("invalid role name %q in ${parent_roles}: single quotes are not allowed", p)
+		}
+		quoted[i] = "'" + p + "'"
+	}
+	return "ARRAY[" + strings.Join(quoted, ", ") + "]", nil
+}
+
 // quoteSQLKeywordList renders a whitespace-separated keyword list (e.g. role attributes) as a
 // single space-joined clause. Each token must be a bare identifier; the keyword whitelist is
 // enforced upstream in commands.ValidateOperation.
@@ -265,28 +304,98 @@ func validConfigName(name string) (string, error) {
 	return name, nil
 }
 
-func buildEmbedded(call string, args map[string]string, operation string) (string, error) {
+// renderCommentFieldSQL turns a comment field's JSON-encoded value into an embedded SQL literal:
+// absent/empty/JSON null/empty-string → bare NULL (unquoted); JSON number → the numeric token
+// verbatim; JSON bool → TRUE/FALSE; JSON string → a quoted literal; JSON array/object → the compact
+// JSON text as a quoted literal. A value that fails to parse as JSON is treated as a plain string.
+func renderCommentFieldSQL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "NULL"
+	}
+	var v any
+	if err := json.Unmarshal([]byte(raw), &v); err != nil {
+		return quoteSQLLiteral(raw) // not JSON: plain, non-empty string
+	}
+	switch t := v.(type) {
+	case nil:
+		return "NULL"
+	case bool:
+		if t {
+			return "TRUE"
+		}
+		return "FALSE"
+	case float64:
+		return raw // re-emit the original JSON number token (avoids float reformatting)
+	case string:
+		if strings.TrimSpace(t) == "" {
+			return "NULL"
+		}
+		return quoteSQLLiteral(t)
+	default: // array / object → raw JSON text
+		b, err := json.Marshal(v)
+		if err != nil {
+			return "NULL"
+		}
+		return quoteSQLLiteral(string(b))
+	}
+}
+
+// commentFieldBindValue converts a comment field's JSON-encoded value into a typed Go value for a
+// pgx bind (function mode): nil for NULL, the number/bool/string as-is, arrays/objects as JSON text.
+func commentFieldBindValue(raw string) any {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	var v any
+	if err := json.Unmarshal([]byte(raw), &v); err != nil {
+		return raw // not JSON: plain string
+	}
+	switch t := v.(type) {
+	case nil:
+		return nil
+	case string:
+		if strings.TrimSpace(t) == "" {
+			return nil
+		}
+		return t
+	case bool, float64:
+		return t
+	default: // array / object → JSON text
+		b, err := json.Marshal(v)
+		if err != nil {
+			return nil
+		}
+		return string(b)
+	}
+}
+
+func buildEmbedded(call string, args map[string]string, operation string, commentFields []string) (string, error) {
 	var b strings.Builder
 	last := 0
 	for _, loc := range placeholderTokenRE.FindAllStringSubmatchIndex(call, -1) {
 		b.WriteString(call[last:loc[0]])
 		inner := call[loc[2]:loc[3]]
-		ph, err := parsePlaceholderToken(inner, operation)
+		ph, err := parsePlaceholderToken(inner, operation, commentFields)
 		if err != nil {
 			return "", err
 		}
-		v, ok := resolveArg(args, ph.field)
-		if !ok {
-			return "", fmt.Errorf("missing value for ${%s}", ph.field)
-		}
-		kind, err := placeholderKindForField(operation, ph.field)
+		kind, err := placeholderKindForField(operation, ph.field, commentFields)
 		if err != nil {
 			return "", err
 		}
 		if kind == fieldBind {
 			return "", fmt.Errorf("${%s} cannot be used in statement/block mode for %s", ph.field, operation)
 		}
+		v, ok := resolveArg(args, ph.field)
+		// A comment field is optional — an absent/empty value resolves to SQL NULL.
+		if !ok && kind != fieldCommentValue {
+			return "", fmt.Errorf("missing value for ${%s}", ph.field)
+		}
 		switch kind {
+		case fieldCommentValue:
+			b.WriteString(renderCommentFieldSQL(v))
 		case fieldIdentifier:
 			quoted, err := quoteSQLIdentifier(v)
 			if err != nil {
@@ -324,14 +433,15 @@ func buildEmbedded(call string, args map[string]string, operation string) (strin
 	return out, nil
 }
 
-func buildFunctionQuery(call string, args map[string]string, operation string) (query string, values []any, err error) {
-	if err := validateCallTemplate(call, operation, model.ExecutionFunction); err != nil {
+func buildFunctionQuery(call string, args map[string]string, operation string, commentFields []string) (query string, values []any, err error) {
+	if err := validateCallTemplate(call, operation, model.ExecutionFunction, commentFields); err != nil {
 		return "", nil, err
 	}
 
+	cfSet := commentFieldSet(operation, commentFields)
 	n := 0
 	values = make([]any, 0, 8)
-	call, err = preprocessArrayOrNull(call, args, operation, &n, &values)
+	call, err = preprocessArrayOrNull(call, args, operation, &n, &values, commentFields)
 	if err != nil {
 		return "", nil, err
 	}
@@ -342,12 +452,13 @@ func buildFunctionQuery(call string, args map[string]string, operation string) (
 	for _, loc := range placeholderTokenRE.FindAllStringSubmatchIndex(call, -1) {
 		b.WriteString(call[last:loc[0]])
 		inner := call[loc[2]:loc[3]]
-		ph, perr := parsePlaceholderToken(inner, operation)
+		ph, perr := parsePlaceholderToken(inner, operation, commentFields)
 		if perr != nil {
 			return "", nil, perr
 		}
 		v, ok := resolveArg(args, ph.field)
-		if !ok {
+		// A comment field is optional — an absent value binds as SQL NULL.
+		if !ok && !cfSet[ph.field] {
 			return "", nil, fmt.Errorf("missing value for ${%s}", ph.field)
 		}
 		switch ph.kind {
@@ -356,9 +467,26 @@ func buildFunctionQuery(call string, args map[string]string, operation string) (
 			b.WriteString(fmt.Sprintf("$%d::text[]", n))
 			values = append(values, buildArrayConcatValue(v, ph.literals))
 		case placeholderSimple:
+			kind, kerr := placeholderKindForField(operation, ph.field, commentFields)
+			if kerr != nil {
+				return "", nil, kerr
+			}
+			if kind == fieldIdentifierList {
+				// parent_roles in function mode → inline ARRAY['a','b'] literal, not a bind.
+				arr, aerr := renderRoleArrayVerbatim(v)
+				if aerr != nil {
+					return "", nil, aerr
+				}
+				b.WriteString(arr)
+				break
+			}
 			n++
 			b.WriteString(fmt.Sprintf("$%d", n))
-			values = append(values, v)
+			if cfSet[ph.field] {
+				values = append(values, commentFieldBindValue(v))
+			} else {
+				values = append(values, v)
+			}
 		}
 		last = loc[1]
 	}

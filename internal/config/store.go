@@ -236,11 +236,11 @@ func (s *Store) ConfigPath() string {
 }
 
 func (s *Store) UpdateDBFunctions(fn model.DBFunctions) error {
-	if err := validateDBFunctions(fn); err != nil {
-		return err
-	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if err := validateDBFunctions(fn, s.cfg.CommentFieldKeys()...); err != nil {
+		return err
+	}
 	s.cfg.DBFunctions = fn
 	return s.save()
 }

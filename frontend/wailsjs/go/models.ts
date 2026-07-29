@@ -191,6 +191,7 @@ export namespace model {
 	export class SetCommentParams {
 	    loginName: string;
 	    comment: string;
+	    commentFields?: Record<string, string>;
 	
 	    static createFrom(source: any = {}) {
 	        return new SetCommentParams(source);
@@ -200,6 +201,7 @@ export namespace model {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.loginName = source["loginName"];
 	        this.comment = source["comment"];
+	        this.commentFields = source["commentFields"];
 	    }
 	}
 	export class RevokeParentsParams {
@@ -244,9 +246,8 @@ export namespace model {
 	}
 	export class CreateRoleParams {
 	    loginName: string;
-	    fullName: string;
-	    email: string;
-	    parentRole: string;
+	    parentRoles: string;
+	    commentFields?: Record<string, string>;
 	
 	    static createFrom(source: any = {}) {
 	        return new CreateRoleParams(source);
@@ -255,9 +256,8 @@ export namespace model {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.loginName = source["loginName"];
-	        this.fullName = source["fullName"];
-	        this.email = source["email"];
-	        this.parentRole = source["parentRole"];
+	        this.parentRoles = source["parentRoles"];
+	        this.commentFields = source["commentFields"];
 	    }
 	}
 	export class OperationSpec {

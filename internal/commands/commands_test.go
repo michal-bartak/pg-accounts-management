@@ -167,11 +167,15 @@ func TestBuildArgs_allOperations(t *testing.T) {
 		{
 			op: OpCreateRole,
 			spec: model.OperationSpec{
-				Operation:  OpCreateRole,
-				CreateRole: &model.CreateRoleParams{LoginName: "u1", FullName: "Name", Email: "e@x.com", ParentRole: "gr_p"},
+				Operation: OpCreateRole,
+				CreateRole: &model.CreateRoleParams{
+					LoginName:     "u1",
+					ParentRoles:   "gr_p",
+					CommentFields: map[string]string{"full_name": `"Name"`, "e_mail": `"e@x.com"`},
+				},
 			},
 			want: map[string]string{
-				"loginname": "u1", "fullname": "Name", "email": "e@x.com", "parent_role": "gr_p",
+				"loginname": "u1", "parent_roles": "gr_p", "full_name": `"Name"`, "e_mail": `"e@x.com"`,
 			},
 		},
 		{
@@ -230,7 +234,7 @@ func TestBuildQuery_allOperations(t *testing.T) {
 			operation: OpCreateRole,
 			spec: model.OperationSpec{
 				Operation:  OpCreateRole,
-				CreateRole: &model.CreateRoleParams{LoginName: "jdoe", FullName: "John", Email: "j@x.com", ParentRole: "gr_extra"},
+				CreateRole: &model.CreateRoleParams{LoginName: "jdoe", ParentRoles: "gr_extra"},
 			},
 			wantSubstr: []string{`CREATE ROLE "jdoe"`},
 		},

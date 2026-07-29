@@ -124,6 +124,11 @@ func TestInlineParams(t *testing.T) {
 	if want := "SELECT g(ARRAY['gr_a', 'gr_b']::text[])"; got != want {
 		t.Fatalf("inlineParams array = %q, want %q", got, want)
 	}
+	// Typed comment-field binds: nil → NULL (not '<nil>'), bool → TRUE/FALSE, number → bare.
+	got = inlineParams("SELECT c($1, $2, $3, $4)", []any{nil, true, false, float64(42)})
+	if want := "SELECT c(NULL, TRUE, FALSE, 42)"; got != want {
+		t.Fatalf("inlineParams typed = %q, want %q", got, want)
+	}
 }
 
 func TestFunctionModeSQLInlined(t *testing.T) {
@@ -140,8 +145,9 @@ func TestFunctionModeSQLInlined(t *testing.T) {
 	if !useQuery {
 		t.Fatal("expected function mode (useQuery)")
 	}
+	// parent_roles is embedded inline as an ARRAY literal, so only loginname is a bind.
 	got := inlineParams(query, values)
-	if want := `SELECT grant_parents('x', 'gr_a,gr_b')`; got != want {
+	if want := `SELECT grant_parents('x', ARRAY['gr_a', 'gr_b'])`; got != want {
 		t.Fatalf("function sql = %q, want %q", got, want)
 	}
 }

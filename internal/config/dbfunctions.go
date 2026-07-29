@@ -74,7 +74,9 @@ func needsCreateRoleTemplateFix(operation, call string) bool {
 		(strings.Contains(call, "ARRAY[${parent_role}") && !strings.Contains(call, "|| ${parent_role}"))
 }
 
-func validateDBFunctions(fns model.DBFunctions) error {
+// validateDBFunctions checks each command template. commentFields are the configured comment-field
+// keys, additionally allowed as ${<key>} placeholders in the create_role / set_comment templates.
+func validateDBFunctions(fns model.DBFunctions, commentFields ...string) error {
 	checks := []struct {
 		op string
 		fn model.DBFunction
@@ -91,7 +93,7 @@ func validateDBFunctions(fns model.DBFunctions) error {
 	}
 	for _, c := range checks {
 		exec := model.NormalizeExecution(c.fn.Execution)
-		if err := calltemplate.ValidateCallTemplateWithExecution(c.fn.Call, c.op, exec); err != nil {
+		if err := calltemplate.ValidateCallTemplateWithExecution(c.fn.Call, c.op, exec, commentFields...); err != nil {
 			return fmt.Errorf("%s: %w", c.op, err)
 		}
 	}

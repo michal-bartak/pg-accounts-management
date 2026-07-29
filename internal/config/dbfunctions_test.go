@@ -83,7 +83,7 @@ func TestNeedsCreateRoleTemplateFix(t *testing.T) {
 		want bool
 	}{
 		{"admin_access.create_role(${loginname}, ${Array['x']})", true},
-		{"admin_access.create_role(${loginname}, ARRAY['a'] || ${parent_role})", false},
+		{"admin_access.create_role(${loginname}, ARRAY['a'] || ${parent_roles})", false},
 		{"fn(${array_concat:parent_role,a,b})", true},
 	}
 	for _, c := range cases {

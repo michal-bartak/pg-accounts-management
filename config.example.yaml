@@ -4,7 +4,7 @@
 # db_functions.<operation>.execution — function | statement | block (default: function)
 # See sql/README.md
 #
-# Create role: ARRAY['fixed_group', ...] || ${parent_role}
+# Create role: ARRAY['fixed_group', ...] || ${parent_roles}
 #   - empty parent role in UI → SQL "... || NULL"
 #   - set parent role → "... || $n::text[]"
 
@@ -31,8 +31,10 @@ db_functions:
     execution: statement
     call: "CREATE ROLE ${loginname}"
   # create_role:
-  #   execution: function   # fullname/email/parent_role available; ARRAY['grp'] || ${parent_role}
-  #   call: "admin_access.create_role(${loginname}, NULL, ${fullname}, ${email}, ARRAY['gr_personal_users'] || ${parent_role})"
+  #   # ${parent_roles}, ${<comment field>} (one per comment_fields entry, e.g. ${full_name},
+  #   # ${e_mail}) available; empty/absent comment fields pass as SQL NULL; ARRAY['grp'] || ${parent_roles}
+  #   execution: function
+  #   call: "admin_access.create_role(${loginname}, NULL, ${full_name}, ${e_mail}, ARRAY['gr_personal_users'] || ${parent_roles})"
   remove_role:
     execution: statement
     call: "DROP ROLE ${loginname}"

@@ -39,6 +39,17 @@ var allowedAttributeKeywords = map[string]bool{
 	"BYPASSRLS": true, "NOBYPASSRLS": true,
 }
 
+// commentFieldArgs copies the per-cluster comment-field values (JSON-encoded; see
+// model.CreateRoleParams.CommentFields) into a fresh args map that reserved placeholders are then
+// layered onto. A nil/empty input yields an empty (non-nil) map.
+func commentFieldArgs(fields map[string]string) map[string]string {
+	args := make(map[string]string, len(fields)+2)
+	for k, v := range fields {
+		args[k] = v
+	}
+	return args
+}
+
 func BuildArgs(cfg model.Config, op model.OperationSpec) (model.DBFunction, map[string]string, error) {
 	switch op.Operation {
 	case OpCreateRole:
@@ -46,12 +57,11 @@ func BuildArgs(cfg model.Config, op model.OperationSpec) (model.DBFunction, map[
 			return model.DBFunction{}, nil, fmt.Errorf("create role parameters missing")
 		}
 		p := op.CreateRole
-		return cfg.DBFunctions.CreateRole, map[string]string{
-			"loginname":   p.LoginName,
-			"fullname":    p.FullName,
-			"email":       p.Email,
-			"parent_role": p.ParentRole,
-		}, nil
+		// Comment fields first, so a reserved placeholder always wins on a key collision.
+		args := commentFieldArgs(p.CommentFields)
+		args["loginname"] = p.LoginName
+		args["parent_roles"] = p.ParentRoles
+		return cfg.DBFunctions.CreateRole, args, nil
 	case OpRemoveRole:
 		if op.RemoveRole == nil {
 			return model.DBFunction{}, nil, fmt.Errorf("remove role parameters missing")
@@ -89,10 +99,10 @@ func BuildArgs(cfg model.Config, op model.OperationSpec) (model.DBFunction, map[
 		if op.SetComment == nil {
 			return model.DBFunction{}, nil, fmt.Errorf("set comment parameters missing")
 		}
-		return cfg.DBFunctions.SetComment, map[string]string{
-			"loginname": op.SetComment.LoginName,
-			"comment":   op.SetComment.Comment,
-		}, nil
+		args := commentFieldArgs(op.SetComment.CommentFields)
+		args["loginname"] = op.SetComment.LoginName
+		args["comment"] = op.SetComment.Comment
+		return cfg.DBFunctions.SetComment, args, nil
 	case OpSetAttribute:
 		if op.SetAttribute == nil {
 			return model.DBFunction{}, nil, fmt.Errorf("set attribute parameters missing")
@@ -132,7 +142,7 @@ func ValidateOperation(cfg model.Config, op model.OperationSpec) error {
 		if op.CreateRole == nil || strings.TrimSpace(op.CreateRole.LoginName) == "" {
 			return fmt.Errorf("login name is required")
 		}
-		// parent_role optional when using ${array_concat:parent_role,...} (empty → fixed groups only)
+		// parent_roles is optional (empty → the create_role template's fixed base groups only)
 	case OpRemoveRole:
 		if op.RemoveRole == nil || strings.TrimSpace(op.RemoveRole.LoginName) == "" {
 			return fmt.Errorf("login name is required")

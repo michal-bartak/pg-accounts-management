@@ -22,14 +22,14 @@ type Querier interface {
 // participate in a per-cluster transaction). It returns the executed SQL text (for display;
 // function-mode bind params are inlined) — non-empty whenever a statement was actually sent,
 // including on execution error — plus a status message.
-func ExecuteOperation(ctx context.Context, q Querier, fn model.DBFunction, operation string, args map[string]string) (sql string, msg string, err error) {
+func ExecuteOperation(ctx context.Context, q Querier, fn model.DBFunction, operation string, args map[string]string, commentFields ...string) (sql string, msg string, err error) {
 	call := strings.TrimSpace(fn.Call)
 	if call == "" {
 		return "", "", errCallNotConfigured()
 	}
 
 	execution := model.NormalizeExecution(fn.Execution)
-	query, values, useQuery, err := calltemplate.Build(call, args, operation, execution)
+	query, values, useQuery, err := calltemplate.Build(call, args, operation, execution, commentFields...)
 	if err != nil {
 		return "", "", err
 	}
@@ -62,6 +62,17 @@ func inlineParams(query string, values []any) string {
 
 func sqlLiteral(v any) string {
 	switch t := v.(type) {
+	case nil:
+		// A nil bind (e.g. an empty/absent comment field) is a real SQL NULL, not the string
+		// "<nil>". Render it unquoted so the display SQL matches what actually executes.
+		return "NULL"
+	case bool:
+		if t {
+			return "TRUE"
+		}
+		return "FALSE"
+	case float64:
+		return fmt.Sprintf("%v", t) // bare numeric literal (comment fields bind numbers as float64)
 	case []string:
 		// The query token already carries a ::text[] cast (e.g. $1::text[]), so don't add one.
 		parts := make([]string, len(t))
@@ -77,8 +88,8 @@ func sqlLiteral(v any) string {
 }
 
 // CallFunction is an alias for ExecuteOperation (Wails-era name).
-func CallFunction(ctx context.Context, conn *pgx.Conn, fn model.DBFunction, operation string, args map[string]string) (sql string, msg string, err error) {
-	return ExecuteOperation(ctx, conn, fn, operation, args)
+func CallFunction(ctx context.Context, conn *pgx.Conn, fn model.DBFunction, operation string, args map[string]string, commentFields ...string) (sql string, msg string, err error) {
+	return ExecuteOperation(ctx, conn, fn, operation, args, commentFields...)
 }
 
 func runQuery(ctx context.Context, q Querier, query string, values ...any) (string, error) {

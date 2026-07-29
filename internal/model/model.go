@@ -185,6 +185,18 @@ type CommentField struct {
 	Label string `yaml:"label" json:"label"`
 }
 
+// CommentFieldKeys returns the configured comment-field keys in order. These are the placeholder
+// names (${<key>}) additionally offered to the create_role / set_comment call templates.
+func (c Config) CommentFieldKeys() []string {
+	keys := make([]string, 0, len(c.CommentFields))
+	for _, f := range c.CommentFields {
+		if f.Key != "" {
+			keys = append(keys, f.Key)
+		}
+	}
+	return keys
+}
+
 // ClustersConfig is the whole clusters+categories set, saved atomically from the staged
 // Clusters editor. A cluster/category with an empty ID is treated as new.
 type ClustersConfig struct {
@@ -208,10 +220,16 @@ type AuthContext struct {
 }
 
 type CreateRoleParams struct {
-	LoginName  string `json:"loginName"`
-	FullName   string `json:"fullName"`
-	Email      string `json:"email"`
-	ParentRole string `json:"parentRole"`
+	LoginName string `json:"loginName"`
+	// ParentRoles is a comma-separated role list for the create_role template's ${parent_roles}
+	// placeholder (same field/name as grant_parents). The Create form leaves it empty and grants
+	// parents via follow-up grant_parents ops; it matters for a custom create_role template.
+	ParentRoles string `json:"parentRoles"`
+	// CommentFields carries the configured comment-field placeholders (${<key>}) offered to the
+	// create_role template. Each value is the JSON encoding of that key's value in the role's
+	// comment (e.g. `"John"`, `42`, `true`, `null`); an absent key resolves to SQL NULL. Replaces
+	// the former hardcoded fullName/email placeholders.
+	CommentFields map[string]string `json:"commentFields,omitempty"`
 }
 
 type RemoveRoleParams struct {
@@ -236,6 +254,9 @@ type ChangePasswordParams struct {
 type SetCommentParams struct {
 	LoginName string `json:"loginName"`
 	Comment   string `json:"comment"`
+	// CommentFields carries the configured comment-field placeholders (${<key>}) offered to the
+	// set_comment template — same JSON-encoded-value convention as CreateRoleParams.CommentFields.
+	CommentFields map[string]string `json:"commentFields,omitempty"`
 }
 
 // SetAttributeParams sets one ALTER ROLE attribute keyword (e.g. SUPERUSER / NOSUPERUSER).

@@ -35,7 +35,7 @@ Cross-platform **PostgreSQL role maintenance** desktop app: manage clusters, bat
 
 Example template: [`config.example.yaml`](config.example.yaml). Implemented in `internal/config/` (`paths.go`, `store.go`).
 
-**YAML keys:** `version`, `categories`, `clusters`, `db_functions.<op>.call`, `db_functions.<op>.execution`, `batch.max_concurrency` (default 5), `ui.theme`, `parent_roles` (preconfigured parent groups — bare identifiers, offered as pick-list choices when granting privileges; Create-role `parent_role` accepts a comma-separated list). Legacy `name`/`params` migrated on load.
+**YAML keys:** `version`, `categories`, `clusters`, `db_functions.<op>.call`, `db_functions.<op>.execution`, `batch.max_concurrency` (default 5), `ui.theme`, `parent_roles` (preconfigured parent groups — bare identifiers, offered as pick-list choices when granting privileges; Create-role uses the same `parent_roles` placeholder as grant/revoke). Legacy `name`/`params` migrated on load.
 
 ## Wails API (`app.go` → `window.go.main.App`)
 
@@ -67,12 +67,12 @@ Config: `db_functions.<operation>.call` + optional `.execution` (`function` \| `
 
 | `operation` | Allowed `${...}` | Notes |
 |-------------|------------------|-------|
-| `create_role` | loginname, fullname, email, parent_role | `ARRAY \|\|` requires `execution: function` |
+| `create_role` | loginname, parent_roles, `${<comment field>}` (per `Config.CommentFields`) | `parent_roles`: statement → `"a", "b"`, function → inline `ARRAY['a','b']`; comment fields typed (string→literal, num/bool→bare, empty/absent→`NULL`); `ARRAY \|\|` requires `execution: function` |
 | `remove_role` | loginname, rolename (alias) | `statement`: e.g. `DROP ROLE ${loginname}`; `block`: a complete anonymous block (`DO $tag$ … $tag$;`), run verbatim |
 | `grant_parents` | loginname, parent_roles | `statement`: `GRANT ${parent_roles} TO ${loginname}` — identifiers, not quoted |
 | `revoke_parents` | loginname, parent_roles | Default `statement`: `REVOKE ${parent_roles} FROM ${loginname}` |
 | `change_password` | loginname, new_password | |
-| `set_comment` | loginname, comment | Default `statement`: `COMMENT ON ROLE ${loginname} IS ${comment}` — comment as escaped literal |
+| `set_comment` | loginname, comment, `${<comment field>}` (per `Config.CommentFields`) | Default `statement`: `COMMENT ON ROLE ${loginname} IS ${comment}` — comment as escaped literal; comment fields typed (empty/absent→`NULL`) |
 | `set_attribute` | loginname, attributes (alias: attribute) | Default `statement`: `ALTER ROLE ${loginname} WITH ${attributes}` — space-separated whitelisted keywords (SUPERUSER/NOSUPERUSER/…), embedded unquoted |
 | `set_config` | loginname, config_name, config_value | Default `statement`: `ALTER ROLE ${loginname} SET ${config_name} = ${config_value}` — `config_name` is a bare unquoted GUC name (`fieldConfigName`, `gucNameRE`-validated), value a literal. Role GUCs read from `pg_roles.rolconfig`. |
 | `reset_config` | loginname, config_name | Default `statement`: `ALTER ROLE ${loginname} RESET ${config_name}` |
@@ -83,15 +83,17 @@ Config: `db_functions.<operation>.call` + optional `.execution` (`function` \| `
 
 `CREATE ROLE ${loginname}`
 
-(fullname/email/parent_role are unused by the vanilla default; a `function`-mode override can
-consume them, e.g. `admin_access.create_role(${loginname}, NULL, ${fullname}, ${email}, ARRAY['grp'] || ${parent_role})`).
+(parent_roles and the configured comment-field placeholders are unused by the vanilla default; a
+`function`-mode override can consume them, e.g.
+`admin_access.create_role(${loginname}, NULL, ${full_name}, ${e_mail}, ARRAY['grp'] || ${parent_roles})`).
 Loading an existing config never force-overwrites user templates; the `#fn-dialog` **Default**
 button reverts one template to the vanilla built-in.
 
 **Template processing:**
 
 - **Function mode:** `${field}` → `$n` text bind from form (`internal/commands` arg map).
-- **Statement/block:** `loginname`, `parent_roles`, `parent_role`, `rolename` → unquoted identifiers; `parent_roles` split on commas (grant/revoke); `new_password`, `fullname`, `email` → SQL string literals.
+- **Statement/block:** `loginname`, `parent_roles`, `rolename` → double-quoted identifiers; `parent_roles` split on commas → `"a", "b"` (create_role/grant/revoke); `new_password`, `comment`, `config_value` → SQL string literals; **comment fields** (create_role/set_comment) → JSON-value-typed (string→literal, number/bool→bare, array/object→JSON literal, empty/`null`/absent→bare `NULL`), threaded in as variadic `commentFields ...string` from `Config.CommentFieldKeys()`.
+- **Function mode `${parent_roles}`:** embedded inline as `ARRAY['a','b']` (verbatim single-quoted values via `renderRoleArrayVerbatim`; `'`-bearing values rejected; empty → `NULL`), NOT a `$n` bind — so wrapper functions receive a real `text[]`. The legacy `ARRAY[fixed] || ${parent_roles}` concat form still binds `$n::text[]` via `preprocessArrayOrNull`.
 - `ARRAY['a','b'] || ${field}` → fixed array literal + `|| NULL` if field empty, else `|| $n::text[]` with `[]string{value}` (processed before other placeholders).
 - `ARRAY[${field}, 'a', 'b']` → normalized to `ARRAY['a','b'] || ${field}` via `normalizeTemplate`.
 - Reject `${Array...}`, `SELECT`, `;`. Legacy `${array_concat:...}` still parsed; migrate broken configs in `internal/config/dbfunctions.go`.
@@ -188,8 +190,8 @@ inline in a `.form-error` (`showInlineError` →
 `buildAlterClusterOps` orders grant→revoke→password→**set_attribute (all keywords
 combined)**→set_config→reset_config→set_comment; create prepends `create_role`
 (`buildCreateClusterOps`). Comment persists via `set_comment` (per-cluster `commentOverrides` wins,
-else `assembleComment`; create's `create_role` gets `${fullname}`/`${email}` from the editor,
-follow-up `set_comment` authoritative). When comments vary the inline editor hides and the Comments
+else `assembleComment`; create's/presence-add's `create_role` gets its comment-field placeholders
+from `commentFieldArgs(effectiveComment)`, follow-up `set_comment` authoritative). When comments vary the inline editor hides and the Comments
 dialog reconciles per cluster (`commentVersionEditors`). One shared
 `confirmScopeDialog`/`buildScopeTargets` (no create fork). **Errors never touch the role form**:
 `executeRoleBatch` returns the results array or `null`; on `null`/any per-cluster failure the
