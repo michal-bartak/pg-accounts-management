@@ -502,3 +502,110 @@ test('fnPlaceholderNames: create_role / set_comment inject configured fields; ot
   assert.deepEqual(r.comment, ['loginname', 'full_name', 'e_mail', 'comment']);
   assert.deepEqual(r.other, ['loginname', 'new_password']);
 });
+
+// --- Run-status phases: create+load log concatenation and phase-aware chip summary -------------
+test('run-status: create+load concatenate per-cluster logs with -- Create/Load Role + phase chip', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    state.clusters = [{id:'c1',alias:'c1',category:'p'},{id:'c2',alias:'c2',category:'p'}];
+    runState = null;
+    beginRunStatus([{clusterId:'c1'},{clusterId:'c2'}], 'Create');
+    finishRunStatus([
+      {clusterId:'c1', status:'ok', message:'', durationMs:5, queries:['CREATE ROLE "bob"','GRANT "gr_a" TO "bob"']},
+      {clusterId:'c2', status:'error', message:'boom', durationMs:3, queries:['CREATE ROLE "bob"']},
+    ]);
+    const createSummary = runStatusSummary();
+    reportRoleLoad({ valid:[{clusterId:'c1', alias:'c1', category:'p', durationMs:2, queries:['SELECT rolname']}], errors:[] }, { appendLog:true });
+    return {
+      createSummary,
+      afterSummary: runStatusSummary(),
+      c1: rowQueries(runState.byId.get('c1')),
+      c2: rowQueries(runState.byId.get('c2')),
+    };
+  })()`);
+  assert.deepEqual(r.createSummary, { stateClass:'error', text:'Status: Create (1/2 failed)' });
+  assert.equal(r.afterSummary.text, 'Status: Create (1/2 failed), Load OK (1 cluster)');
+  assert.deepEqual(r.c1, ['-- Create Role','CREATE ROLE "bob"','GRANT "gr_a" TO "bob"','-- Load Role','SELECT rolname']);
+  assert.deepEqual(r.c2, ['-- Create Role','CREATE ROLE "bob"']); // no Load segment (role absent there)
+});
+
+test('run-status: create+load all-ok chip shows OK (n clusters)', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    state.clusters = [{id:'c1',alias:'c1',category:'p'}];
+    runState = null;
+    beginRunStatus([{clusterId:'c1'}], 'Create');
+    finishRunStatus([{clusterId:'c1', status:'ok', durationMs:1, queries:['CREATE ROLE "bob"']}]);
+    reportRoleLoad({ valid:[{clusterId:'c1', alias:'c1', category:'p', durationMs:1, queries:['SELECT 1']}], errors:[] }, { appendLog:true });
+    return runStatusSummary();
+  })()`);
+  assert.deepEqual(r, { stateClass:'ok', text:'Status: OK (1 cluster)' });
+});
+
+test('run-status: a single unnamed phase keeps the legacy chip text and a verbatim log', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    state.clusters = [{id:'c1',alias:'c1',category:'p'},{id:'c2',alias:'c2',category:'p'}];
+    runState = null;
+    beginRunStatus([{clusterId:'c1'},{clusterId:'c2'}]); // no phase name
+    finishRunStatus([
+      {clusterId:'c1', status:'ok', queries:['REVOKE "x" FROM "bob"']},
+      {clusterId:'c2', status:'error', message:'no', queries:[]},
+    ]);
+    return { summary: runStatusSummary(), c1: rowQueries(runState.byId.get('c1')) };
+  })()`);
+  assert.deepEqual(r.summary, { stateClass:'error', text:'Status: Error (1/2 failed)' });
+  assert.deepEqual(r.c1, ['REVOKE "x" FROM "bob"']); // unnamed phase → no -- separators
+});
+
+test('run-status: a default (user-initiated) load resets the chip (create log dropped)', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    state.clusters = [{id:'c1',alias:'c1',category:'p'}];
+    runState = null;
+    beginRunStatus([{clusterId:'c1'}], 'Create');
+    finishRunStatus([{clusterId:'c1', status:'ok', queries:['CREATE ROLE "bob"']}]);
+    reportRoleLoad({ valid:[{clusterId:'c1', alias:'c1', category:'p', queries:['SELECT 1']}], errors:[] }); // default: reset
+    return rowQueries(runState.byId.get('c1'));
+  })()`);
+  assert.deepEqual(r, ['SELECT 1']); // reset to a single unnamed load phase, verbatim
+});
+
+test('formatQueryLine: SQL gets a trailing ; but -- comment separators are left alone', () => {
+  const r = evalJSON(`[formatQueryLine('SELECT 1'), formatQueryLine('CREATE ROLE "x";'), formatQueryLine('-- Create Role')]`);
+  assert.deepEqual(r, ['SELECT 1;', 'CREATE ROLE "x";', '-- Create Role']);
+});
+
+test('enterAlterAfterCreate: switches to Alter, scopes to the sidebar selection, appends the load log', async () => {
+  const p = vm.runInContext(`(async () => {
+    ${SETUP_STATE}
+    state.clusters = [{id:'c1',alias:'c1',category:'p'},{id:'c2',alias:'c2',category:'p'}];
+    const _resolve = resolveSelectedClusters, _cats = getSelectedCategories, _ids = getSelectedClusterIDs, _reload = reloadDetails, _footer = updateOpsFooter;
+    let reloadOpts = null;
+    try {
+      getSelectedCategories = () => ['p'];
+      getSelectedClusterIDs = () => [];
+      resolveSelectedClusters = () => state.clusters;
+      updateOpsFooter = () => {};
+      reloadDetails = async (opts) => { reloadOpts = opts; };
+      currentOp = 'create_role';
+      await enterAlterAfterCreate('bob');
+      return JSON.stringify({
+        currentOp, alterSelected,
+        targets: alterTargets,
+        scope: alterScopeClusters.map((c) => c.clusterId),
+        appliedClusterIds: [...alterAppliedSelection.clusterIds],
+        reloadOpts,
+      });
+    } finally {
+      resolveSelectedClusters = _resolve; getSelectedCategories = _cats; getSelectedClusterIDs = _ids;
+      reloadDetails = _reload; updateOpsFooter = _footer;
+    }
+  })()`, ctx);
+  const r = JSON.parse(await p);
+  assert.equal(r.currentOp, 'alter_user');
+  assert.equal(r.alterSelected, 'bob');
+  assert.deepEqual(r.targets, { categoryIds: ['p'], clusterIds: [] });
+  assert.deepEqual(r.scope, ['c1', 'c2']);          // all originally-selected clusters
+  assert.deepEqual(r.reloadOpts, { appendLog: true }); // load appends to the create log, not reset
+});
