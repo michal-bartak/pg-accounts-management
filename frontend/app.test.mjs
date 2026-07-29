@@ -504,7 +504,7 @@ test('fnPlaceholderNames: create_role / set_comment inject configured fields; ot
 });
 
 // --- Run-status phases: create+load log concatenation and phase-aware chip summary -------------
-test('run-status: create+load concatenate per-cluster logs with -- Create/Load Role + phase chip', () => {
+test('run-status: post-create load logs a -- Load Role query on EVERY cluster + inline error', () => {
   const r = evalJSON(`(() => {
     ${SETUP_STATE}
     state.clusters = [{id:'c1',alias:'c1',category:'p'},{id:'c2',alias:'c2',category:'p'}];
@@ -512,10 +512,18 @@ test('run-status: create+load concatenate per-cluster logs with -- Create/Load R
     beginRunStatus([{clusterId:'c1'},{clusterId:'c2'}], 'Create');
     finishRunStatus([
       {clusterId:'c1', status:'ok', message:'', durationMs:5, queries:['CREATE ROLE "bob"','GRANT "gr_a" TO "bob"']},
-      {clusterId:'c2', status:'error', message:'boom', durationMs:3, queries:['CREATE ROLE "bob"']},
+      {clusterId:'c2', status:'error', message:'permission denied', durationMs:3, queries:['CREATE ROLE "bob"']},
     ]);
     const createSummary = runStatusSummary();
-    reportRoleLoad({ valid:[{clusterId:'c1', alias:'c1', category:'p', durationMs:2, queries:['SELECT rolname']}], errors:[] }, { appendLog:true });
+    // Load runs on ALL selected clusters: c1 found, c2 reachable-but-role-absent (carries the SQL).
+    reportRoleLoad({
+      valid:  [{clusterId:'c1', alias:'c1', category:'p', durationMs:2, exists:true,  queries:['SELECT rolname']}],
+      errors: [],
+      all:    [
+        {clusterId:'c1', alias:'c1', category:'p', durationMs:2, exists:true,  error:'', queries:['SELECT rolname']},
+        {clusterId:'c2', alias:'c2', category:'p', durationMs:1, exists:false, error:'', queries:['SELECT rolname']},
+      ],
+    }, { appendLog:true });
     return {
       createSummary,
       afterSummary: runStatusSummary(),
@@ -524,9 +532,25 @@ test('run-status: create+load concatenate per-cluster logs with -- Create/Load R
     };
   })()`);
   assert.deepEqual(r.createSummary, { stateClass:'error', text:'Status: Create (1/2 failed)' });
-  assert.equal(r.afterSummary.text, 'Status: Create (1/2 failed), Load OK (1 cluster)');
+  // Load ran (ok) on both clusters, so the Load phase reports 2 clusters.
+  assert.equal(r.afterSummary.text, 'Status: Create (1/2 failed), Load OK (2 clusters)');
   assert.deepEqual(r.c1, ['-- Create Role','CREATE ROLE "bob"','GRANT "gr_a" TO "bob"','-- Load Role','SELECT rolname']);
-  assert.deepEqual(r.c2, ['-- Create Role','CREATE ROLE "bob"']); // no Load segment (role absent there)
+  // The failed cluster now shows its create error inline AND the load query that ran there.
+  assert.deepEqual(r.c2, ['-- Create Role','CREATE ROLE "bob"','-- ERROR: permission denied','-- Load Role','SELECT rolname']);
+});
+
+test('run-status: an unreachable cluster on load shows -- Load Role + -- ERROR (no SQL ran)', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    state.clusters = [{id:'c1',alias:'c1',category:'p'}];
+    runState = null;
+    beginRunStatus([{clusterId:'c1'}], 'Create');
+    finishRunStatus([{clusterId:'c1', status:'ok', durationMs:1, queries:['CREATE ROLE "bob"']}]);
+    reportRoleLoad({ valid:[], errors:[], all:[{clusterId:'c1', alias:'c1', category:'p', error:'connection refused', queries:[]}] }, { appendLog:true });
+    return { summary: runStatusSummary(), c1: rowQueries(runState.byId.get('c1')) };
+  })()`);
+  assert.equal(r.summary.text, 'Status: Create OK (1 cluster), Load (1/1 failed)');
+  assert.deepEqual(r.c1, ['-- Create Role','CREATE ROLE "bob"','-- Load Role','-- ERROR: connection refused']);
 });
 
 test('run-status: create+load all-ok chip shows OK (n clusters)', () => {
@@ -536,7 +560,7 @@ test('run-status: create+load all-ok chip shows OK (n clusters)', () => {
     runState = null;
     beginRunStatus([{clusterId:'c1'}], 'Create');
     finishRunStatus([{clusterId:'c1', status:'ok', durationMs:1, queries:['CREATE ROLE "bob"']}]);
-    reportRoleLoad({ valid:[{clusterId:'c1', alias:'c1', category:'p', durationMs:1, queries:['SELECT 1']}], errors:[] }, { appendLog:true });
+    reportRoleLoad({ valid:[{clusterId:'c1', alias:'c1', category:'p', durationMs:1, exists:true, queries:['SELECT 1']}], errors:[], all:[{clusterId:'c1', alias:'c1', category:'p', durationMs:1, exists:true, error:'', queries:['SELECT 1']}] }, { appendLog:true });
     return runStatusSummary();
   })()`);
   assert.deepEqual(r, { stateClass:'ok', text:'Status: OK (1 cluster)' });
@@ -572,8 +596,8 @@ test('run-status: a default (user-initiated) load resets the chip (create log dr
 });
 
 test('formatQueryLine: SQL gets a trailing ; but -- comment separators are left alone', () => {
-  const r = evalJSON(`[formatQueryLine('SELECT 1'), formatQueryLine('CREATE ROLE "x";'), formatQueryLine('-- Create Role')]`);
-  assert.deepEqual(r, ['SELECT 1;', 'CREATE ROLE "x";', '-- Create Role']);
+  const r = evalJSON(`[formatQueryLine('SELECT 1'), formatQueryLine('CREATE ROLE "x";'), formatQueryLine('-- Create Role'), formatQueryLine('-- ERROR: permission denied')]`);
+  assert.deepEqual(r, ['SELECT 1;', 'CREATE ROLE "x";', '-- Create Role', '-- ERROR: permission denied']);
 });
 
 test('enterAlterAfterCreate: switches to Alter, scopes to the sidebar selection, appends the load log', async () => {
