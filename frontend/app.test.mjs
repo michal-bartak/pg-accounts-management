@@ -273,6 +273,56 @@ test('buildAlterClusterOps: a pending grant emits grant_parents', () => {
   assert.deepEqual(ops, [{ clusterId: 'c1', ops: ['grant_parents'] }]);
 });
 
+// Regression: the parents selected for a newly-created role must reach BOTH the create_role
+// template's ${parent_roles} AND the follow-up grant_parents (per cluster).
+test('buildCreateClusterOps: create_role and grant_parents both carry the selected parents', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    const _origResolve = resolveSelectedClusters; // shared vm context — restore to avoid leaking
+    try {
+      state.clusters = [{id:'c1',alias:'c1',category:'p'},{id:'c2',alias:'c2',category:'p'}];
+      currentOp = 'create_role';
+      resetEditMaps();
+      resolveSelectedClusters = () => state.clusters;   // stub the DOM-checkbox read
+      alterDetails = state.clusters.map((c) => ({ clusterId:c.id, exists:false, comment:'', parents:[], attributes:{}, settings:{} }));
+      alterSelected = 'bob';
+      alterAdd.set('gr_admin', new Set(['c1','c2']));
+      alterAdd.set('gr_ro', new Set(['c1']));           // c1 gets two parents, c2 gets one
+      return buildCreateClusterOps({ loginName:'bob' }).map((c) => ({
+        id: c.clusterId,
+        create: c.operations.find((o) => o.operation === 'create_role').createRole.parentRoles,
+        grant: (c.operations.find((o) => o.operation === 'grant_parents') || {}).grantParents.parentRoles,
+      }));
+    } finally { resolveSelectedClusters = _origResolve; }
+  })()`);
+  assert.deepEqual(r, [
+    { id: 'c1', create: 'gr_admin,gr_ro', grant: 'gr_admin,gr_ro' },
+    { id: 'c2', create: 'gr_admin', grant: 'gr_admin' },
+  ]);
+});
+
+// Alter presence-add: create_role for a newly-added cluster also carries that cluster's parents.
+test('buildAlterClusterOps: presence-add create_role carries the granted parents', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    currentOp = 'alter_user';
+    alterSelected = 'bob';
+    resetEditMaps();
+    alterDetails = [{ clusterId:'cX', exists:false, comment:'', parents:[], attributes:{}, settings:{} }];
+    commentEditor = editorFromComment('', true); /* varies → created bare, no comment */
+    alterAdd.set('gr_new', new Set(['cX']));
+    const ops = buildAlterClusterOps().find((c) => c.clusterId === 'cX').operations;
+    return {
+      order: ops.map((o) => o.operation),
+      create: ops.find((o) => o.operation === 'create_role').createRole.parentRoles,
+      grant: ops.find((o) => o.operation === 'grant_parents').grantParents.parentRoles,
+    };
+  })()`);
+  assert.deepEqual(r.order, ['create_role', 'grant_parents']);
+  assert.equal(r.create, 'gr_new');
+  assert.equal(r.grant, 'gr_new');
+});
+
 // addPrivilegeScope: "Add privilege" is additive — it must never revoke where the privilege
 // already lives. Regression for the bug where adding P1 to cluster D revoked it from A/B/C.
 test('addPrivilegeScope: adding an existing privilege to a new cluster grants D and revokes nothing', () => {
@@ -399,4 +449,187 @@ test('openSearchDialog clears cached results (no stale matches from a prior scop
     return { cleared: alterGroups.length };
   })()`);
   assert.equal(r.cleared, 0);
+});
+
+// --- commentFieldArgs: per-cluster create_role / set_comment placeholder values ---------------
+test('commentFieldArgs: JSON-encodes each configured field present in the comment (typed)', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    state.commentFields = [{key:'full_name'},{key:'e_mail'},{key:'age'},{key:'active'}];
+    return commentFieldArgs('{"full_name":"John","age":42,"active":true,"e_mail":null}');
+  })()`);
+  // Values are JSON encodings so the backend can recover their type; null encodes as "null".
+  assert.deepEqual(r, { full_name: '"John"', e_mail: 'null', age: '42', active: 'true' });
+});
+
+test('commentFieldArgs: an empty-string field is kept, encoded as "" (backend maps it to NULL)', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    state.commentFields = [{key:'full_name'}];
+    return commentFieldArgs('{"full_name":""}');
+  })()`);
+  // Present (not omitted) and JSON-encoded as the two-char string "" — renderCommentFieldSQL /
+  // commentFieldBindValue then turn "" into SQL NULL. Distinct from an absent key (also NULL).
+  assert.deepEqual(r, { full_name: '""' });
+});
+
+test('commentFieldArgs: keys absent from the comment are omitted (→ backend NULL)', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    return commentFieldArgs('{"full_name":"Jane"}');
+  })()`);
+  assert.deepEqual(r, { full_name: '"Jane"' }); // e_mail omitted
+});
+
+test('commentFieldArgs: a plain-text (non-object) comment yields no field args', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    return commentFieldArgs('just some text');
+  })()`);
+  assert.deepEqual(r, {});
+});
+
+test('fnPlaceholderNames: create_role / set_comment inject configured fields; other ops unchanged', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    return {
+      create: fnPlaceholderNames('create_role', ['loginname','parent_roles']),
+      comment: fnPlaceholderNames('set_comment', ['loginname','comment']),
+      other: fnPlaceholderNames('change_password', ['loginname','new_password']),
+    };
+  })()`);
+  assert.deepEqual(r.create, ['loginname', 'full_name', 'e_mail', 'parent_roles']);
+  assert.deepEqual(r.comment, ['loginname', 'full_name', 'e_mail', 'comment']);
+  assert.deepEqual(r.other, ['loginname', 'new_password']);
+});
+
+// --- Run-status phases: create+load log concatenation and phase-aware chip summary -------------
+test('run-status: post-create load logs a -- Load Role query on EVERY cluster + inline error', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    state.clusters = [{id:'c1',alias:'c1',category:'p'},{id:'c2',alias:'c2',category:'p'}];
+    runState = null;
+    beginRunStatus([{clusterId:'c1'},{clusterId:'c2'}], 'Create');
+    finishRunStatus([
+      {clusterId:'c1', status:'ok', message:'', durationMs:5, queries:['CREATE ROLE "bob"','GRANT "gr_a" TO "bob"']},
+      {clusterId:'c2', status:'error', message:'permission denied', durationMs:3, queries:['CREATE ROLE "bob"']},
+    ]);
+    const createSummary = runStatusSummary();
+    // Load runs on ALL selected clusters: c1 found, c2 reachable-but-role-absent (carries the SQL).
+    reportRoleLoad({
+      valid:  [{clusterId:'c1', alias:'c1', category:'p', durationMs:2, exists:true,  queries:['SELECT rolname']}],
+      errors: [],
+      all:    [
+        {clusterId:'c1', alias:'c1', category:'p', durationMs:2, exists:true,  error:'', queries:['SELECT rolname']},
+        {clusterId:'c2', alias:'c2', category:'p', durationMs:1, exists:false, error:'', queries:['SELECT rolname']},
+      ],
+    }, { appendLog:true });
+    return {
+      createSummary,
+      afterSummary: runStatusSummary(),
+      c1: rowQueries(runState.byId.get('c1')),
+      c2: rowQueries(runState.byId.get('c2')),
+    };
+  })()`);
+  assert.deepEqual(r.createSummary, { stateClass:'error', text:'Status: Create (1/2 failed)' });
+  // Load ran (ok) on both clusters, so the Load phase reports 2 clusters.
+  assert.equal(r.afterSummary.text, 'Status: Create (1/2 failed), Load OK (2 clusters)');
+  assert.deepEqual(r.c1, ['-- Create Role','CREATE ROLE "bob"','GRANT "gr_a" TO "bob"','-- Load Role','SELECT rolname']);
+  // The failed cluster now shows its create error inline AND the load query that ran there.
+  assert.deepEqual(r.c2, ['-- Create Role','CREATE ROLE "bob"','-- ERROR: permission denied','-- Load Role','SELECT rolname']);
+});
+
+test('run-status: an unreachable cluster on load shows -- Load Role + -- ERROR (no SQL ran)', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    state.clusters = [{id:'c1',alias:'c1',category:'p'}];
+    runState = null;
+    beginRunStatus([{clusterId:'c1'}], 'Create');
+    finishRunStatus([{clusterId:'c1', status:'ok', durationMs:1, queries:['CREATE ROLE "bob"']}]);
+    reportRoleLoad({ valid:[], errors:[], all:[{clusterId:'c1', alias:'c1', category:'p', error:'connection refused', queries:[]}] }, { appendLog:true });
+    return { summary: runStatusSummary(), c1: rowQueries(runState.byId.get('c1')) };
+  })()`);
+  assert.equal(r.summary.text, 'Status: Create OK (1 cluster), Load (1/1 failed)');
+  assert.deepEqual(r.c1, ['-- Create Role','CREATE ROLE "bob"','-- Load Role','-- ERROR: connection refused']);
+});
+
+test('run-status: create+load all-ok chip shows OK (n clusters)', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    state.clusters = [{id:'c1',alias:'c1',category:'p'}];
+    runState = null;
+    beginRunStatus([{clusterId:'c1'}], 'Create');
+    finishRunStatus([{clusterId:'c1', status:'ok', durationMs:1, queries:['CREATE ROLE "bob"']}]);
+    reportRoleLoad({ valid:[{clusterId:'c1', alias:'c1', category:'p', durationMs:1, exists:true, queries:['SELECT 1']}], errors:[], all:[{clusterId:'c1', alias:'c1', category:'p', durationMs:1, exists:true, error:'', queries:['SELECT 1']}] }, { appendLog:true });
+    return runStatusSummary();
+  })()`);
+  assert.deepEqual(r, { stateClass:'ok', text:'Status: OK (1 cluster)' });
+});
+
+test('run-status: a single unnamed phase keeps the legacy chip text and a verbatim log', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    state.clusters = [{id:'c1',alias:'c1',category:'p'},{id:'c2',alias:'c2',category:'p'}];
+    runState = null;
+    beginRunStatus([{clusterId:'c1'},{clusterId:'c2'}]); // no phase name
+    finishRunStatus([
+      {clusterId:'c1', status:'ok', queries:['REVOKE "x" FROM "bob"']},
+      {clusterId:'c2', status:'error', message:'no', queries:[]},
+    ]);
+    return { summary: runStatusSummary(), c1: rowQueries(runState.byId.get('c1')) };
+  })()`);
+  assert.deepEqual(r.summary, { stateClass:'error', text:'Status: Error (1/2 failed)' });
+  assert.deepEqual(r.c1, ['REVOKE "x" FROM "bob"']); // unnamed phase → no -- separators
+});
+
+test('run-status: a default (user-initiated) load resets the chip (create log dropped)', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    state.clusters = [{id:'c1',alias:'c1',category:'p'}];
+    runState = null;
+    beginRunStatus([{clusterId:'c1'}], 'Create');
+    finishRunStatus([{clusterId:'c1', status:'ok', queries:['CREATE ROLE "bob"']}]);
+    reportRoleLoad({ valid:[{clusterId:'c1', alias:'c1', category:'p', queries:['SELECT 1']}], errors:[] }); // default: reset
+    return rowQueries(runState.byId.get('c1'));
+  })()`);
+  assert.deepEqual(r, ['SELECT 1']); // reset to a single unnamed load phase, verbatim
+});
+
+test('formatQueryLine: SQL gets a trailing ; but -- comment separators are left alone', () => {
+  const r = evalJSON(`[formatQueryLine('SELECT 1'), formatQueryLine('CREATE ROLE "x";'), formatQueryLine('-- Create Role'), formatQueryLine('-- ERROR: permission denied')]`);
+  assert.deepEqual(r, ['SELECT 1;', 'CREATE ROLE "x";', '-- Create Role', '-- ERROR: permission denied']);
+});
+
+test('enterAlterAfterCreate: switches to Alter, scopes to the sidebar selection, appends the load log', async () => {
+  const p = vm.runInContext(`(async () => {
+    ${SETUP_STATE}
+    state.clusters = [{id:'c1',alias:'c1',category:'p'},{id:'c2',alias:'c2',category:'p'}];
+    const _resolve = resolveSelectedClusters, _cats = getSelectedCategories, _ids = getSelectedClusterIDs, _reload = reloadDetails, _footer = updateOpsFooter;
+    let reloadOpts = null;
+    try {
+      getSelectedCategories = () => ['p'];
+      getSelectedClusterIDs = () => [];
+      resolveSelectedClusters = () => state.clusters;
+      updateOpsFooter = () => {};
+      reloadDetails = async (opts) => { reloadOpts = opts; };
+      currentOp = 'create_role';
+      await enterAlterAfterCreate('bob');
+      return JSON.stringify({
+        currentOp, alterSelected,
+        targets: alterTargets,
+        scope: alterScopeClusters.map((c) => c.clusterId),
+        appliedClusterIds: [...alterAppliedSelection.clusterIds],
+        reloadOpts,
+      });
+    } finally {
+      resolveSelectedClusters = _resolve; getSelectedCategories = _cats; getSelectedClusterIDs = _ids;
+      reloadDetails = _reload; updateOpsFooter = _footer;
+    }
+  })()`, ctx);
+  const r = JSON.parse(await p);
+  assert.equal(r.currentOp, 'alter_user');
+  assert.equal(r.alterSelected, 'bob');
+  assert.deepEqual(r.targets, { categoryIds: ['p'], clusterIds: [] });
+  assert.deepEqual(r.scope, ['c1', 'c2']);          // all originally-selected clusters
+  assert.deepEqual(r.reloadOpts, { appendLog: true }); // load appends to the create log, not reset
 });

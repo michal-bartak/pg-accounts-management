@@ -40,9 +40,15 @@ logging. Each template's dialog has a **Default** button that restores the built
 The app knows the kind of each field, so you don't quote them yourself:
 
 - **Role names** (`loginname`) → double-quoted identifiers, preserving case.
-- **`parent_roles`** → a comma-separated list of quoted identifiers.
-- **`new_password`**, **`comment`**, **`fullname`**, **`email`**, **`config_value`** →
-  escaped string literals.
+- **`parent_roles`** (create_role, grant_parents, revoke_parents) → in **statement/block** mode a
+  comma-separated list of quoted identifiers (`"a", "b"`); in **function** mode an inline
+  `ARRAY['a', 'b']` literal (values verbatim, an empty selection → `NULL`).
+- **`new_password`**, **`comment`**, **`config_value`** → escaped string literals.
+- **Comment fields** — one placeholder per key configured under *Settings → Comments → Comment
+  fields* (e.g. `${full_name}`, `${e_mail}`), available in **`create_role`** and **`set_comment`**.
+  The value comes from the role's JSON comment and is embedded by type: string → quoted literal,
+  number/boolean → bare literal, array/object → JSON text, and an empty/`null`/missing value →
+  bare `NULL`.
 - **`config_name`** → a bare, validated GUC name (never quoted).
 - **`attributes`** → a space-separated keyword list, each keyword checked against a whitelist
   (`SUPERUSER`/`NOSUPERUSER`, `CREATEROLE`, `LOGIN`, `REPLICATION`, `BYPASSRLS`, …). All of a
@@ -55,15 +61,16 @@ Suppose role creation must go through a helper that also assigns fixed groups. S
 
 ```text
 admin_access.create_role(
-  ${loginname}, NULL, ${fullname}, ${email},
-  ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_role}
+  ${loginname}, NULL, ${full_name}, ${e_mail},
+  ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_roles}
 )
 ```
 
-- `${loginname}`, `${fullname}`, `${email}` come from the form as binds.
+- `${loginname}` is a bind; `${full_name}` / `${e_mail}` are comment-field placeholders (their
+  values come from the role's comment, typed, `NULL` when empty/absent).
 - `NULL` is a plain SQL literal for an unused argument.
-- `ARRAY[...] || ${parent_role}` appends the optional parent role from the form to a fixed
-  set (it becomes `|| NULL` when the field is empty).
+- `ARRAY[...] || ${parent_roles}` appends the selected parent roles to a fixed set (it becomes
+  `|| NULL` when the selection is empty).
 
 ## Read (introspection) queries
 

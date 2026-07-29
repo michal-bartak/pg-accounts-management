@@ -69,9 +69,16 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   Settings-managed list of bare-identifier role names, saved via `SaveParentRoles`
   (`Store.UpdateParentRoles` validates identifier syntax, dedupes). They are offered as
   pick-list choices (toggle **chips**) in both the Create-role and Alter-role
-  Add-privilege dialogs, several at once. Create-role's `parent_role` placeholder accepts
-  a **comma-separated** value — `calltemplate` splits it into multiple `text[]` elements
-  in the `ARRAY[...] || ${parent_role}` path.
+  Add-privilege dialogs, several at once. Create-role uses the **same `${parent_roles}`
+  placeholder as grant/revoke** (there is no singular `${parent_role}`): statement mode → a
+  double-quoted identifier list (`"a", "b"`), function mode → an inline `ARRAY['a', 'b']` literal
+  (values verbatim, `'`-bearing values rejected; empty → `NULL`). The selected parents are published
+  to **both** the `create_role` op's `${parent_roles}` **and** the follow-up `grant_parents` op (per
+  cluster, same value) — `buildCreateClusterOps` copies each cluster's `grant_parents.parentRoles`
+  into its `create_role`, and the Alter presence-add path sets `create_role.parentRoles =
+  toGrant.join(',')`. The default `create_role` (`CREATE ROLE ${loginname}`) ignores it and
+  `grant_parents` does the actual grant; a custom `create_role` that grants via `${parent_roles}`
+  will re-grant (a harmless PostgreSQL NOTICE).
 - **Role comments are format-agnostic** (plain text **or** arbitrary JSON — no forced keys).
   The role form's inline comment editor (`#role-comment-editor`) has a **Fields ↔ Raw**
   toggle: *Fields* edits string values only (never adds/removes keys); *Raw* edits the whole
@@ -146,9 +153,9 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   `[{clusterId, operations:[{operation, <paramKey>:{…}}]}]` (order per cluster: grant → revoke →
   password → **attributes (all keywords combined into one `set_attribute`)** → set_config →
   reset_config → set_comment). **Create**: `runOperation` validates the login, pre-flight-warns via
-  `LoadRoleDetails`, then `buildCreateClusterOps(base)` prepends a `create_role` op (empty
-  `parent_role`; `${fullname}`/`${email}` sourced best-effort from the editor) to each cluster's
-  diff. **Update**: `saveAlterations` uses `buildAlterClusterOps()`. `removeRole` sends one
+  `LoadRoleDetails`, then `buildCreateClusterOps(base)` prepends a `create_role` op (its
+  `${parent_roles}` = that cluster's `grant_parents.parentRoles`; comment-field placeholders via
+  `commentFieldArgs(assembleComment())`) to each cluster's diff. **Update**: `saveAlterations` uses `buildAlterClusterOps()`. `removeRole` sends one
   `remove_role` op per cluster. The comment persists via **`set_comment`** (per-cluster
   `commentOverrides` wins, else the inline editor's `assembleComment()`). Everything publishes
   together, atomically per cluster, on the one **Save changes** / **Create role** pass. Progress
@@ -255,22 +262,38 @@ All defaults are **statement** mode, vanilla PostgreSQL DDL:
 
 | op | placeholders | default template |
 |----|--------------|------------------|
-| `create_role` | loginname, fullname, email, parent_role | `CREATE ROLE ${loginname}` (fullname/email/parent unused by the vanilla default; a `function`-mode override can consume them via `ARRAY[] \|\| ${parent_role}`) |
+| `create_role` | loginname, parent_roles, **`${<comment field>}`** (one per `Config.CommentFields`) | `CREATE ROLE ${loginname}` (parent_roles + comment fields unused by the vanilla default; a `function`-mode override can consume them, e.g. `admin.create(${loginname}, ${parent_roles})`) |
 | `remove_role` | loginname (rolename alias) | `DROP ROLE ${loginname}` |
 | `grant_parents` | loginname, parent_roles | `GRANT ${parent_roles} TO ${loginname}` |
 | `revoke_parents` | loginname, parent_roles | `REVOKE ${parent_roles} FROM ${loginname}` |
 | `change_password` | loginname, new_password | `ALTER ROLE ${loginname} PASSWORD ${new_password}` |
-| `set_comment` | loginname, **comment** | `COMMENT ON ROLE ${loginname} IS ${comment}` |
+| `set_comment` | loginname, **comment**, **`${<comment field>}`** (one per `Config.CommentFields`) | `COMMENT ON ROLE ${loginname} IS ${comment}` |
 | `set_attribute` | loginname, **attributes** (space-separated keyword list; `attribute` singular kept as an alias) | `ALTER ROLE ${loginname} WITH ${attributes}` |
 | `set_config` | loginname, **config_name**, config_value | `ALTER ROLE ${loginname} SET ${config_name} = ${config_value}` |
 | `reset_config` | loginname, **config_name** | `ALTER ROLE ${loginname} RESET ${config_name}` |
 
 Field kinds when embedding (statement/block): role names → **double-quoted identifiers**
 (`quoteSQLIdentifier` → `"name"` with `"`→`""`, so case is preserved and special chars are safe;
-rejects only empty/comma/NUL — comma is the list delimiter); `parent_roles` → comma-separated
-list, each element double-quoted (`fieldIdentifierList` → `"a", "b"`);
-`new_password`/`comment`/`fullname`/`email`/**`config_value`** → quoted **literals**
+rejects only empty/comma/NUL — comma is the list delimiter); `parent_roles`
+(`fieldIdentifierList`, used by create_role/grant_parents/revoke_parents) → **statement/block**: a
+comma-separated, each-element-double-quoted identifier list (`"a", "b"`); **function**:
+`buildFunctionQuery` special-cases it into an inline `ARRAY['a', 'b']` literal (verbatim single
+quotes via `renderRoleArrayVerbatim`, `'`-bearing values rejected, empty → `NULL`) rather than a
+`$n` bind (the `ARRAY[fixed] || ${parent_roles}` concat form still binds `$n::text[]` via
+`preprocessArrayOrNull`);
+`new_password`/`comment`/**`config_value`** → quoted **literals**
 (`quoteSQLLiteral`, `E'…'` for backslash-bearing values);
+`new_password`/`comment`/**`config_value`** → quoted **literals**
+(`quoteSQLLiteral`, `E'…'` for backslash-bearing values);
+a **comment-field** placeholder (create_role / set_comment; `fieldCommentValue`) → **typed by the
+JSON value** carried in its arg: string → quoted literal, number/bool → bare typed literal
+(`42`/`TRUE`), array/object → JSON text as a quoted literal, and **empty string / JSON `null` /
+absent key → bare `NULL`** (never quoted); in function mode the same value is bound as its Go type
+(nil/string/float64/bool). The configured keys are threaded into `calltemplate.Build` /
+`ValidateCallTemplateWithExecution` as a variadic `commentFields ...string` (calltemplate must not
+import config), sourced from `Config.CommentFieldKeys()` in the batch runner / `validateDBFunctions`;
+the per-cluster JSON-encoded values are built by the frontend `commentFieldArgs(effectiveComment)`
+and carried in `CreateRoleParams.CommentFields` / `SetCommentParams.CommentFields`;
 `config_name` → a **bare, unquoted GUC name** (`fieldConfigName`, validated by `gucNameRE` in
 `calltemplate/execution.go` — GUC names are case-insensitive, optionally namespaced, so they are
 not double-quoted; validation is the injection guard);

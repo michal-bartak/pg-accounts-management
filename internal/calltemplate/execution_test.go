@@ -397,20 +397,163 @@ func TestBuild_statement_identifiersQuoted_preserveCaseAndSpecial(t *testing.T) 
 	}
 }
 
-func TestBuild_function_grantParents_stillBinds(t *testing.T) {
+// ${parent_roles} in function mode expands to an inline ARRAY['a','b'] literal (verbatim), NOT a
+// single-string bind — so a wrapper function receives a real text[] rather than "gr_a,gr_b".
+func TestBuild_function_parentRoles_inlineArray(t *testing.T) {
 	sql, vals, useQuery, err := Build(
 		"your_schema.grant_role_parents(${loginname}, ${parent_roles})",
-		map[string]string{"loginname": "u1", "parent_roles": "gr_a,gr_b"},
+		map[string]string{"loginname": "u1", "parent_roles": "gr_a, gr_b"},
 		"grant_parents",
 		model.ExecutionFunction,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Only loginname is a bind ($1); parent_roles is embedded inline as an array literal.
+	if !useQuery || len(vals) != 1 || vals[0] != "u1" {
+		t.Fatalf("useQuery=%v vals=%v", useQuery, vals)
+	}
+	if sql != "SELECT your_schema.grant_role_parents($1, ARRAY['gr_a', 'gr_b'])" {
+		t.Fatalf("got: %s", sql)
+	}
+}
+
+// create_role's ${parent_roles} is the same field: statement → quoted identifier list; function →
+// inline ARRAY literal. A value with a single quote is rejected (injection guard for verbatim mode).
+func TestBuild_parentRoles_createRole_bothModes(t *testing.T) {
+	stmt, _, _, err := Build("CREATE ROLE ${loginname} IN ROLE ${parent_roles}", // (statement)
+		map[string]string{"loginname": "jdoe", "parent_roles": "gr_a, gr_b"}, "create_role", model.ExecutionStatement)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stmt != `CREATE ROLE "jdoe" IN ROLE "gr_a", "gr_b"` {
+		t.Fatalf("statement got: %s", stmt)
+	}
+	fn, vals, _, err := Build("admin.create(${loginname}, ${parent_roles})",
+		map[string]string{"loginname": "jdoe", "parent_roles": "gr_a, gr_b"}, "create_role", model.ExecutionFunction)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fn != "SELECT admin.create($1, ARRAY['gr_a', 'gr_b'])" || len(vals) != 1 {
+		t.Fatalf("function got: %s vals=%v", fn, vals)
+	}
+	if _, _, _, err := Build("admin.create(${loginname}, ${parent_roles})",
+		map[string]string{"loginname": "jdoe", "parent_roles": "gr_a', DROP"}, "create_role", model.ExecutionFunction); err == nil {
+		t.Fatal("expected a single-quote-bearing role name to be rejected")
+	}
+}
+
+// --- Comment-field placeholders (create_role / set_comment) ---
+
+// TestBuild_commentFields_statementTyping covers the JSON-typed embedding: string → quoted
+// literal, empty/null/absent → bare NULL, number/bool → typed literal, array/object → JSON text.
+func TestBuild_commentFields_statementTyping(t *testing.T) {
+	call := "CREATE ROLE ${loginname} /* ${full_name} ${e_mail} ${age} ${active} ${tags} */"
+	args := map[string]string{
+		"loginname": "jdoe",
+		"full_name": `"John O'Hara"`,
+		"e_mail":    `""`, // empty string → NULL
+		"age":       `42`,
+		"active":    `true`,
+		"tags":      `["a","b"]`,
+		// "missing" intentionally absent → NULL
+	}
+	sql, _, useQuery, err := Build(call, args, "create_role", model.ExecutionStatement,
+		"full_name", "e_mail", "age", "active", "tags", "missing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if useQuery {
+		t.Fatal("statement mode should not use a query")
+	}
+	want := `CREATE ROLE "jdoe" /* 'John O''Hara' NULL 42 TRUE '["a","b"]' */`
+	if sql != want {
+		t.Fatalf("got:  %s\nwant: %s", sql, want)
+	}
+}
+
+// TestBuild_commentFields_absentIsNull ensures an unconfigured-in-args field resolves to NULL
+// rather than erroring "missing value".
+func TestBuild_commentFields_absentIsNull(t *testing.T) {
+	sql, _, _, err := Build("COMMENT ON ROLE ${loginname} IS ${comment} -- ${dept}",
+		map[string]string{"loginname": "jdoe", "comment": "'{}'"}, "set_comment", model.ExecutionStatement, "dept")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(sql, "-- NULL") {
+		t.Fatalf("expected trailing NULL, got: %s", sql)
+	}
+}
+
+// TestBuild_commentFields_functionBinds ensures function mode binds typed values (nil / string /
+// number / bool) rather than raw JSON text.
+func TestBuild_commentFields_functionBinds(t *testing.T) {
+	_, vals, useQuery, err := Build("admin.create(${loginname}, ${full_name}, ${age}, ${missing})",
+		map[string]string{"loginname": "jdoe", "full_name": `"Jane"`, "age": `7`},
+		"create_role", model.ExecutionFunction, "full_name", "age", "missing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !useQuery {
+		t.Fatal("function mode should use a query")
+	}
+	// $1 loginname (string), $2 full_name ("Jane"), $3 age (7), $4 missing (nil).
+	if len(vals) != 4 {
+		t.Fatalf("want 4 binds, got %v", vals)
+	}
+	if vals[1] != "Jane" {
+		t.Fatalf("full_name bind: %#v", vals[1])
+	}
+	if f, ok := vals[2].(float64); !ok || f != 7 {
+		t.Fatalf("age bind: %#v", vals[2])
+	}
+	if vals[3] != nil {
+		t.Fatalf("missing bind should be nil, got %#v", vals[3])
+	}
+}
+
+// TestBuild_commentFields_emptyStringIsNull pins the requirement that an empty-string comment
+// field (JSON-encoded as `""` — present in the args, not absent) is stored as SQL NULL in BOTH
+// execution modes, exactly like a JSON null or a missing key — never as an empty literal ''.
+func TestBuild_commentFields_emptyStringIsNull(t *testing.T) {
+	// Statement mode: embedded as a bare, unquoted NULL (not '').
+	sql, _, _, err := Build("CREATE ROLE ${loginname} -- ${full_name}",
+		map[string]string{"loginname": "jdoe", "full_name": `""`}, "create_role", model.ExecutionStatement, "full_name")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sql != `CREATE ROLE "jdoe" -- NULL` {
+		t.Fatalf("statement got: %q, want trailing NULL", sql)
+	}
+
+	// Function mode: bound as a real nil (→ SQL NULL), not the empty string "".
+	_, vals, useQuery, err := Build("admin.create(${loginname}, ${full_name})",
+		map[string]string{"loginname": "jdoe", "full_name": `""`}, "create_role", model.ExecutionFunction, "full_name")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !useQuery || len(vals) != 2 {
 		t.Fatalf("useQuery=%v vals=%v", useQuery, vals)
 	}
-	if sql != "SELECT your_schema.grant_role_parents($1, $2)" {
-		t.Fatalf("got: %s", sql)
+	if vals[1] != nil {
+		t.Fatalf("empty-string full_name should bind as nil (NULL), got %#v", vals[1])
+	}
+}
+
+// TestValidate_createRole_rejectsRemovedFullnameEmail confirms the legacy fullname/email
+// placeholders are gone (hard removal), while a configured comment field is accepted.
+func TestValidate_createRole_rejectsRemovedFullnameEmail(t *testing.T) {
+	if err := ValidateCallTemplateWithExecution("CREATE ROLE ${loginname} -- ${fullname}", "create_role", model.ExecutionStatement); err == nil {
+		t.Fatal("expected ${fullname} to be rejected for create_role")
+	}
+	if err := ValidateCallTemplateWithExecution("CREATE ROLE ${loginname} -- ${email}", "create_role", model.ExecutionStatement); err == nil {
+		t.Fatal("expected ${email} to be rejected for create_role")
+	}
+	// A comment field is only allowed when configured.
+	if err := ValidateCallTemplateWithExecution("CREATE ROLE ${loginname} -- ${full_name}", "create_role", model.ExecutionStatement); err == nil {
+		t.Fatal("expected ${full_name} rejected when not configured")
+	}
+	if err := ValidateCallTemplateWithExecution("CREATE ROLE ${loginname} -- ${full_name}", "create_role", model.ExecutionStatement, "full_name"); err != nil {
+		t.Fatalf("configured ${full_name} should be allowed: %v", err)
 	}
 }

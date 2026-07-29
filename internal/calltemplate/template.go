@@ -12,9 +12,9 @@ var (
 	placeholderTokenRE = regexp.MustCompile(`\$\{([^}]+)\}`)
 	placeholderNameRE  = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 	roleLiteralRE      = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
-	// ARRAY['gr_a', 'gr_b'] || ${parent_role}
+	// ARRAY['gr_a', 'gr_b'] || ${parent_roles}
 	arrayOrNullRE = regexp.MustCompile(`ARRAY\s*\[((?:\s*'[a-zA-Z_][a-zA-Z0-9_]*'\s*,?\s*)+)\]\s*\|\|\s*\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}`)
-	// ARRAY[${parent_role}, 'gr_a', 'gr_b'] → ARRAY['gr_a', 'gr_b'] || ${parent_role}
+	// ARRAY[${parent_roles}, 'gr_a', 'gr_b'] → ARRAY['gr_a', 'gr_b'] || ${parent_roles}
 	arrayLiteralFormRE  = regexp.MustCompile(`ARRAY\[\s*\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}((?:\s*,\s*'[a-zA-Z_][a-zA-Z0-9_]*')+)\s*\]`)
 	arrayLiteralQuoteRE = regexp.MustCompile(`'([a-zA-Z_][a-zA-Z0-9_]*)'`)
 )
@@ -33,11 +33,14 @@ type parsedPlaceholder struct {
 	raw      string
 }
 
+// AllowedPlaceholders returns the fixed (reserved) placeholder names for an operation.
+// For create_role and set_comment the configured comment-field keys are additionally allowed;
+// those are merged in by allowedPlaceholderNames, which the parse/validate paths use.
 func AllowedPlaceholders(operation string) map[string]bool {
 	var names []string
 	switch operation {
 	case "create_role":
-		names = []string{"loginname", "fullname", "email", "parent_role"}
+		names = []string{"loginname", "parent_roles"}
 	case "remove_role":
 		names = []string{"loginname"}
 	case "grant_parents", "revoke_parents":
@@ -64,7 +67,26 @@ func AllowedPlaceholders(operation string) map[string]bool {
 	return out
 }
 
-func parsePlaceholderToken(inner string, operation string) (parsedPlaceholder, error) {
+// commentFieldSet returns the configured comment-field keys valid as placeholders for the given
+// operation (create_role / set_comment only); nil otherwise. Each key must be a bare identifier.
+func commentFieldSet(operation string, commentFields []string) map[string]bool {
+	if operation != "create_role" && operation != "set_comment" {
+		return nil
+	}
+	if len(commentFields) == 0 {
+		return nil
+	}
+	m := make(map[string]bool, len(commentFields))
+	for _, f := range commentFields {
+		f = strings.TrimSpace(f)
+		if f != "" && placeholderNameRE.MatchString(f) {
+			m[f] = true
+		}
+	}
+	return m
+}
+
+func parsePlaceholderToken(inner string, operation string, commentFields []string) (parsedPlaceholder, error) {
 	inner = strings.TrimSpace(inner)
 	if inner == "" {
 		return parsedPlaceholder{}, fmt.Errorf("empty placeholder")
@@ -80,7 +102,7 @@ func parsePlaceholderToken(inner string, operation string) (parsedPlaceholder, e
 			return parsedPlaceholder{}, fmt.Errorf("invalid ${array_concat:...}: use ARRAY['fixed', ...] || ${field} instead")
 		}
 		field := items[0]
-		allowed := allowedPlaceholderNames(operation)
+		allowed := allowedPlaceholderNames(operation, commentFields)
 		if allowed == nil || !allowed[field] {
 			return parsedPlaceholder{}, fmt.Errorf("unknown field %q in ${array_concat:...}", field)
 		}
@@ -100,7 +122,7 @@ func parsePlaceholderToken(inner string, operation string) (parsedPlaceholder, e
 
 	if !placeholderNameRE.MatchString(inner) {
 		return parsedPlaceholder{}, fmt.Errorf(
-			"invalid placeholder ${%s}: use ${loginname} or ARRAY['fixed_role', ...] || ${parent_role}",
+			"invalid placeholder ${%s}: use ${loginname} or ARRAY['fixed_role', ...] || ${parent_roles}",
 			inner,
 		)
 	}
@@ -109,7 +131,7 @@ func parsePlaceholderToken(inner string, operation string) (parsedPlaceholder, e
 
 func normalizeTemplate(call string) string {
 	call = strings.TrimSpace(call)
-	// ARRAY[${parent_role}, 'a', 'b'] → ARRAY['a', 'b'] || ${parent_role}
+	// ARRAY[${parent_roles}, 'a', 'b'] → ARRAY['a', 'b'] || ${parent_roles}
 	call = arrayLiteralFormRE.ReplaceAllStringFunc(call, func(match string) string {
 		sub := arrayLiteralFormRE.FindStringSubmatch(match)
 		if len(sub) < 3 {
@@ -162,8 +184,8 @@ func formatFixedArraySQL(literals []string) string {
 }
 
 // preprocessArrayOrNull expands ARRAY['a','b'] || ${field} — empty field becomes || NULL.
-func preprocessArrayOrNull(call string, args map[string]string, operation string, n *int, values *[]any) (string, error) {
-	allowed := allowedPlaceholderNames(operation)
+func preprocessArrayOrNull(call string, args map[string]string, operation string, n *int, values *[]any, commentFields []string) (string, error) {
+	allowed := allowedPlaceholderNames(operation, commentFields)
 	var err error
 	call = arrayOrNullRE.ReplaceAllStringFunc(call, func(match string) string {
 		if err != nil {
@@ -197,7 +219,7 @@ func preprocessArrayOrNull(call string, args map[string]string, operation string
 }
 
 // splitList splits a comma-separated value into trimmed, non-empty items — lets a single
-// parent_role placeholder carry several preconfigured parent groups at once.
+// parent_roles placeholder carry several preconfigured parent groups at once.
 func splitList(v string) []string {
 	var out []string
 	for _, part := range strings.Split(v, ",") {

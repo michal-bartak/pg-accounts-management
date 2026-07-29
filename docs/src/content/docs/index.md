@@ -29,7 +29,7 @@ function or view so a low-privilege connection can act through it.
   each group has a colour and an optional *require confirmation* flag. You select whole
   groups and/or individual clusters, and that selection is remembered between sessions.
 - **Create a role** on every selected cluster at once — login name, and (via your template)
-  full name, email, and parent roles.
+  parent roles and the configured comment fields (full name, email, …).
 - **Alter a role** by searching for it first, then editing its whole identity in one form:
   parent-role memberships, attributes (superuser, create role, create DB, inherit, login,
   replication, bypass RLS), settings (role-level `GUC`s such as `statement_timeout`),
