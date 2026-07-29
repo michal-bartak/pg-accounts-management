@@ -1147,8 +1147,6 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .scope-row-labels .hint { margin: 0; }
 .scope-row-actions { display: flex; gap: 0.35rem; flex-shrink: 0; align-items: stretch; }
 .scope-row.is-removed .scope-row-name { text-decoration: line-through; color: var(--danger); }
-.scope-row.is-added .scope-row-name { color: var(--ok); }
-.scope-row.is-extending { border-color: var(--ok); }
 .chip-scope-strike { text-decoration: line-through; opacity: 0.7; }
 .row-note { font-size: var(--fs-xs); color: var(--danger); }
 
