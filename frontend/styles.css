@@ -1117,8 +1117,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
    selection). One cluster of a group: filled, no border. */
 .chip-scope.scope-kind-group { text-transform: uppercase; background: transparent; border: 1px solid currentColor; }
 .chip-scope.scope-kind-cluster { border: none; }
-/* Pending grant (green) wins over the environment colour. */
-.chip-scope.chip-scope-add { color: var(--ok); background: rgba(127, 217, 154, 0.22); border-color: var(--ok); }
+/* Pending grant keeps its group colour (via data-cat) and is flagged with a leading "+". */
 .chip-scope.chip-scope-strike { text-decoration: line-through; color: var(--danger); background: transparent; border-color: var(--danger); }
 /* Privilege/attribute rows: [ name | labels ]  ✎ × ↺  (actions outside the row box) */
 .scope-rows { display: grid; gap: 0.35rem; }
