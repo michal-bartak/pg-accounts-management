@@ -181,6 +181,7 @@ func (a *App) TestConnectionInput(in model.ClusterInput, auth model.AuthContext)
 		Category:    in.Category,
 		SSLMode:     sslMode,
 		ConnectUser: in.ConnectUser,
+		Password:    in.Password,
 	}
 	return pg.TestConnection(cluster, auth)
 }

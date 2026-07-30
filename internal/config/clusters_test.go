@@ -75,3 +75,27 @@ func TestSaveClustersAndCategories(t *testing.T) {
 		t.Fatal("expected error for missing host")
 	}
 }
+
+// An optional per-cluster password round-trips through save + a fresh Load from disk.
+func TestSaveClustersAndCategories_passwordRoundTrips(t *testing.T) {
+	s := tmpStore(t)
+	if err := s.SaveClustersAndCategories(
+		[]model.Cluster{{Alias: "db1", Host: "h1", Database: "app", Category: "pre_prod", ConnectUser: "admin", Password: "s3cret"}},
+		[]model.Category{{Label: "Pre Prod"}},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Get().Clusters[0].Password; got != "s3cret" {
+		t.Fatalf("in-memory password not kept: %q", got)
+	}
+
+	// Reload from the same file to prove it was written to (and parsed from) YAML.
+	reloaded := &Store{path: s.path}
+	if err := reloaded.Load(); err != nil {
+		t.Fatal(err)
+	}
+	c := reloaded.Get().Clusters[0]
+	if c.Password != "s3cret" || c.ConnectUser != "admin" {
+		t.Fatalf("password/connect_user did not survive disk round-trip: %+v", c)
+	}
+}

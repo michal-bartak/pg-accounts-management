@@ -16,10 +16,17 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
 
 ## Product decisions (don't regress)
 
-- **Secrets never in config, and no in-UI credential fields.** Auth resolution: user =
-  cluster `connect_user` → `PGUSER`; password = `PGPASSWORD` → `~/.pgpass` → empty
-  (trust, like psql). `getAuth()` returns empty strings. See
-  [internal/pg/auth.go](internal/pg/auth.go).
+- **Auth resolution** ([internal/pg/auth.go](internal/pg/auth.go)): user (`ResolveUser`) =
+  cluster `connect_user` → `PGUSER` → **OS login user** (`user.Current()`, like psql/libpq) →
+  error; password (`ResolvePassword`) = **cluster `password`** → `AuthContext.Password` (unused by
+  the UI) → `PGPASSWORD` → `~/.pgpass` → empty (trust, like psql). The `AuthContext` from the run
+  dialog is still always empty from the UI. **The one credential in config is the optional
+  per-cluster `password`** — an opt-in, plain-text field on `model.Cluster`/`ClusterInput`
+  (`yaml:"password,omitempty"`), stored in the private config (`save()` writes mode `0600`) and
+  editable in the Clusters cluster editor as a **masked field with a 👁 reveal toggle** next to
+  Connect user (the two share a `.form-row`, borrowing the Host/Port width mechanism). When set it
+  is used directly; when blank the app falls back to `PGPASSWORD`/`~/.pgpass` as before. It rides on
+  `ClusterInput` (not `AuthContext`), so `TestConnectionInput` tests an unsaved password too.
 - **Production gate is a per-group `confirm` flag**, surfaced only as the confirm popup
   (`askConfirm('Production', …)`); no checkbox. `commands.RequiresProductionConfirm`
   and the frontend `hasProductionTargets`/`categoryConfirm` read the flag (not the id

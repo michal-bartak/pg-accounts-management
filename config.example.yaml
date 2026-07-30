@@ -22,6 +22,22 @@ categories:
     color: "#6eb5ff"
     confirm: false
 clusters: []
+# Cluster fields: alias, host, port, database, category (a group id above), sslmode,
+# connect_user, password. connect_user and password are optional:
+#   - connect_user: blank → PGUSER env → OS login user (like psql).
+#   - password: optional plain-text password (this config is private, written mode 0600).
+#     When set it is used directly; when blank the app falls back to PGPASSWORD → ~/.pgpass.
+# Example:
+# clusters:
+#   - id: 00000000-0000-0000-0000-000000000000
+#     alias: prod-main
+#     host: db.example.com
+#     port: 5432
+#     database: postgres
+#     category: production
+#     sslmode: require
+#     connect_user: admin
+#     password: "s3cret"   # optional; omit to use PGPASSWORD / ~/.pgpass
 # Defaults are vanilla PostgreSQL DDL (statement mode), shown below. Override any command
 # with a privileged wrapper function (execution: function) or a PL/pgSQL block — e.g. so a
 # low-privilege connect user can act through a SECURITY DEFINER function that also writes an

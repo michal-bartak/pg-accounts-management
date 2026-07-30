@@ -343,7 +343,22 @@
           <option value="verify-full">verify-full</option>
         </select>
       </label>
-      <label>Connect user (optional) <input name="connectUser" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="Uses PGUSER if empty" /></label>
+      <div class="form-row">
+        <label><span class="field-label-row">Username (optional) <button type="button" class="q-hint" aria-label="Optional. If blank, the app uses the PGUSER environment variable, then your OS login user." data-hint="Optional. If blank, the app uses the PGUSER environment variable, then your OS login user.">?</button></span>
+          <input name="connectUser" autocapitalize="none" autocomplete="off" spellcheck="false" />
+        </label>
+        <label><span class="field-label-row">Password (optional) <button type="button" class="q-hint" aria-label="Optional; stored in the private config. If blank, the app falls back to the PGPASSWORD environment variable, then ~/.pgpass, then no password." data-hint="Optional; stored in the private config. If blank, the app falls back to the PGPASSWORD environment variable, then ~/.pgpass, then no password.">?</button></span>
+          <span class="pw-field">
+            <input name="password" type="password" autocapitalize="none" autocomplete="off" spellcheck="false" />
+            <button type="button" class="pw-toggle" aria-label="Show password">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z" />
+                <circle cx="12" cy="12" r="3.2" />
+              </svg>
+            </button>
+          </span>
+        </label>
+      </div>
       <hr class="form-sep" />
       <label>Category <select name="category" required></select></label>
       <menu>

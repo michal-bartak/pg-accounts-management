@@ -103,6 +103,7 @@ export namespace model {
 	    category: string;
 	    sslmode?: string;
 	    connectUser?: string;
+	    password?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Cluster(source);
@@ -118,6 +119,7 @@ export namespace model {
 	        this.category = source["category"];
 	        this.sslmode = source["sslmode"];
 	        this.connectUser = source["connectUser"];
+	        this.password = source["password"];
 	    }
 	}
 	export class ClusterInput {
@@ -128,6 +130,7 @@ export namespace model {
 	    category: string;
 	    sslMode: string;
 	    connectUser: string;
+	    password: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ClusterInput(source);
@@ -142,6 +145,7 @@ export namespace model {
 	        this.category = source["category"];
 	        this.sslMode = source["sslMode"];
 	        this.connectUser = source["connectUser"];
+	        this.password = source["password"];
 	    }
 	}
 	export class ResetConfigParams {

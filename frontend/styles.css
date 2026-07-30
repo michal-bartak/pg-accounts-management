@@ -894,10 +894,34 @@ dialog h2 { font-size: var(--fs-h2); }
   gap: 0.2rem;
   font-size: var(--fs-label);
 }
-/* Host + Port on one line. */
+/* Host + Port on one line. min-width:0 (here and on the inputs) lets flex-basis actually
+   govern the width — without it each field floors at its input's intrinsic (size=20) width. */
 #cluster-form .form-row { display: flex; gap: 0.65rem; }
-#cluster-form .form-row > label { flex: 1; }
-#cluster-form .form-row > label.port { flex: 0 0 6rem; }
+#cluster-form .form-row > label { flex: 1; min-width: 0; }
+#cluster-form .form-row > label.port { flex: 0 0 5.5rem; }
+#cluster-form .form-row input { min-width: 0; }
+/* Field-label text + its ? hint badge on one line above the input. */
+#cluster-form .field-label-row { display: inline-flex; align-items: center; gap: 0.3rem; }
+/* Password input with the reveal toggle overlaid inside it, on the right. */
+#cluster-form .pw-field { position: relative; display: block; }
+#cluster-form .pw-field > input { width: 100%; padding-right: 2rem; }
+#cluster-form .pw-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.4rem;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  color: var(--text);
+  opacity: 0.55;
+}
+#cluster-form .pw-toggle svg { display: block; width: 1.05rem; height: 1.05rem; }
+#cluster-form .pw-toggle:hover { opacity: 1; }
 /* Separator before the (bottom) Category field. */
 #cluster-form .form-sep { width: 100%; border: none; border-top: 1px solid var(--border); margin: 0.4rem 0; }
 /* Test connection sits on the left; Save / Cancel stay on the right. */

@@ -43,6 +43,10 @@ type Cluster struct {
 	Category    string `yaml:"category" json:"category"`
 	SSLMode     string `yaml:"sslmode,omitempty" json:"sslmode,omitempty"`
 	ConnectUser string `yaml:"connect_user,omitempty" json:"connectUser,omitempty"`
+	// Password is an optional per-cluster password stored plain-text in the (private, 0600)
+	// config. When set it wins over PGPASSWORD / ~/.pgpass; when empty the app falls back to
+	// the environment / pgpass as before. See internal/pg/auth.go ResolvePassword.
+	Password string `yaml:"password,omitempty" json:"password,omitempty"`
 }
 
 type DBFunction struct {
@@ -212,6 +216,7 @@ type ClusterInput struct {
 	Category    string `json:"category"`
 	SSLMode     string `json:"sslMode"`
 	ConnectUser string `json:"connectUser"`
+	Password    string `json:"password"`
 }
 
 type AuthContext struct {
