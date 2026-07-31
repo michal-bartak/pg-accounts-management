@@ -204,7 +204,16 @@ body {
   border-radius: 50%; font-size: 0.72rem; cursor: pointer;
   background: transparent; border: 1px solid var(--hint-color); color: var(--hint-color);
   display: inline-flex; align-items: center; justify-content: center;
+  position: relative;
 }
+/* Accent dot on the About button when a newer version is available (auto or manual check). */
+.update-badge {
+  position: absolute; top: -2px; right: -2px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--primary); box-shadow: 0 0 4px var(--primary);
+  border: 1px solid var(--bg); pointer-events: none;
+}
+.update-badge[hidden] { display: none; }
 .info-btn:not(:disabled):hover,
 .info-btn:focus-visible { color: var(--hint-color); background: transparent; border-color: var(--hint-color); outline: none; }
 
@@ -788,6 +797,10 @@ tr:last-child td { border-bottom: none; }
 /* Extra breathing room above a row that follows another within the same settings group. */
 .settings-row-gap { margin-top: 0.9rem; }
 
+/* Password-generator character classes in two columns: lower/upper | digits/symbols. */
+.pwgen-classes { display: flex; align-items: flex-start; gap: 2.5rem; }
+.pwgen-col { display: flex; flex-direction: column; gap: 0.5rem; }
+
 /* Two side-by-side subsections (DB command templates | Introspection queries).
    Collapses to one column when the panel is too narrow. */
 .settings-two-col {
@@ -894,10 +907,67 @@ dialog h2 { font-size: var(--fs-h2); }
   gap: 0.2rem;
   font-size: var(--fs-label);
 }
-/* Host + Port on one line. */
+/* Host + Port on one line. min-width:0 (here and on the inputs) lets flex-basis actually
+   govern the width — without it each field floors at its input's intrinsic (size=20) width. */
 #cluster-form .form-row { display: flex; gap: 0.65rem; }
-#cluster-form .form-row > label { flex: 1; }
-#cluster-form .form-row > label.port { flex: 0 0 6rem; }
+#cluster-form .form-row > label { flex: 1; min-width: 0; }
+#cluster-form .form-row > label.port { flex: 0 0 5.5rem; }
+#cluster-form .form-row input { min-width: 0; }
+/* Field-label text + its ? hint badge on one line above the input. */
+#cluster-form .field-label-row { display: inline-flex; align-items: center; gap: 0.3rem; }
+/* Password input with icon toggles overlaid inside it, on the right. Shared by the cluster editor
+   and the role form's "new password" field. The role form also carries a Copy icon (left of the
+   eye); keep `.pw-copy` OUT of the `.pw-toggle` class so togglePwReveal's `.closest('.pw-toggle')`
+   never matches it. */
+.pw-field { position: relative; display: block; }
+.pw-field > input { width: 100%; padding-right: 2rem; }
+.alter-password .pw-field > input { padding-right: 3.4rem; } /* room for Copy + eye */
+.pw-toggle,
+.pw-copy {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  color: var(--text);
+  opacity: 0.55;
+}
+.pw-toggle { right: 0.4rem; }
+.pw-copy { right: 1.95rem; }
+.pw-toggle svg { display: block; width: 1.05rem; height: 1.05rem; }
+.pw-copy svg { display: block; width: 0.875rem; height: 0.875rem; } /* 14px */
+.pw-toggle:hover,
+.pw-copy:hover { opacity: 1; }
+.pw-toggle:disabled,
+.pw-copy:disabled { opacity: 0.25; pointer-events: none; cursor: default; }
+
+/* Generate button sits to the right of the password field (outside the box). */
+.pw-gen {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  opacity: 0.85;
+}
+/* flex-shrink:0 — the SVG has no intrinsic width attribute, so as a flex item in this fixed-width
+   inline-flex button it would otherwise collapse to a thin sliver (the eye/copy escape this only
+   via their absolute-positioned parents). */
+/* Size the glyph to match the text-glyph icons on .scope-act edit/delete buttons (which render at
+   --fs-base ≈ 13px ink), so this bordered icon button reads at the same weight as those. */
+.pw-gen svg { display: block; width: 0.85rem; height: 0.85rem; flex-shrink: 0; }
+.pw-gen:hover { opacity: 1; }
+.pw-gen:disabled { opacity: 0.35; pointer-events: none; cursor: default; }
 /* Separator before the (bottom) Category field. */
 #cluster-form .form-sep { width: 100%; border: none; border-top: 1px solid var(--border); margin: 0.4rem 0; }
 /* Test connection sits on the left; Save / Cancel stay on the right. */
@@ -1152,7 +1222,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 
 /* Password section: field + checkbox side by side */
 .alter-password { display: flex; flex-direction: row; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-.alter-password input[type="password"] { min-width: 260px; }
+.alter-password .pw-field { min-width: 260px; }
 .alter-password label.inline { display: flex; align-items: center; gap: 0.35rem; }
 
 

@@ -12,7 +12,7 @@
       <span class="brand-dot"></span>
       <h1>DbAccounts</h1>
       <span class="app-ver" id="app-version" hidden></span>
-      <button type="button" class="info-btn" id="btn-about" title="About DbAccounts" aria-label="About DbAccounts">i</button>
+      <button type="button" class="info-btn" id="btn-about" title="About DbAccounts" aria-label="About DbAccounts">i<span class="update-badge" id="update-badge" hidden></span></button>
     </div>
   </header>
 
@@ -48,7 +48,7 @@
                 <div id="role-comment-editor" class="role-comment-editor">
                   <div class="rce-toolbar">
                     <span class="rce-label">Comment
-                      <button type="button" class="q-hint" aria-label="Role comment. Fields edits known/JSON keys as labeled inputs; Raw edits the comment as free text (plain text or JSON)." data-hint="Role comment. Fields edits known/JSON keys as labeled inputs; Raw edits the comment as free text (plain text or JSON).">?</button>
+                      <button type="button" class="q-hint" data-hint="Role comment. Fields edits known/JSON keys as labeled inputs; Raw edits the comment as free text (plain text or JSON).">?</button>
                     </span>
                     <div class="segmented rce-mode" id="rce-mode" role="group" aria-label="Comment editing mode">
                       <button type="button" class="seg-btn" data-mode="fields">Fields</button>
@@ -129,7 +129,7 @@
               </div>
             </div>
             <div class="settings-field">
-              <span class="settings-field-label">Max concurrency <button type="button" class="q-hint" aria-label="How many clusters an operation runs against in parallel." data-hint="How many clusters an operation runs against in parallel.">?</button></span>
+              <span class="settings-field-label">Max concurrency <button type="button" class="q-hint" data-hint="How many clusters an operation runs against in parallel.">?</button></span>
               <input type="number" id="batch-concurrency" class="settings-num" min="1" max="50" value="5" />
             </div>
           </div>
@@ -139,7 +139,7 @@
                 <input type="checkbox" id="ui-stage-create" />
                 <span>Stage role creation when an added target doesn't yet have the role</span>
               </label>
-              <button type="button" class="q-hint" aria-label="In Alter role, when you add a target where the role doesn't exist yet: on stages its creation on that cluster (a CREATE on Save); off just brings the cluster into view — you can still create it there from Present on." data-hint="In Alter role, when you add a target where the role doesn't exist yet: on stages its creation on that cluster (a CREATE on Save); off just brings the cluster into view — you can still create it there from Present on.">?</button>
+              <button type="button" class="q-hint" data-hint="In Alter role, when you add a target where the role doesn't exist yet: this option enabled stages the role creation on that cluster automatically; Otherwise it just brings the cluster into view — you can still add the role manually in the `Present on` section.">?</button>
             </div>
           </div>
           <div class="settings-row settings-row-gap">
@@ -148,13 +148,46 @@
                 <input type="checkbox" id="ui-check-updates" />
                 <span>Check for updates on startup</span>
               </label>
-              <button type="button" class="q-hint" aria-label="On startup, check the project's GitHub Releases and show a popup if a newer version is available. A manual check is always available in the About dialog." data-hint="On startup, check the project's GitHub Releases and show a popup if a newer version is available. A manual check is always available in the About dialog.">?</button>
+              <button type="button" class="q-hint" data-hint="On startup, check the project's GitHub Releases and show a popup if a newer version is available. A manual check is always available in the About dialog.">?</button>
             </div>
           </div>
         </div>
 
         <div class="settings-group">
-          <span class="settings-group-label">Preconfigured parent groups <button type="button" class="q-hint" aria-label="Role names offered as pick-list choices when granting privileges in Create role and Alter role. Drag the handle to reorder." data-hint="Role names offered as pick-list choices when granting privileges in Create role and Alter role. Drag the handle to reorder.">?</button></span>
+          <span class="settings-group-label">Password generator <button type="button" class="q-hint" data-hint="Controls the random password produced by the Generate button on the role form's password field. At least one character class stays enabled (lowercase is forced on if you turn them all off).">?</button></span>
+          <div class="settings-row settings-row-gap pwgen-classes">
+            <div class="pwgen-col">
+              <div class="settings-check-line">
+                <label class="settings-check"><input type="checkbox" id="pwgen-lower" /> <span>Lowercase letters (a–z)</span></label>
+              </div>
+              <div class="settings-check-line">
+                <label class="settings-check"><input type="checkbox" id="pwgen-upper" /> <span>Uppercase letters (A–Z)</span></label>
+              </div>
+            </div>
+            <div class="pwgen-col">
+              <div class="settings-check-line">
+                <label class="settings-check"><input type="checkbox" id="pwgen-digits" /> <span>Digits (0–9)</span></label>
+              </div>
+              <div class="settings-check-line">
+                <label class="settings-check"><input type="checkbox" id="pwgen-symbols" /> <span>Symbols (!@#$…)</span></label>
+              </div>
+            </div>
+          </div>
+          <div class="settings-row settings-row-gap">
+            <div class="settings-check-line">
+              <label class="settings-check"><input type="checkbox" id="pwgen-exclude-similar" /> <span>Exclude look-alike characters (i l 1 I o O 0)</span></label>
+            </div>
+          </div>
+          <div class="settings-row settings-row-gap">
+            <div class="settings-field">
+              <span class="settings-field-label">Length</span>
+              <input type="number" id="pwgen-length" class="settings-num" min="6" max="128" value="10" />
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <span class="settings-group-label">Preconfigured parent groups <button type="button" class="q-hint" data-hint="Role names offered as pick-list choices when granting privileges in Create role and Alter role. Drag the handle to reorder.">?</button></span>
           <div id="parent-roles-editor" class="list-editor"></div>
           <button type="button" class="list-add" id="btn-add-parent-role">Add group…</button>
         </div>
@@ -163,12 +196,12 @@
           <span class="settings-group-label">Comments</span>
           <div class="settings-row settings-row-top">
             <div class="settings-field">
-              <span class="settings-field-label">Comment fields <button type="button" class="q-hint" aria-label="JSON keys shown as labeled inputs when a role comment holds JSON (Create / Alter role). Drag the handle to reorder; keys not listed here are still shown. Plain-text comments use the Raw view." data-hint="JSON keys shown as labeled inputs when a role comment holds JSON (Create / Alter role). Drag the handle to reorder; keys not listed here are still shown. Plain-text comments use the Raw view.">?</button></span>
+              <span class="settings-field-label">Comment fields <button type="button" class="q-hint" data-hint="JSON keys shown as labeled inputs when a role comment holds JSON (Create / Alter role). Drag the handle to reorder; keys not listed here are still shown. Plain-text comments use the Raw view.">?</button></span>
               <div id="comment-fields-editor" class="list-editor"></div>
               <button type="button" class="list-add" id="btn-add-comment-field">Add field…</button>
             </div>
             <div class="settings-field">
-              <span class="settings-field-label">Preferred comment view <button type="button" class="q-hint" aria-label="Default editor mode for a new/empty comment (Create role, or a role with no comment). Comments that already have content auto-detect." data-hint="Default editor mode for a new/empty comment (Create role, or a role with no comment). Comments that already have content auto-detect.">?</button></span>
+              <span class="settings-field-label">Preferred comment view <button type="button" class="q-hint" data-hint="Default editor mode for a new/empty comment (Create role, or a role with no comment). Comments that already have content auto-detect.">?</button></span>
               <div class="segmented" id="comment-view-pref" role="group" aria-label="Preferred comment view">
                 <button type="button" class="seg-btn" data-pref="fields">Fields</button>
                 <button type="button" class="seg-btn" data-pref="raw">Raw</button>
@@ -187,7 +220,7 @@
             </div>
             <div class="settings-col">
               <div class="settings-group-head">
-                <span class="settings-group-label">Introspection queries <button type="button" class="q-hint" aria-label="Read-only catalog queries used by Alter role. Point one at a privileged wrapper function or view if the connect user cannot read the catalogs directly. Each must return its contract columns (shown in the editor); $1 is the search pattern or role name." data-hint="Read-only catalog queries used by Alter role. Point one at a privileged wrapper function or view if the connect user cannot read the catalogs directly. Each must return its contract columns (shown in the editor); $1 is the search pattern or role name.">?</button></span>
+                <span class="settings-group-label">Introspection queries <button type="button" class="q-hint" data-hint="Read-only catalog queries used by Alter role. Point one at a privileged wrapper function or view if the connect user cannot read the catalogs directly. Each must return its contract columns (shown in the editor); $1 is the search pattern or role name.">?</button></span>
               </div>
               <div id="db-reads-editor" class="scope-rows fn-list"></div>
             </div>
@@ -237,7 +270,7 @@
 
   <dialog id="search-dialog">
     <div class="search-dialog-body">
-      <h2>Find role <button type="button" class="q-hint" aria-label="Scans the selected clusters/groups (Target selection). Matches role name and comment." data-hint="Scans the selected clusters/groups (Target selection). Matches role name and comment.">?</button></h2>
+      <h2>Find role <button type="button" class="q-hint" data-hint="Scans the selected clusters/groups (Target selection). Matches role name and comment.">?</button></h2>
       <div class="alter-search">
         <input type="search" id="alter-search-term" placeholder="Search by role name or comment…" autocapitalize="none" autocomplete="off" spellcheck="false" autofocus />
         <button type="button" id="btn-alter-search" class="primary">Search</button>
@@ -276,7 +309,7 @@
 
   <dialog id="comments-dialog">
     <div class="comments-dialog-body">
-      <h2>Comments <button type="button" class="q-hint" aria-label="Clusters are grouped by identical comment. Edit a box and save it to update all its clusters." data-hint="Clusters are grouped by identical comment. Edit a box and save it to update all its clusters.">?</button></h2>
+      <h2>Comments <button type="button" class="q-hint" data-hint="Clusters are grouped by identical comment. Edit a box and save it to update all its clusters.">?</button></h2>
       <div id="comments-list"></div>
       <menu>
         <button type="button" id="comments-dialog-cancel">Cancel</button>
@@ -343,7 +376,22 @@
           <option value="verify-full">verify-full</option>
         </select>
       </label>
-      <label>Connect user (optional) <input name="connectUser" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="Uses PGUSER if empty" /></label>
+      <div class="form-row">
+        <label><span class="field-label-row">Username (optional) <button type="button" class="q-hint" data-hint="Optional. If blank, the app uses the PGUSER environment variable, then your OS login user.">?</button></span>
+          <input name="connectUser" autocapitalize="none" autocomplete="off" spellcheck="false" />
+        </label>
+        <label><span class="field-label-row">Password (optional) <button type="button" class="q-hint" data-hint="Optional; stored in the private config. If blank, the app falls back to the PGPASSWORD environment variable, then ~/.pgpass, then no password.">?</button></span>
+          <span class="pw-field">
+            <input name="password" type="password" autocapitalize="none" autocomplete="off" spellcheck="false" />
+            <button type="button" class="pw-toggle" aria-label="Show password">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z" />
+                <circle cx="12" cy="12" r="3.2" />
+              </svg>
+            </button>
+          </span>
+        </label>
+      </div>
       <hr class="form-sep" />
       <label>Category <select name="category" required></select></label>
       <menu>
@@ -358,7 +406,7 @@
   <dialog id="groups-dialog">
     <div class="groups-dialog-body">
       <div class="settings-section-head">
-        <h2>Cluster groups <button type="button" class="q-hint" aria-label="A &quot;require confirmation&quot; gate and a colour per group. Deleting a group in use by a cluster is blocked." data-hint="A &quot;require confirmation&quot; gate and a colour per group. Deleting a group in use by a cluster is blocked.">?</button></h2>
+        <h2>Cluster groups <button type="button" class="q-hint" data-hint="A &quot;require confirmation&quot; gate and a colour per group. Deleting a group in use by a cluster is blocked.">?</button></h2>
         <button type="button" id="btn-add-group" autofocus>Add group</button>
       </div>
       <div class="table-wrap">

@@ -18,6 +18,8 @@ export function GetConfig():Promise<model.Config>;
 
 export function GetConfigPath():Promise<string>;
 
+export function GetPendingUpdate():Promise<model.UpdateInfo>;
+
 export function ImportFromEnvironment():Promise<model.EnvImport>;
 
 export function LoadRoleDetails(arg1:model.RoleDetailsRequest):Promise<Array<model.ClusterRoleDetail>>;

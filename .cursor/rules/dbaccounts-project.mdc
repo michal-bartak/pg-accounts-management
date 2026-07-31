@@ -13,7 +13,7 @@ Cross-platform **PostgreSQL role maintenance** desktop app: manage clusters, bat
 |-------|----------|
 | UI shell | **Wails v2** + embedded WebView; frontend is vanilla HTML/CSS/JS in `frontend/` |
 | DB driver | **pgx/v5**; direct **TCP** to `host:port` (no SSH tunnels in v1) |
-| Secrets | **Never** store passwords in YAML; optional `connect_user` only. No in-UI credential fields. Auth: user = cluster `connect_user` → `PGUSER`; password = `PGPASSWORD` → `~/.pgpass` → **empty** (trust / no password, like psql). Production gated by a confirm popup (no checkbox). |
+| Secrets | Optional per-cluster `connect_user` + `password` (both editable in the cluster editor; password is a masked field with a reveal toggle, stored plain-text in the private config written mode `0600`). Auth: user = cluster `connect_user` → `PGUSER` → **OS login user** (like psql); password = cluster `password` → `PGPASSWORD` → `~/.pgpass` → **empty** (trust, like psql). Production gated by a confirm popup (no checkbox). |
 | Role logic | App calls **call templates** with `${placeholder}` → `SELECT fn($1,...)` — real DDL/privileges live in **DB functions** on each cluster |
 | Categories | = cluster groups. Editable in Settings (label + base `color` + `confirm` flag); id is a slug of the label. Colours applied via a generated `<style id="cat-colors">` keyed on `data-cat` (no hardcoded prod/uat colours). `confirm` drives the production popup. |
 | DB function specs | User will provide real names/signatures; defaults in `config.example.yaml` are placeholders (`your_schema.*`) |
@@ -35,7 +35,7 @@ Cross-platform **PostgreSQL role maintenance** desktop app: manage clusters, bat
 
 Example template: [`config.example.yaml`](config.example.yaml). Implemented in `internal/config/` (`paths.go`, `store.go`).
 
-**YAML keys:** `version`, `categories`, `clusters`, `db_functions.<op>.call`, `db_functions.<op>.execution`, `batch.max_concurrency` (default 5), `ui.theme`, `parent_roles` (preconfigured parent groups — bare identifiers, offered as pick-list choices when granting privileges; Create-role uses the same `parent_roles` placeholder as grant/revoke). Legacy `name`/`params` migrated on load.
+**YAML keys:** `version`, `categories`, `clusters`, `db_functions.<op>.call`, `db_functions.<op>.execution`, `batch.max_concurrency` (default 5), `ui.theme`, `ui.password_gen` (role-form random password generator: `length` clamped `[6,128]`/default 10, class toggles `lowercase/uppercase/digits/symbols`, `exclude_similar`; at least one class stays on — Settings → Password generator, persisted via `SaveUISettings`/`UISettings.PasswordGen`), `parent_roles` (preconfigured parent groups — bare identifiers, offered as pick-list choices when granting privileges; Create-role uses the same `parent_roles` placeholder as grant/revoke). Legacy `name`/`params` migrated on load.
 
 ## Wails API (`app.go` → `window.go.main.App`)
 

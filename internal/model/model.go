@@ -43,6 +43,10 @@ type Cluster struct {
 	Category    string `yaml:"category" json:"category"`
 	SSLMode     string `yaml:"sslmode,omitempty" json:"sslmode,omitempty"`
 	ConnectUser string `yaml:"connect_user,omitempty" json:"connectUser,omitempty"`
+	// Password is an optional per-cluster password stored plain-text in the (private, 0600)
+	// config. When set it wins over PGPASSWORD / ~/.pgpass; when empty the app falls back to
+	// the environment / pgpass as before. See internal/pg/auth.go ResolvePassword.
+	Password string `yaml:"password,omitempty" json:"password,omitempty"`
 }
 
 type DBFunction struct {
@@ -117,6 +121,54 @@ type UISettings struct {
 	// CheckForUpdates opts into the on-startup GitHub-Releases version check. Pointer so a
 	// missing value (nil) defaults to ON, including for existing configs — use AutoCheck().
 	CheckForUpdates *bool `yaml:"check_for_updates,omitempty" json:"checkForUpdates,omitempty"`
+	// PasswordGen configures the role-form random password generator (which character classes,
+	// length, exclude look-alikes). Pointer so a missing block (existing configs) falls back to
+	// the built-in default via Normalized() — never nil after config load.
+	PasswordGen *PasswordGen `yaml:"password_gen,omitempty" json:"passwordGen"`
+}
+
+// PasswordGen configures the role-form random password generator.
+type PasswordGen struct {
+	Length         int  `yaml:"length,omitempty" json:"length"`
+	Lowercase      bool `yaml:"lowercase" json:"lowercase"`
+	Uppercase      bool `yaml:"uppercase" json:"uppercase"`
+	Digits         bool `yaml:"digits" json:"digits"`
+	Symbols        bool `yaml:"symbols" json:"symbols"`
+	ExcludeSimilar bool `yaml:"exclude_similar,omitempty" json:"excludeSimilar"`
+}
+
+// Password generator length bounds and default (also the frontend #pwgen-length min/max).
+const (
+	PasswordGenMinLength     = 6
+	PasswordGenMaxLength     = 128
+	PasswordGenDefaultLength = 10
+)
+
+// DefaultPasswordGen is the built-in generator config: 10 chars, lowercase + digits.
+func DefaultPasswordGen() *PasswordGen {
+	return &PasswordGen{Length: PasswordGenDefaultLength, Lowercase: true, Digits: true}
+}
+
+// Normalized returns a valid PasswordGen: a nil receiver becomes the default; the length is
+// clamped to [PasswordGenMinLength, PasswordGenMaxLength] (default when ≤0); and if no character
+// class is enabled, lowercase is forced on so the generator always has a pool to draw from.
+func (p *PasswordGen) Normalized() *PasswordGen {
+	if p == nil {
+		return DefaultPasswordGen()
+	}
+	out := *p
+	switch {
+	case out.Length <= 0:
+		out.Length = PasswordGenDefaultLength
+	case out.Length < PasswordGenMinLength:
+		out.Length = PasswordGenMinLength
+	case out.Length > PasswordGenMaxLength:
+		out.Length = PasswordGenMaxLength
+	}
+	if !out.Lowercase && !out.Uppercase && !out.Digits && !out.Symbols {
+		out.Lowercase = true
+	}
+	return &out
 }
 
 // AutoCheck reports whether the on-startup update check is enabled (nil = default ON).
@@ -212,6 +264,7 @@ type ClusterInput struct {
 	Category    string `json:"category"`
 	SSLMode     string `json:"sslMode"`
 	ConnectUser string `json:"connectUser"`
+	Password    string `json:"password"`
 }
 
 type AuthContext struct {

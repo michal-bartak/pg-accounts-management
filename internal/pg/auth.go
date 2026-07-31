@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/user"
 	"strconv"
 	"strings"
 
@@ -20,10 +21,18 @@ func ResolveUser(cluster model.Cluster, auth model.AuthContext) (string, error) 
 	if u := os.Getenv("PGUSER"); u != "" {
 		return u, nil
 	}
+	// Fall back to the OS login user, like psql/libpq default when no user is given.
+	if u, err := user.Current(); err == nil && u.Username != "" {
+		return u.Username, nil
+	}
 	return "", fmt.Errorf("database user not set: set connect user on cluster, PGUSER, or provide user in the run dialog")
 }
 
 func ResolvePassword(cluster model.Cluster, user string, auth model.AuthContext) (string, error) {
+	// An explicitly configured per-cluster password wins over everything else.
+	if cluster.Password != "" {
+		return cluster.Password, nil
+	}
 	if auth.Password != "" {
 		return auth.Password, nil
 	}

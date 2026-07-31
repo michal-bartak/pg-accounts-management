@@ -77,7 +77,7 @@ func DefaultConfig() model.Config {
 			RoleParents: model.DBRead{Query: defaultRoleParentsQuery},
 		},
 		Batch:         model.BatchSettings{MaxConcurrency: 5},
-		UI:            model.UISettings{Theme: model.ThemeSystem, CommentDefaultView: model.CommentViewFields},
+		UI:            model.UISettings{Theme: model.ThemeSystem, CommentDefaultView: model.CommentViewFields, PasswordGen: model.DefaultPasswordGen()},
 		CommentFields: defaultCommentFields(),
 	}
 }
@@ -156,6 +156,7 @@ func (s *Store) Load() error {
 	}
 	cfg.UI.Theme = model.NormalizeTheme(cfg.UI.Theme)
 	cfg.UI.CommentDefaultView = model.NormalizeCommentView(cfg.UI.CommentDefaultView)
+	cfg.UI.PasswordGen = cfg.UI.PasswordGen.Normalized()
 	cfg.ParentRoles = sanitizeParentRoles(cfg.ParentRoles)
 	cfg.CommentFields = sanitizeCommentFields(cfg.CommentFields)
 	if len(cfg.CommentFields) == 0 {
@@ -274,6 +275,7 @@ func (s *Store) UpdateUI(ui model.UISettings) error {
 		CommentDefaultView:     model.NormalizeCommentView(ui.CommentDefaultView),
 		StageCreateOnTargetAdd: ui.StageCreateOnTargetAdd,
 		CheckForUpdates:        ui.CheckForUpdates,
+		PasswordGen:            ui.PasswordGen.Normalized(),
 	}
 	return s.save()
 }
@@ -344,6 +346,7 @@ func (s *Store) AddCluster(in model.ClusterInput) (model.Cluster, error) {
 		Category:    in.Category,
 		SSLMode:     defaultSSLMode(in.SSLMode),
 		ConnectUser: in.ConnectUser,
+		Password:    in.Password,
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -373,6 +376,7 @@ func (s *Store) UpdateCluster(id string, in model.ClusterInput) (model.Cluster, 
 			Category:    in.Category,
 			SSLMode:     defaultSSLMode(in.SSLMode),
 			ConnectUser: in.ConnectUser,
+			Password:    in.Password,
 		}
 		if err := s.save(); err != nil {
 			return model.Cluster{}, err
@@ -532,6 +536,7 @@ func (s *Store) SaveClustersAndCategories(clusters []model.Cluster, categories [
 		in := model.ClusterInput{
 			Alias: c.Alias, Host: c.Host, Port: c.Port, Database: c.Database,
 			Category: c.Category, SSLMode: c.SSLMode, ConnectUser: c.ConnectUser,
+			Password: c.Password,
 		}
 		if err := validateClusterInput(in); err != nil {
 			return err
@@ -546,7 +551,7 @@ func (s *Store) SaveClustersAndCategories(clusters []model.Cluster, categories [
 		out = append(out, model.Cluster{
 			ID: id, Alias: c.Alias, Host: c.Host, Port: defaultPort(c.Port),
 			Database: c.Database, Category: c.Category, SSLMode: defaultSSLMode(c.SSLMode),
-			ConnectUser: c.ConnectUser,
+			ConnectUser: c.ConnectUser, Password: c.Password,
 		})
 	}
 

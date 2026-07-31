@@ -16,10 +16,17 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
 
 ## Product decisions (don't regress)
 
-- **Secrets never in config, and no in-UI credential fields.** Auth resolution: user =
-  cluster `connect_user` → `PGUSER`; password = `PGPASSWORD` → `~/.pgpass` → empty
-  (trust, like psql). `getAuth()` returns empty strings. See
-  [internal/pg/auth.go](internal/pg/auth.go).
+- **Auth resolution** ([internal/pg/auth.go](internal/pg/auth.go)): user (`ResolveUser`) =
+  cluster `connect_user` → `PGUSER` → **OS login user** (`user.Current()`, like psql/libpq) →
+  error; password (`ResolvePassword`) = **cluster `password`** → `AuthContext.Password` (unused by
+  the UI) → `PGPASSWORD` → `~/.pgpass` → empty (trust, like psql). The `AuthContext` from the run
+  dialog is still always empty from the UI. **The one credential in config is the optional
+  per-cluster `password`** — an opt-in, plain-text field on `model.Cluster`/`ClusterInput`
+  (`yaml:"password,omitempty"`), stored in the private config (`save()` writes mode `0600`) and
+  editable in the Clusters cluster editor as a **masked field with a 👁 reveal toggle** next to
+  Connect user (the two share a `.form-row`, borrowing the Host/Port width mechanism). When set it
+  is used directly; when blank the app falls back to `PGPASSWORD`/`~/.pgpass` as before. It rides on
+  `ClusterInput` (not `AuthContext`), so `TestConnectionInput` tests an unsaved password too.
 - **Production gate is a per-group `confirm` flag**, surfaced only as the confirm popup
   (`askConfirm('Production', …)`); no checkbox. `commands.RequiresProductionConfirm`
   and the frontend `hasProductionTargets`/`categoryConfirm` read the flag (not the id
@@ -243,8 +250,15 @@ Config/clusters/groups: `GetConfig`, `GetConfigPath`, `ReloadConfig`, `AddCluste
 `Store.SaveClustersAndCategories`; the per-item `Add/Update/Delete Cluster/Category` are kept
 but no longer used by the UI), `GetAppVersion`, `CheckForUpdate` (GitHub-Releases version check →
 `internal/update`; opt-in auto-check on startup gated by `ui.check_for_updates`, default ON via
-`UISettings.AutoCheck()`), `SetUpdateSeenVersion` (suppresses the startup popup for an
-already-dismissed version; the About dialog still shows it).
+`UISettings.AutoCheck()`), `SetUpdateSeenVersion` (persists the seen release version —
+`UpdateSeenVersion` — so the startup popup isn't re-shown for it; written by **both** the auto
+path and a **manual** About check via the frontend `persistSeenVersion`), `GetPendingUpdate`
+(`update.Pending`: reconstructs the pending `UpdateInfo` from `UpdateSeenVersion` **without a
+network call** — used on startup by `restorePendingUpdate` to **light the header About-button
+badge + About line across restarts**, incl. when auto-check is off; reports "not available" once
+the running version catches up). **Update-available badge**: a small `--primary` dot
+(`#update-badge`, `.update-badge`) on `#btn-about`, driven by `renderUpdateBadge()` from module
+`updateState`; lit by the auto check, the manual check, and the startup pending-restore alike.
 Run/test: `TestConnection` (by saved cluster id), `TestConnectionInput` (ad-hoc
 `ClusterInput`+`Auth`, used by the cluster editor to test on-screen values),
 `PreviewTargets`, `RunRoleBatch(RoleBatchRequest)` (per-cluster transactional batch; the UI's
@@ -443,7 +457,19 @@ The header is a `.brand` row (accent dot + smaller title + version chip + round 
   version editable via its own Fields/Raw editor (`commentVersionEditors`). It has no per-row
   save — **OK** stages edits into `commentOverrides` (`commitCommentsDialog`), **Cancel**
   discards, and the staged comments publish with everything else on **Save changes**.
-- **Password** row (field + checkbox) and a red **Remove role** button. Run results are not an
+- **Password** row: a masked field inside a `.pw-field` with an overlaid **Copy** icon
+  (`#btn-copy-password`, left) + **reveal eye** (`.pw-toggle`, right), a **Generate** icon button
+  (`#btn-gen-password`, `.pw-gen`) to the right of the field, and the **Set password** checkbox.
+  The field + Generate + Copy + eye are **disabled unless "Set password" is checked**
+  (`syncPasswordControls()`, driven by `alterDoPassword`; called from `renderAlterDetail`, the
+  checkbox handler, and `clearPasswordEditor`). **Generate** (`generatePassword` → written by
+  `generatePasswordIntoField`) builds a random password from the saved **`ui.password_gen`** config
+  (`model.PasswordGen`: `length` clamped `[6,128]`, class toggles `lowercase/uppercase/digits/symbols`,
+  `exclude_similar` drops `il1IoO0`; at least one class stays on — lowercase forced), using
+  `crypto.getRandomValues` with a `Math.random` fallback. **Copy** copies the value even while masked
+  (COPY→CHECK→COPY icon-swap). The generator config is a **Settings → Password generator** section
+  (`#pwgen-*` controls), persisted via the existing `SaveUISettings` (`UISettings.PasswordGen`,
+  normalized in `config.store`; no new bound method). A red **Remove role** button. Run results are not an
   in-body table: they surface in the **footer status chip** `#run-status` (left of the action
   buttons; hidden until a run starts, then `running… (D/T)` → `OK`/`Error`), updated live from
   `role-batch-progress` events (`beginRunStatus`/`applyRunProgress`/`finishRunStatus`/
