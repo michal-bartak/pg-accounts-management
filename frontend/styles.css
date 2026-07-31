@@ -204,7 +204,16 @@ body {
   border-radius: 50%; font-size: 0.72rem; cursor: pointer;
   background: transparent; border: 1px solid var(--hint-color); color: var(--hint-color);
   display: inline-flex; align-items: center; justify-content: center;
+  position: relative;
 }
+/* Accent dot on the About button when a newer version is available (auto or manual check). */
+.update-badge {
+  position: absolute; top: -2px; right: -2px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--primary); box-shadow: 0 0 4px var(--primary);
+  border: 1px solid var(--bg); pointer-events: none;
+}
+.update-badge[hidden] { display: none; }
 .info-btn:not(:disabled):hover,
 .info-btn:focus-visible { color: var(--hint-color); background: transparent; border-color: var(--hint-color); outline: none; }
 

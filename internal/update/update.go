@@ -74,6 +74,24 @@ func Check(ctx context.Context, currentVersion, repoURL string) (model.UpdateInf
 	return info, nil
 }
 
+// Pending reconstructs — without any network call — the update the user was last informed about
+// (the persisted seenVersion) if it is still newer than currentVersion. It drives the
+// "update available" badge across restarts, including when the startup auto-check is off, and
+// naturally reports "not available" once the user upgrades past the seen version. ReleaseURL
+// points at the repo's latest-release page (the exact html_url is only known after a Check).
+func Pending(seenVersion, currentVersion, repoURL string) model.UpdateInfo {
+	info := model.UpdateInfo{CurrentVersion: strings.TrimSpace(currentVersion)}
+	seen := strings.TrimPrefix(strings.TrimSpace(seenVersion), "v")
+	if seen != "" && compareVersions(seen, info.CurrentVersion) > 0 {
+		info.LatestVersion = seen
+		info.UpdateAvailable = true
+		if r := strings.TrimRight(strings.TrimSpace(repoURL), "/"); r != "" {
+			info.ReleaseURL = r + "/releases/latest"
+		}
+	}
+	return info
+}
+
 // ownerRepo extracts OWNER, REPO from a https://github.com/OWNER/REPO URL.
 func ownerRepo(repoURL string) (owner, repo string, ok bool) {
 	rest, found := strings.CutPrefix(strings.TrimSpace(repoURL), "https://github.com/")

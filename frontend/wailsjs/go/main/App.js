@@ -34,6 +34,10 @@ export function GetConfigPath() {
   return window['go']['main']['App']['GetConfigPath']();
 }
 
+export function GetPendingUpdate() {
+  return window['go']['main']['App']['GetPendingUpdate']();
+}
+
 export function ImportFromEnvironment() {
   return window['go']['main']['App']['ImportFromEnvironment']();
 }

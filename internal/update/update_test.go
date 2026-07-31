@@ -98,3 +98,27 @@ func TestCheck_ServerError(t *testing.T) {
 		t.Fatal("HTTP 500 should error")
 	}
 }
+
+func TestPending(t *testing.T) {
+	// A seen version still newer than current → pending (badge lit across restart), no network.
+	got := Pending("0.4.0", "0.3.0", repo)
+	if !got.UpdateAvailable || got.LatestVersion != "0.4.0" ||
+		got.ReleaseURL != repo+"/releases/latest" || got.CurrentVersion != "0.3.0" {
+		t.Fatalf("expected pending 0.4.0, got %+v", got)
+	}
+	// Leading "v" and surrounding space are tolerated.
+	if got := Pending(" v0.4.0 ", "0.3.0", repo); !got.UpdateAvailable || got.LatestVersion != "0.4.0" {
+		t.Fatalf("expected v-prefixed pending, got %+v", got)
+	}
+	// Upgraded past (or equal to) the seen version → nothing pending.
+	if got := Pending("0.4.0", "0.4.0", repo); got.UpdateAvailable {
+		t.Fatalf("equal versions must not be pending: %+v", got)
+	}
+	if got := Pending("0.4.0", "0.5.0", repo); got.UpdateAvailable {
+		t.Fatalf("current ahead of seen must not be pending: %+v", got)
+	}
+	// No seen version → nothing pending.
+	if got := Pending("", "0.3.0", repo); got.UpdateAvailable {
+		t.Fatalf("empty seen must not be pending: %+v", got)
+	}
+}

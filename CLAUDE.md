@@ -250,8 +250,15 @@ Config/clusters/groups: `GetConfig`, `GetConfigPath`, `ReloadConfig`, `AddCluste
 `Store.SaveClustersAndCategories`; the per-item `Add/Update/Delete Cluster/Category` are kept
 but no longer used by the UI), `GetAppVersion`, `CheckForUpdate` (GitHub-Releases version check →
 `internal/update`; opt-in auto-check on startup gated by `ui.check_for_updates`, default ON via
-`UISettings.AutoCheck()`), `SetUpdateSeenVersion` (suppresses the startup popup for an
-already-dismissed version; the About dialog still shows it).
+`UISettings.AutoCheck()`), `SetUpdateSeenVersion` (persists the seen release version —
+`UpdateSeenVersion` — so the startup popup isn't re-shown for it; written by **both** the auto
+path and a **manual** About check via the frontend `persistSeenVersion`), `GetPendingUpdate`
+(`update.Pending`: reconstructs the pending `UpdateInfo` from `UpdateSeenVersion` **without a
+network call** — used on startup by `restorePendingUpdate` to **light the header About-button
+badge + About line across restarts**, incl. when auto-check is off; reports "not available" once
+the running version catches up). **Update-available badge**: a small `--primary` dot
+(`#update-badge`, `.update-badge`) on `#btn-about`, driven by `renderUpdateBadge()` from module
+`updateState`; lit by the auto check, the manual check, and the startup pending-restore alike.
 Run/test: `TestConnection` (by saved cluster id), `TestConnectionInput` (ad-hoc
 `ClusterInput`+`Auth`, used by the cluster editor to test on-screen values),
 `PreviewTargets`, `RunRoleBatch(RoleBatchRequest)` (per-cluster transactional batch; the UI's

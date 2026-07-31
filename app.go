@@ -70,6 +70,15 @@ func (a *App) SetUpdateSeenVersion(v string) error {
 	return a.store.SetUpdateSeenVersion(v)
 }
 
+// GetPendingUpdate returns — without any network call — the update the user was last informed
+// about (the persisted UpdateSeenVersion) if it is still newer than the running version. This
+// drives the "update available" badge across restarts, including when the startup auto-check is
+// off; it naturally reports "not available" once the user upgrades past the seen version.
+func (a *App) GetPendingUpdate() (model.UpdateInfo, error) {
+	v := version.Get()
+	return update.Pending(a.store.Get().UpdateSeenVersion, v.Version, v.RepoURL), nil
+}
+
 func (a *App) ReloadConfig() (model.Config, error) {
 	if err := a.store.Load(); err != nil {
 		return model.Config{}, err
