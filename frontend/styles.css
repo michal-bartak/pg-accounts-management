@@ -963,7 +963,9 @@ dialog h2 { font-size: var(--fs-h2); }
 /* flex-shrink:0 — the SVG has no intrinsic width attribute, so as a flex item in this fixed-width
    inline-flex button it would otherwise collapse to a thin sliver (the eye/copy escape this only
    via their absolute-positioned parents). */
-.pw-gen svg { display: block; width: 1.05rem; height: 1.05rem; flex-shrink: 0; }
+/* Size the glyph to match the text-glyph icons on .scope-act edit/delete buttons (which render at
+   --fs-base ≈ 13px ink), so this bordered icon button reads at the same weight as those. */
+.pw-gen svg { display: block; width: 0.85rem; height: 0.85rem; flex-shrink: 0; }
 .pw-gen:hover { opacity: 1; }
 .pw-gen:disabled { opacity: 0.35; pointer-events: none; cursor: default; }
 /* Separator before the (bottom) Category field. */

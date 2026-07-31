@@ -459,8 +459,8 @@ The header is a `.brand` row (accent dot + smaller title + version chip + round 
   discards, and the staged comments publish with everything else on **Save changes**.
 - **Password** row: a masked field inside a `.pw-field` with an overlaid **Copy** icon
   (`#btn-copy-password`, left) + **reveal eye** (`.pw-toggle`, right), a **Generate** icon button
-  (`#btn-gen-password`, `.pw-gen`) to the right of the field, and the **Change password** checkbox.
-  The field + Generate + Copy + eye are **disabled unless "Change password" is checked**
+  (`#btn-gen-password`, `.pw-gen`) to the right of the field, and the **Set password** checkbox.
+  The field + Generate + Copy + eye are **disabled unless "Set password" is checked**
   (`syncPasswordControls()`, driven by `alterDoPassword`; called from `renderAlterDetail`, the
   checkbox handler, and `clearPasswordEditor`). **Generate** (`generatePassword` → written by
   `generatePasswordIntoField`) builds a random password from the saved **`ui.password_gen`** config
