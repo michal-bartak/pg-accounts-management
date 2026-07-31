@@ -145,9 +145,18 @@ batch:
 # ui.theme: light | dark | system (follow OS appearance)
 # ui.comment_default_view: fields | raw — preferred comment editor mode for a NEW/empty
 #   comment (Create role, or a role with no comment). Content-bearing comments auto-detect.
+# ui.password_gen: role-form random password generator. length is clamped to [6,128] (default
+#   10); at least one character class stays enabled (lowercase forced on if all are off).
 ui:
   theme: system
   comment_default_view: fields
+  password_gen:
+    length: 10
+    lowercase: true
+    uppercase: false
+    digits: true
+    symbols: false
+    exclude_similar: false
 
 # targets: the last Operations-page target selection, remembered across restarts. Managed by
 # the app (updated whenever you toggle a group/cluster checkbox). Omit or leave empty for the

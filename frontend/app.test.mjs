@@ -633,3 +633,40 @@ test('enterAlterAfterCreate: switches to Alter, scopes to the sidebar selection,
   assert.deepEqual(r.scope, ['c1', 'c2']);          // all originally-selected clusters
   assert.deepEqual(r.reloadOpts, { appendLog: true }); // load appends to the create log, not reset
 });
+
+// ---------------------------------------------------------------------------------------------
+// Password generator (no crypto in the vm sandbox → generatePassword uses its Math.random fallback).
+test('generatePassword: honors length and only draws from enabled classes', () => {
+  const r = evalJSON(`(() => {
+    const pw = generatePassword({ length: 40, lowercase: true, uppercase: false, digits: false, symbols: false, excludeSimilar: false });
+    return { len: pw.length, allLower: /^[a-z]+$/.test(pw) };
+  })()`);
+  assert.equal(r.len, 40);
+  assert.equal(r.allLower, true);
+});
+
+test('generatePassword: digits + uppercase pool excludes lowercase/symbols', () => {
+  const r = evalJSON(`(() => {
+    const pw = generatePassword({ length: 60, lowercase: false, uppercase: true, digits: true, symbols: false, excludeSimilar: false });
+    return { onlyUpperDigits: /^[A-Z0-9]+$/.test(pw), len: pw.length };
+  })()`);
+  assert.equal(r.onlyUpperDigits, true);
+  assert.equal(r.len, 60);
+});
+
+test('generatePassword: excludeSimilar removes look-alike characters', () => {
+  const r = evalJSON(`(() => {
+    const pw = generatePassword({ length: 200, lowercase: true, uppercase: true, digits: true, symbols: false, excludeSimilar: true });
+    return { hasSimilar: /[il1IoO0]/.test(pw) };
+  })()`);
+  assert.equal(r.hasSimilar, false);
+});
+
+test('generatePassword: empty pool (no classes) defensively falls back to lowercase', () => {
+  const r = evalJSON(`(() => {
+    const pw = generatePassword({ length: 12, lowercase: false, uppercase: false, digits: false, symbols: false, excludeSimilar: false });
+    return { len: pw.length, allLower: /^[a-z]+$/.test(pw) };
+  })()`);
+  assert.equal(r.len, 12);
+  assert.equal(r.allLower, true);
+});

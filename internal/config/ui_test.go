@@ -82,6 +82,61 @@ func TestUICheckForUpdatesAndSeenVersion(t *testing.T) {
 	}
 }
 
+func TestDefaultConfigPasswordGen(t *testing.T) {
+	pg := DefaultConfig().UI.PasswordGen
+	if pg == nil {
+		t.Fatal("default ui.password_gen is nil")
+	}
+	if pg.Length != model.PasswordGenDefaultLength || !pg.Lowercase || !pg.Digits || pg.Uppercase || pg.Symbols {
+		t.Fatalf("default password_gen = %+v, want len 10 lowercase+digits only", *pg)
+	}
+}
+
+func TestNormalizePasswordGen(t *testing.T) {
+	// nil receiver → the built-in default.
+	if got := (*model.PasswordGen)(nil).Normalized(); got == nil || got.Length != model.PasswordGenDefaultLength || !got.Lowercase || !got.Digits {
+		t.Fatalf("nil.Normalized() = %+v, want default", got)
+	}
+	// Length clamping (0 → default, below min → min, above max → max).
+	if got := (&model.PasswordGen{Length: 0, Lowercase: true}).Normalized(); got.Length != model.PasswordGenDefaultLength {
+		t.Errorf("length 0 → %d, want %d", got.Length, model.PasswordGenDefaultLength)
+	}
+	if got := (&model.PasswordGen{Length: 3, Lowercase: true}).Normalized(); got.Length != model.PasswordGenMinLength {
+		t.Errorf("length 3 → %d, want %d", got.Length, model.PasswordGenMinLength)
+	}
+	if got := (&model.PasswordGen{Length: 9999, Lowercase: true}).Normalized(); got.Length != model.PasswordGenMaxLength {
+		t.Errorf("length 9999 → %d, want %d", got.Length, model.PasswordGenMaxLength)
+	}
+	// No class enabled → lowercase forced on.
+	if got := (&model.PasswordGen{Length: 12}).Normalized(); !got.Lowercase {
+		t.Errorf("all-classes-off should force lowercase on: %+v", *got)
+	}
+}
+
+func TestUpdateUIPersistsPasswordGen(t *testing.T) {
+	s := tmpStore(t)
+	// Default present before any update.
+	if pg := s.Get().UI.PasswordGen; pg == nil || pg.Length != model.PasswordGenDefaultLength {
+		t.Fatalf("default password_gen not present: %+v", pg)
+	}
+	// Custom config round-trips (with normalization applied).
+	custom := &model.PasswordGen{Length: 200, Uppercase: true, Symbols: true, ExcludeSimilar: true}
+	if err := s.UpdateUI(model.UISettings{Theme: "dark", PasswordGen: custom}); err != nil {
+		t.Fatal(err)
+	}
+	got := s.Get().UI.PasswordGen
+	if got == nil || got.Length != model.PasswordGenMaxLength || !got.Uppercase || !got.Symbols || !got.ExcludeSimilar || got.Lowercase || got.Digits {
+		t.Fatalf("password_gen not persisted/normalized: %+v", got)
+	}
+	// nil PasswordGen normalizes back to the default rather than persisting nil.
+	if err := s.UpdateUI(model.UISettings{Theme: "dark"}); err != nil {
+		t.Fatal(err)
+	}
+	if pg := s.Get().UI.PasswordGen; pg == nil || pg.Length != model.PasswordGenDefaultLength {
+		t.Fatalf("nil password_gen should normalize to default: %+v", pg)
+	}
+}
+
 func TestNormalizeTheme(t *testing.T) {
 	tests := []struct {
 		in, want string

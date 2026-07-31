@@ -457,7 +457,19 @@ The header is a `.brand` row (accent dot + smaller title + version chip + round 
   version editable via its own Fields/Raw editor (`commentVersionEditors`). It has no per-row
   save — **OK** stages edits into `commentOverrides` (`commitCommentsDialog`), **Cancel**
   discards, and the staged comments publish with everything else on **Save changes**.
-- **Password** row (field + checkbox) and a red **Remove role** button. Run results are not an
+- **Password** row: a masked field inside a `.pw-field` with an overlaid **Copy** icon
+  (`#btn-copy-password`, left) + **reveal eye** (`.pw-toggle`, right), a **Generate** icon button
+  (`#btn-gen-password`, `.pw-gen`) to the right of the field, and the **Change password** checkbox.
+  The field + Generate + Copy + eye are **disabled unless "Change password" is checked**
+  (`syncPasswordControls()`, driven by `alterDoPassword`; called from `renderAlterDetail`, the
+  checkbox handler, and `clearPasswordEditor`). **Generate** (`generatePassword` → written by
+  `generatePasswordIntoField`) builds a random password from the saved **`ui.password_gen`** config
+  (`model.PasswordGen`: `length` clamped `[6,128]`, class toggles `lowercase/uppercase/digits/symbols`,
+  `exclude_similar` drops `il1IoO0`; at least one class stays on — lowercase forced), using
+  `crypto.getRandomValues` with a `Math.random` fallback. **Copy** copies the value even while masked
+  (COPY→CHECK→COPY icon-swap). The generator config is a **Settings → Password generator** section
+  (`#pwgen-*` controls), persisted via the existing `SaveUISettings` (`UISettings.PasswordGen`,
+  normalized in `config.store`; no new bound method). A red **Remove role** button. Run results are not an
   in-body table: they surface in the **footer status chip** `#run-status` (left of the action
   buttons; hidden until a run starts, then `running… (D/T)` → `OK`/`Error`), updated live from
   `role-batch-progress` events (`beginRunStatus`/`applyRunProgress`/`finishRunStatus`/

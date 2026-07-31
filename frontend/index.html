@@ -154,6 +154,39 @@
         </div>
 
         <div class="settings-group">
+          <span class="settings-group-label">Password generator <button type="button" class="q-hint" data-hint="Controls the random password produced by the Generate button on the role form's password field. At least one character class stays enabled (lowercase is forced on if you turn them all off).">?</button></span>
+          <div class="settings-row settings-row-gap pwgen-classes">
+            <div class="pwgen-col">
+              <div class="settings-check-line">
+                <label class="settings-check"><input type="checkbox" id="pwgen-lower" /> <span>Lowercase letters (a–z)</span></label>
+              </div>
+              <div class="settings-check-line">
+                <label class="settings-check"><input type="checkbox" id="pwgen-upper" /> <span>Uppercase letters (A–Z)</span></label>
+              </div>
+            </div>
+            <div class="pwgen-col">
+              <div class="settings-check-line">
+                <label class="settings-check"><input type="checkbox" id="pwgen-digits" /> <span>Digits (0–9)</span></label>
+              </div>
+              <div class="settings-check-line">
+                <label class="settings-check"><input type="checkbox" id="pwgen-symbols" /> <span>Symbols (!@#$…)</span></label>
+              </div>
+            </div>
+          </div>
+          <div class="settings-row settings-row-gap">
+            <div class="settings-check-line">
+              <label class="settings-check"><input type="checkbox" id="pwgen-exclude-similar" /> <span>Exclude look-alike characters (i l 1 I o O 0)</span></label>
+            </div>
+          </div>
+          <div class="settings-row settings-row-gap">
+            <div class="settings-field">
+              <span class="settings-field-label">Length</span>
+              <input type="number" id="pwgen-length" class="settings-num" min="6" max="128" value="10" />
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-group">
           <span class="settings-group-label">Preconfigured parent groups <button type="button" class="q-hint" data-hint="Role names offered as pick-list choices when granting privileges in Create role and Alter role. Drag the handle to reorder.">?</button></span>
           <div id="parent-roles-editor" class="list-editor"></div>
           <button type="button" class="list-add" id="btn-add-parent-role">Add group…</button>

@@ -77,7 +77,7 @@ func DefaultConfig() model.Config {
 			RoleParents: model.DBRead{Query: defaultRoleParentsQuery},
 		},
 		Batch:         model.BatchSettings{MaxConcurrency: 5},
-		UI:            model.UISettings{Theme: model.ThemeSystem, CommentDefaultView: model.CommentViewFields},
+		UI:            model.UISettings{Theme: model.ThemeSystem, CommentDefaultView: model.CommentViewFields, PasswordGen: model.DefaultPasswordGen()},
 		CommentFields: defaultCommentFields(),
 	}
 }
@@ -156,6 +156,7 @@ func (s *Store) Load() error {
 	}
 	cfg.UI.Theme = model.NormalizeTheme(cfg.UI.Theme)
 	cfg.UI.CommentDefaultView = model.NormalizeCommentView(cfg.UI.CommentDefaultView)
+	cfg.UI.PasswordGen = cfg.UI.PasswordGen.Normalized()
 	cfg.ParentRoles = sanitizeParentRoles(cfg.ParentRoles)
 	cfg.CommentFields = sanitizeCommentFields(cfg.CommentFields)
 	if len(cfg.CommentFields) == 0 {
@@ -274,6 +275,7 @@ func (s *Store) UpdateUI(ui model.UISettings) error {
 		CommentDefaultView:     model.NormalizeCommentView(ui.CommentDefaultView),
 		StageCreateOnTargetAdd: ui.StageCreateOnTargetAdd,
 		CheckForUpdates:        ui.CheckForUpdates,
+		PasswordGen:            ui.PasswordGen.Normalized(),
 	}
 	return s.save()
 }

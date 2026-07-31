@@ -797,6 +797,10 @@ tr:last-child td { border-bottom: none; }
 /* Extra breathing room above a row that follows another within the same settings group. */
 .settings-row-gap { margin-top: 0.9rem; }
 
+/* Password-generator character classes in two columns: lower/upper | digits/symbols. */
+.pwgen-classes { display: flex; align-items: flex-start; gap: 2.5rem; }
+.pwgen-col { display: flex; flex-direction: column; gap: 0.5rem; }
+
 /* Two side-by-side subsections (DB command templates | Introspection queries).
    Collapses to one column when the panel is too narrow. */
 .settings-two-col {
@@ -911,14 +915,17 @@ dialog h2 { font-size: var(--fs-h2); }
 #cluster-form .form-row input { min-width: 0; }
 /* Field-label text + its ? hint badge on one line above the input. */
 #cluster-form .field-label-row { display: inline-flex; align-items: center; gap: 0.3rem; }
-/* Password input with the reveal toggle overlaid inside it, on the right.
-   Shared by the cluster editor and the role form's "new password" field. */
+/* Password input with icon toggles overlaid inside it, on the right. Shared by the cluster editor
+   and the role form's "new password" field. The role form also carries a Copy icon (left of the
+   eye); keep `.pw-copy` OUT of the `.pw-toggle` class so togglePwReveal's `.closest('.pw-toggle')`
+   never matches it. */
 .pw-field { position: relative; display: block; }
 .pw-field > input { width: 100%; padding-right: 2rem; }
-.pw-toggle {
+.alter-password .pw-field > input { padding-right: 3.4rem; } /* room for Copy + eye */
+.pw-toggle,
+.pw-copy {
   position: absolute;
   top: 50%;
-  right: 0.4rem;
   transform: translateY(-50%);
   display: flex;
   align-items: center;
@@ -930,8 +937,35 @@ dialog h2 { font-size: var(--fs-h2); }
   color: var(--text);
   opacity: 0.55;
 }
+.pw-toggle { right: 0.4rem; }
+.pw-copy { right: 1.95rem; }
 .pw-toggle svg { display: block; width: 1.05rem; height: 1.05rem; }
-.pw-toggle:hover { opacity: 1; }
+.pw-copy svg { display: block; width: 0.875rem; height: 0.875rem; } /* 14px */
+.pw-toggle:hover,
+.pw-copy:hover { opacity: 1; }
+.pw-toggle:disabled,
+.pw-copy:disabled { opacity: 0.25; pointer-events: none; cursor: default; }
+
+/* Generate button sits to the right of the password field (outside the box). */
+.pw-gen {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  opacity: 0.85;
+}
+/* flex-shrink:0 — the SVG has no intrinsic width attribute, so as a flex item in this fixed-width
+   inline-flex button it would otherwise collapse to a thin sliver (the eye/copy escape this only
+   via their absolute-positioned parents). */
+.pw-gen svg { display: block; width: 1.05rem; height: 1.05rem; flex-shrink: 0; }
+.pw-gen:hover { opacity: 1; }
+.pw-gen:disabled { opacity: 0.35; pointer-events: none; cursor: default; }
 /* Separator before the (bottom) Category field. */
 #cluster-form .form-sep { width: 100%; border: none; border-top: 1px solid var(--border); margin: 0.4rem 0; }
 /* Test connection sits on the left; Save / Cancel stay on the right. */
