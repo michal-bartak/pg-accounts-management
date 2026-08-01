@@ -12,6 +12,7 @@ export default defineConfig({
       title: 'DbAccounts',
       description: 'Maintain PostgreSQL roles across many clusters from one desktop app',
       plugins: [starlightThemeRapide()],
+      favicon: '/appicon.png',
       logo: {
         src: './src/assets/appicon.png',
         alt: 'DbAccounts',
