@@ -1,4 +1,5 @@
 build/bin/
+build/windows/
 dist/
 *.tar.gz
 *.exe
