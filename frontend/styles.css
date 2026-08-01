@@ -344,12 +344,19 @@ th, td {
 th { background: var(--surface); color: var(--muted); font-weight: 500; }
 tr:last-child td { border-bottom: none; }
 
-/* Table row action icons (Edit ✎ / Delete ×) — same square buttons as the role form,
-   right-aligned in the last (Actions) column. Tighten only that cell's padding (top/bottom +
-   right); left is left at the default so the other columns (e.g. alias) are unaffected. */
-.row-actions { display: flex; gap: 0.35rem; justify-content: flex-end; }
+/* Table row action icons (Edit / Delete) — same square buttons as the role form, LEFT-aligned
+   in the last (Actions) column so the buttons line up under the left-aligned "Actions" header
+   label (both sit at the cell's default left padding, like every other column). Tighten only
+   that cell's vertical padding. */
+.row-actions { display: flex; gap: 0.35rem; }
+/* Hug the Actions column to its content (width:1% = "as narrow as content" in an auto table),
+   so the row's slack is absorbed by the other columns rather than left trailing after the
+   buttons — the buttons then read as the very last elements in the row. Header label + buttons
+   stay left-aligned and share the same left edge. */
 #clusters-table th:last-child,
-#clusters-table td:last-child { text-align: right; padding-right: 0.35rem; }
+#clusters-table td:last-child,
+#groups-table th:last-child,
+#groups-table td:last-child { width: 1%; white-space: nowrap; }
 #clusters-table td:last-child { padding-top: 0.25rem; padding-bottom: 0.25rem; }
 
 .badge {
