@@ -43,7 +43,6 @@ Example template: [`config.example.yaml`](config.example.yaml). Implemented in `
 - `AddCluster`, `UpdateCluster`, `DeleteCluster` (per-item; kept but unused by the UI now)
 - `SaveClusters(ClustersConfig)` — staged Clusters editor: replaces the whole clusters+categories
   set atomically via `Store.SaveClustersAndCategories` (validate + UUID/slug ids + referential integrity)
-- `ImportFromEnvironment` — reads `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`
 - `SaveDBFunctions`, `SaveBatchSettings`, `SaveUISettings`, `SaveParentRoles`, `SaveTargetSelection`
 - `TestConnection`, `PreviewTargets`, `RunRoleBatch` (per-cluster transactional batch — the
   create/update/remove path), `RunOperation` (legacy single-op, unused by the UI)
@@ -229,7 +228,6 @@ internal/calltemplate/    Call template parse/validate/SQL build (stdlib only)
 internal/pg/              DSN, auth, Connect, CallFunction, introspect.go (role reads)
 internal/batch/           Concurrent executor + all-cluster scan (Search/LoadRoleDetails)
 internal/commands/        Op validation + arg maps
-internal/envimport/       PG* env import
 internal/update/          GitHub-Releases version check (stdlib http + semver compare)
 frontend/                 UI (app.js uses backend())
 sql/README.md             Docs for user's PostgreSQL functions
