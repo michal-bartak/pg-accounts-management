@@ -395,14 +395,15 @@ tr:last-child td { border-bottom: none; }
   white-space: normal;
 }
 .q-hint-pop[hidden] { display: none; }
-/* Warning variant (e.g. non-text comment value): a plain amber ⚠ that still drives the
-   shared hover/focus hint popover — no circular badge chrome. */
+/* Warning variant (e.g. non-text comment value): a plain amber warning triangle (ICONS.warn)
+   that still drives the shared hover/focus hint popover — no circular badge chrome. */
 .q-hint.q-warn,
 .q-hint.q-warn:hover,
 .q-hint.q-warn:focus-visible {
   width: 16px; height: 16px; border-radius: 0; border: none;
-  background: transparent; color: var(--warn, #e8a838); font-size: 1.15rem;
+  background: transparent; color: var(--warn, #e8a838);
 }
+.q-hint.q-warn .ic { width: 16px; height: 16px; }
 
 .ops-layout {
   flex: 1 1 auto;
@@ -946,7 +947,9 @@ dialog h2 { font-size: var(--fs-h2); }
 .pw-toggle:disabled,
 .pw-copy:disabled { opacity: 0.25; pointer-events: none; cursor: default; }
 
-/* Generate button sits to the right of the password field (outside the box). */
+/* Generate button sits to the right of the password field (outside the box). A bordered square
+   icon button in the same family as .scope-act / .icon-btn — so it carries the shared button
+   surface fill + radius (not a transparent, hollow-looking override). */
 .pw-gen {
   display: inline-flex;
   align-items: center;
@@ -954,8 +957,8 @@ dialog h2 { font-size: var(--fs-h2); }
   width: var(--control-h);
   height: var(--control-h);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  background: none;
+  border-radius: var(--radius);
+  background: var(--surface);
   color: var(--text);
   cursor: pointer;
   opacity: 0.85;
@@ -1117,6 +1120,13 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .scope-act:disabled:hover { border-color: var(--border); }
 /* "off" indicator for an attribute that's enabled nowhere — de-emphasised (~50% less visible). */
 .scope-off { opacity: 0.3; }
+
+/* Inline SVG action icons (edit / delete / discard), replacing the old ✎ × ↺ text glyphs so
+   they render identically across platforms. currentColor + inherited opacity make them match
+   the surrounding button; pointer-events:none keeps clicks/drag on the button, not the path. */
+.ic { display: block; pointer-events: none; }
+.scope-act .ic,
+.le-del .ic { width: 15px; height: 15px; }
 
 .alter-add-priv { display: flex; gap: 0.4rem; margin-top: 0.7rem; }
 
