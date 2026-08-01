@@ -7,7 +7,6 @@ import (
 
 	"github.com/michalbartak/dbaccounts/internal/batch"
 	"github.com/michalbartak/dbaccounts/internal/config"
-	"github.com/michalbartak/dbaccounts/internal/envimport"
 	"github.com/michalbartak/dbaccounts/internal/model"
 	"github.com/michalbartak/dbaccounts/internal/pg"
 	"github.com/michalbartak/dbaccounts/internal/update"
@@ -151,10 +150,6 @@ func (a *App) DeleteCategory(id string) error {
 // Save). Validates the full set atomically; nothing persists on error.
 func (a *App) SaveClusters(cfg model.ClustersConfig) error {
 	return a.store.SaveClustersAndCategories(cfg.Clusters, cfg.Categories)
-}
-
-func (a *App) ImportFromEnvironment() model.EnvImport {
-	return envimport.FromEnvironment()
 }
 
 func (a *App) TestConnection(req model.TestConnectionRequest) error {

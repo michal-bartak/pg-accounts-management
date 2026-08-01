@@ -38,10 +38,6 @@ export function GetPendingUpdate() {
   return window['go']['main']['App']['GetPendingUpdate']();
 }
 
-export function ImportFromEnvironment() {
-  return window['go']['main']['App']['ImportFromEnvironment']();
-}
-
 export function LoadRoleDetails(arg1) {
   return window['go']['main']['App']['LoadRoleDetails'](arg1);
 }

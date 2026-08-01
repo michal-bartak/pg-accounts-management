@@ -397,13 +397,6 @@ type ClusterProgress struct {
 	Queries    []string `json:"queries,omitempty"` // executed SQL (set on the "done" event)
 }
 
-type EnvImport struct {
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	Database string `json:"database"`
-	User     string `json:"user"`
-}
-
 type TestConnectionRequest struct {
 	ClusterID string      `json:"clusterId"`
 	Auth      AuthContext `json:"auth"`

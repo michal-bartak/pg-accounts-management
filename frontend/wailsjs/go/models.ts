@@ -695,24 +695,6 @@ export namespace model {
 	
 	
 	
-	export class EnvImport {
-	    host: string;
-	    port: number;
-	    database: string;
-	    user: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new EnvImport(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.host = source["host"];
-	        this.port = source["port"];
-	        this.database = source["database"];
-	        this.user = source["user"];
-	    }
-	}
 	
 	
 	

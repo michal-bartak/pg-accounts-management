@@ -88,7 +88,6 @@
     <section id="panel-clusters" class="panel">
       <div class="toolbar">
         <button type="button" id="btn-add-cluster" class="primary">Add cluster</button>
-        <button type="button" id="btn-import-env">Import from PG* env</button>
         <button type="button" id="btn-test-clusters">Test connections</button>
         <button type="button" id="btn-manage-groups">Cluster groups</button>
       </div>
@@ -361,7 +360,7 @@
     <form method="dialog" id="cluster-form" autocapitalize="none">
       <h2 id="cluster-dialog-title">Add cluster</h2>
       <input type="hidden" name="id" />
-      <label>Alias <input name="alias" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
+      <label>Alias <input name="alias" required autocapitalize="none" autocomplete="off" spellcheck="false" autofocus /></label>
       <div class="form-row">
         <label>Host <input name="host" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
         <label class="port">Port <input name="port" type="number" value="5432" /></label>
@@ -407,7 +406,7 @@
     <div class="groups-dialog-body">
       <div class="settings-section-head">
         <h2>Cluster groups <button type="button" class="q-hint" data-hint="A &quot;require confirmation&quot; gate and a colour per group. Deleting a group in use by a cluster is blocked.">?</button></h2>
-        <button type="button" id="btn-add-group" autofocus>Add group</button>
+        <button type="button" id="btn-add-group">Add group</button>
       </div>
       <div class="table-wrap">
         <table id="groups-table">
@@ -431,7 +430,7 @@
     <form method="dialog" id="group-form" autocapitalize="none">
       <h2 id="group-dialog-title">Add group</h2>
       <input type="hidden" name="id" />
-      <label>Label <input name="label" required autocapitalize="none" autocomplete="off" spellcheck="false" /></label>
+      <label>Label <input name="label" required autocapitalize="none" autocomplete="off" spellcheck="false" autofocus /></label>
       <label>Colour <input name="color" type="color" value="#9aa3b5" /></label>
       <label class="inline"><input type="checkbox" name="confirm" /> Require confirmation before running</label>
       <p id="group-error" class="form-error hidden"></p>

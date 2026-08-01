@@ -244,7 +244,7 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
 
 Config/clusters/groups: `GetConfig`, `GetConfigPath`, `ReloadConfig`, `AddCluster`,
 `UpdateCluster`, `DeleteCluster`, `AddCategory`, `UpdateCategory`, `DeleteCategory`,
-`ImportFromEnvironment`, `SaveDBFunctions`, `SaveDBReads` (introspection queries), `SaveBatchSettings`, `SaveUISettings`,
+`SaveDBFunctions`, `SaveDBReads` (introspection queries), `SaveBatchSettings`, `SaveUISettings`,
 `SaveParentRoles`, `SaveCommentFields`, `SaveTargetSelection`, `SaveClusters`
 (staged Clusters editor — replaces the whole clusters+categories set at once via
 `Store.SaveClustersAndCategories`; the per-item `Add/Update/Delete Cluster/Category` are kept
@@ -407,7 +407,9 @@ Open every `<dialog>` via the **`openModal(dlgOrId)`** helper in
 [frontend/app.js](frontend/app.js), never a bare `.showModal()`: it drops `showModal()`'s
 auto-focus (which otherwise leaves a keyboard focus ring on the first Close/OK button, or
 pops a `?` hint) **unless** the dialog declares intentional initial focus via an `[autofocus]`
-element (e.g. the Find-role search input, the Add-group button). Focus indicators are
+element (e.g. the Find-role search input, and the first field of the add/edit forms — the
+group **Label** and cluster **Alias** inputs). Settings list editors focus the new row's
+input after an Add (parent-group `.pr-value`, comment-field `.cf-key`). Focus indicators are
 **keyboard-only** (`:focus-visible`) and **inset** (border-colour + `inset` box-shadow; a
 light ring on primary-filled controls where a primary ring would vanish) so scroll containers
 / `overflow:hidden` never clip them — one rule in `styles.css` covers text fields, buttons and
@@ -494,7 +496,6 @@ internal/config/          YAML persistence, DBFunction migrate/validate
 internal/pg/              DSN, auth, Connect, CallFunction, introspect.go (reads)
 internal/batch/           Concurrent executor + all-cluster scan
 internal/commands/        Op validation + arg maps + attribute keyword whitelist
-internal/envimport/       PG* env import
 internal/update/          GitHub-Releases version check (stdlib http + semver compare)
 internal/version/         App version + git-remote-derived RepoURL/DocsURL (ldflags)
 frontend/                 Vanilla JS UI (app.js via backend())
