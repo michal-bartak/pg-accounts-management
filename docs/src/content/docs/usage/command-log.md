@@ -6,8 +6,18 @@ description: Live progress, per-cluster results, and the exact SQL that ran
 Results don't appear in the form. They go to the **status chip** in the footer, next to the
 action buttons.
 
-<figure class="shot-todo" data-shot="run-status-chip.png">
-  <figcaption>Footer status chip — running, then OK or Error</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Footer status chip](../../../assets/usage/run-status-chip-light.png)
+
+</div>
+<div class="dark-only">
+
+![Footer status chip](../../../assets/usage/run-status-chip-dark.png)
+
+</div>
+<figcaption>Footer status chip — running, then OK or Error</figcaption>
 </figure>
 
 The chip is hidden until something runs, then shows `running… (done/total)` and settles on
@@ -19,8 +29,18 @@ write.
 
 Click the chip to open the results panel. It fills in while the run is still going.
 
-<figure class="shot-todo" data-shot="run-status-dialog.png">
-  <figcaption>Results panel — one row per cluster: Cluster, Category, Status, Duration, Message</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Results panel](../../../assets/usage/run-status-dialog-light.png)
+
+</div>
+<div class="dark-only">
+
+![Results panel](../../../assets/usage/run-status-dialog-dark.png)
+
+</div>
+<figcaption>Results panel — one row per cluster: Cluster, Category, Status, Duration, Message</figcaption>
 </figure>
 
 | Column | Notes |
@@ -41,8 +61,18 @@ Each row has two actions:
 
 The view button opens the statements the app sent to that cluster, in order.
 
-<figure class="shot-todo" data-shot="run-queries-dialog.png">
-  <figcaption>Executed SQL for one cluster, with its own Copy button</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Executed SQL for one cluster, with its own Copy button](../../../assets/usage/run-queries-dialog-light.png)
+
+</div>
+<div class="dark-only">
+
+![Executed SQL for one cluster, with its own Copy button](../../../assets/usage/run-queries-dialog-dark.png)
+
+</div>
+<figcaption>Executed SQL for one cluster, with its own Copy button</figcaption>
 </figure>
 
 - The SQL is the real thing, after placeholder substitution — including a failing statement's,

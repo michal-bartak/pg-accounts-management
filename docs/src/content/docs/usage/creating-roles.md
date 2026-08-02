@@ -6,8 +6,18 @@ description: One form, every selected cluster, and what happens when a cluster f
 Click the **Create role** tab. The form resets to an empty role over the clusters currently
 selected in **Target selection**.
 
-<figure class="shot-todo" data-shot="create-role-form.png">
-  <figcaption>Create role — login name, comment editor, privileges, attributes, settings</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Create role](../../../assets/usage/create-role-form-light.png)
+
+</div>
+<div class="dark-only">
+
+![Create role](../../../assets/usage/create-role-form-dark.png)
+
+</div>
+<figcaption>Create role — login name, comment editor, privileges, attributes, settings</figcaption>
 </figure>
 
 It is the same form as Alter, over an empty baseline: every edit is a grant, an enable, or a
@@ -34,8 +44,18 @@ password, the attributes, the settings, and the comment. Confirmation-flagged gr
 
 ## When a cluster fails
 
-<figure class="shot-todo" data-shot="create-role-partial-failure.png">
-  <figcaption>Command log after a run where one cluster failed and the others succeeded</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Command log after a run where one cluster failed and the others succeeded](../../../assets/usage/create-role-partial-failure-light.png)
+
+</div>
+<div class="dark-only">
+
+![Command log after a run where one cluster failed and the others succeeded](../../../assets/usage/create-role-partial-failure-dark.png)
+
+</div>
+<figcaption>Command log after a run where one cluster failed and the others succeeded</figcaption>
 </figure>
 
 - The failing cluster is **rolled back** completely — no half-created role. The error names

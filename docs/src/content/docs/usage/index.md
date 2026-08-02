@@ -6,15 +6,37 @@ description: Targets, scope labels, and how a change reaches the clusters
 The **Operations** tab is where you create and alter roles. Its left sidebar picks the
 targets; the right side is one form for the role.
 
-![Operations tab](../../../assets/screenshot-operations.png)
+<figure class="shot">
+<div class="light-only">
+
+![Operations overview](../../../assets/usage/operations-overview-light.png)
+
+</div>
+<div class="dark-only">
+
+![Operations tab](../../../assets/usage/operations-overview-dark.png)
+
+</div>
+<figcaption>Operations tab — Target selection on the left, the role form on the right</figcaption>
+</figure>
 
 ## Everything goes to the selected targets
 
 There is no per-cluster form. Whatever you do on this tab — searching, creating, altering,
 removing — applies to **exactly** the clusters selected in the sidebar.
 
-<figure class="shot-todo" data-shot="target-selection.png">
-  <figcaption>Target selection — group checkboxes and the expanded "Or pick clusters" list</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Target selection](../../../assets/usage/target-selection-light.png)
+
+</div>
+<div class="dark-only">
+
+![Target selection](../../../assets/usage/target-selection-dark.png)
+
+</div>
+<figcaption>Target selection — group checkboxes and the expanded "Or pick clusters" list</figcaption>
 </figure>
 
 - Tick whole **groups**, or expand **Or pick clusters** to choose individual clusters.
@@ -29,8 +51,18 @@ retroactively widen an open form — search again.
 Wherever clusters are listed — Present on, privilege rows, attributes, settings, comments,
 search results — the app uses the same labels, coloured by group:
 
-<figure class="shot-todo" data-shot="scope-labels.png">
-  <figcaption>Scope labels — an outlined group label next to filled per-cluster labels</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Scope labels](../../../assets/usage/scope-labels-light.png)
+
+</div>
+<div class="dark-only">
+
+![Scope labels](../../../assets/usage/scope-labels-dark.png)
+
+</div>
+<figcaption>Scope labels — an outlined group label next to filled per-cluster labels</figcaption>
 </figure>
 
 - **Outlined label** (bordered, transparent) — *every* cluster of that group in scope matches.
@@ -42,8 +74,18 @@ search results — the app uses the same labels, coloured by group:
 
 Labels also show edits you haven't saved yet:
 
-<figure class="shot-todo" data-shot="scope-labels-pending.png">
-  <figcaption>Scope labels — a pending addition prefixed with +, and a pending removal in red strikethrough</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Scope labels](../../../assets/usage/scope-labels-pending-light.png)
+
+</div>
+<div class="dark-only">
+
+![Scope labels](../../../assets/usage/scope-labels-pending-dark.png)
+
+</div>
+<figcaption>Scope labels — a pending addition prefixed with +, and a pending removal in red strikethrough</figcaption>
 </figure>
 
 - **Pending addition** — a leading **`+`** on the label. The colour doesn't change: the label

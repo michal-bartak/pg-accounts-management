@@ -2,7 +2,11 @@
   "name": "dbaccounts-docs",
   "type": "module",
   "scripts": {
+    "shots": "node scripts/screenshots.mjs",
+    "shots:status": "node scripts/screenshots.mjs status",
+    "predev": "node scripts/screenshots.mjs",
     "dev": "astro dev",
+    "prebuild": "node scripts/screenshots.mjs",
     "build": "astro build",
     "preview": "astro preview"
   },

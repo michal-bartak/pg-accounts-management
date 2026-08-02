@@ -5,8 +5,18 @@ description: What the Generate button produces
 
 Controls the random password produced by **Generate** on the role form's password field.
 
-<figure class="shot-todo" data-shot="settings-pwgen.png">
-  <figcaption>Settings → Password generator — character classes, look-alike exclusion, length</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Settings → Password generator](../../../assets/configuration/settings-pwgen-light.png)
+
+</div>
+<div class="dark-only">
+
+![Settings → Password generator](../../../assets/configuration/settings-pwgen-dark.png)
+
+</div>
+<figcaption>Settings → Password generator — character classes, look-alike exclusion, length</figcaption>
 </figure>
 
 | Option | Notes |

@@ -13,16 +13,36 @@ template when you want the app to go through a wrapper function or view — for 
 low-privilege connection can create roles via a `SECURITY DEFINER` function, or to add audit
 logging.
 
-<figure class="shot-todo" data-shot="settings-templates.png">
-  <figcaption>Settings → DB command templates and Introspection queries, side by side</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Settings → DB command templates and Introspection queries, side by side](../../../assets/configuration/settings-templates-light.png)
+
+</div>
+<div class="dark-only">
+
+![Settings → DB command templates and Introspection queries, side by side](../../../assets/configuration/settings-templates-dark.png)
+
+</div>
+<figcaption>Settings → DB command templates and Introspection queries, side by side</figcaption>
 </figure>
 
 Clicking a command opens its editor: execution mode, the template text, clickable placeholder
 chips, and a **Default** button that restores the built-in version. The **?** in the title bar
 opens the full syntax reference.
 
-<figure class="shot-todo" data-shot="template-editor.png">
-  <figcaption>Template editor — execution mode, template text, placeholder chips, Default button</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Template editor](../../../assets/configuration/template-editor-light.png)
+
+</div>
+<div class="dark-only">
+
+![Template editor](../../../assets/configuration/template-editor-dark.png)
+
+</div>
+<figcaption>Template editor — execution mode, template text, placeholder chips, Default button</figcaption>
 </figure>
 
 ## Operations and their defaults

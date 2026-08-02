@@ -6,7 +6,19 @@ description: Define clusters, their credentials, and the groups that gate confir
 The **Clusters** tab holds every database the app can reach, and the groups they belong to.
 Editing is staged — press **Save** to write, **Discard** to revert.
 
-![Clusters tab](../../../assets/screenshot-clusters.png)
+<figure class="shot">
+<div class="light-only">
+
+![Clusters tab](../../../assets/configuration/clusters-tab-light.png)
+
+</div>
+<div class="dark-only">
+
+![Clusters tab](../../../assets/configuration/clusters-tab-dark.png)
+
+</div>
+<figcaption>Clusters tab — cluster list, Status column, and toolbar</figcaption>
+</figure>
 
 Each row's **Actions** cell has
 <svg class="doc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg> **edit** and
@@ -15,8 +27,18 @@ filled by **Test connections**.
 
 ## Cluster fields
 
-<figure class="shot-todo" data-shot="cluster-editor.png">
-  <figcaption>Cluster editor — every field, with the password reveal toggle</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Cluster editor](../../../assets/configuration/cluster-editor-light.png)
+
+</div>
+<div class="dark-only">
+
+![Cluster editor](../../../assets/configuration/cluster-editor-dark.png)
+
+</div>
+<figcaption>Cluster editor — every field, with the password reveal toggle</figcaption>
 </figure>
 
 | Field | Notes |
@@ -54,8 +76,18 @@ that matters to you.
 
 Groups are edited from the **Cluster groups** button in the toolbar.
 
-<figure class="shot-todo" data-shot="cluster-groups.png">
-  <figcaption>Cluster groups dialog and the group editor — label, colour, require confirmation</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Cluster groups dialog and the group editor](../../../assets/configuration/cluster-groups-light.png)
+
+</div>
+<div class="dark-only">
+
+![Cluster groups dialog and the group editor](../../../assets/configuration/cluster-groups-dark.png)
+
+</div>
+<figcaption>Cluster groups dialog and the group editor — label, colour, require confirmation</figcaption>
 </figure>
 
 | Field | Notes |

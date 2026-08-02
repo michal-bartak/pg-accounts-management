@@ -5,8 +5,18 @@ description: Add the role to more clusters, drop it from some, or remove it enti
 
 The **Present on** block, just under the login name, shows which clusters the role exists on.
 
-<figure class="shot-todo" data-shot="present-on.png">
-  <figcaption>Present on — existing clusters, a pending addition prefixed with +, a pending removal in red strikethrough</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Present on](../../../assets/usage/present-on-light.png)
+
+</div>
+<div class="dark-only">
+
+![Present on](../../../assets/usage/present-on-dark.png)
+
+</div>
+<figcaption>Present on — existing clusters, a pending addition prefixed with +, a pending removal in red strikethrough</figcaption>
 </figure>
 
 It uses the shared [scope labels](/pg-accounts-management/usage/):
@@ -21,8 +31,18 @@ The <svg class="doc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 [scope](/pg-accounts-management/usage/) — the clusters that Target selection resolved to when
 you searched. Tick to add, untick to drop.
 
-<figure class="shot-todo" data-shot="presence-editor.png">
-  <figcaption>Presence picker — the clusters in scope, with the role's current presence ticked</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Presence picker](../../../assets/usage/presence-editor-light.png)
+
+</div>
+<div class="dark-only">
+
+![Presence picker](../../../assets/usage/presence-editor-dark.png)
+
+</div>
+<figcaption>Presence picker — the clusters in scope, with the role's current presence ticked</figcaption>
 </figure>
 
 - **Adding** a cluster brings the whole form to bear on it: privileges, attributes, settings,
@@ -39,6 +59,16 @@ wasn't part of Target selection when you searched, tick it in the sidebar and se
 The red **Remove role** button drops the role from **every cluster in scope where it exists**.
 It always asks for confirmation first, and groups flagged *require confirmation* add their own.
 
-<figure class="shot-todo" data-shot="remove-role-confirm.png">
-  <figcaption>Remove role confirmation, listing the affected clusters</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Remove role confirmation, listing the affected clusters](../../../assets/usage/remove-role-confirm-light.png)
+
+</div>
+<div class="dark-only">
+
+![Remove role confirmation, listing the affected clusters](../../../assets/usage/remove-role-confirm-dark.png)
+
+</div>
+<figcaption>Remove role confirmation, listing the affected clusters</figcaption>
 </figure>

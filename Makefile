@@ -1,4 +1,4 @@
-.PHONY: version sync-wails-version ensure-wails test test-frontend test-vet build build-ci package package-ci clean dist docs-install docs-dev docs-build docs-preview docs-clean docs-lint
+.PHONY: version sync-wails-version ensure-wails test test-frontend test-vet build build-ci package package-ci clean dist docs-install docs-dev docs-build docs-preview docs-clean docs-lint docs-shots docs-shots-status
 
 VERSION := $(shell tr -d ' \n\r' < VERSION)
 VERSION_PKG := github.com/michalbartak/dbaccounts/internal/version
@@ -120,6 +120,17 @@ docs-preview: docs-build
 
 docs-clean:
 	rm -rf $(DOCS_DIR)/dist $(DOCS_DIR)/.astro
+
+# Screenshots. Every figure references a real .png under docs/src/assets, so replacing one is
+# "overwrite the file, rebuild" — no markdown edit. Files not captured yet hold a generated
+# placeholder naming themselves, so the build never breaks on a missing shot.
+#   docs-shots         create placeholders for any newly referenced image (also runs on dev/build)
+#   docs-shots-status  list which screenshots are real and which are still placeholders
+docs-shots: $(DOCS_DIR)/node_modules
+	cd $(DOCS_DIR) && npm run shots
+
+docs-shots-status: $(DOCS_DIR)/node_modules
+	cd $(DOCS_DIR) && npm run shots:status
 
 # Lint the docs prose (Vale) and structure (markdownlint). Config: .vale.ini,
 # .markdownlint.yaml. One-time setup: `brew install vale && vale sync`.

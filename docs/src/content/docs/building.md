@@ -64,3 +64,27 @@ make docs-preview   # serve the built site locally
 
 On push to `main`, the `deploy-docs` workflow builds the site and publishes it to GitHub
 Pages.
+
+### Screenshots
+
+Every figure is a light/dark pair under `docs/src/assets/<section>/`, named after the figure:
+
+```text
+docs/src/assets/usage/target-selection-light.png
+docs/src/assets/usage/target-selection-dark.png
+```
+
+Starlight's theme toggle picks one, so **replacing a screenshot is just overwriting the file
+and rebuilding** — no markdown to edit. Capture both themes with the same window size and
+scroll position, or the swap reads as a page jump instead of a theme change.
+
+Files not captured yet hold a generated placeholder that names itself, so a missing shot never
+breaks the build:
+
+```bash
+make docs-shots-status   # which screenshots are real, which are still placeholders
+make docs-shots          # generate placeholders for newly referenced images
+```
+
+`docs-shots` also runs automatically before `docs-dev` and `docs-build`, so adding a figure to
+a page and rebuilding is enough to get its placeholder.

@@ -21,7 +21,19 @@ function or view so a low-privilege connection can act through it.
 
 :::
 
-![DbAccounts — Operations tab](../../assets/screenshot-operations.png)
+<figure class="shot">
+<div class="light-only">
+
+![DbAccounts — Alter role](../../assets/usage/alter-form-light.png)
+
+</div>
+<div class="dark-only">
+
+![DbAccounts — Alter role](../../assets/usage/alter-form-dark.png)
+
+</div>
+<figcaption>Altering a role across Production and UAT from one form</figcaption>
+</figure>
 
 ## What it does
 
