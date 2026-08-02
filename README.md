@@ -6,7 +6,7 @@ A cross-platform desktop app for maintaining **PostgreSQL roles across many clus
 
 ## Quick start
 
-Download the latest release for your platform from the [Releases page](../../releases), then follow the [Installation guide](https://michal-bartak.github.io/pg-accounts-management/installation/) for platform notes and how credentials are resolved (the app has no password fields — it uses `PGUSER`/`PGPASSWORD` or `~/.pgpass`, like `psql`).
+Download the latest release for your platform from the [Releases page](../../releases), then follow the [Installation guide](https://michal-bartak.github.io/pg-accounts-management/installation/) for platform notes and how credentials are resolved (an optional per-cluster user/password, else `PGUSER`/`PGPASSWORD`, else `~/.pgpass`, like `psql`).
 
 **Developers:**
 

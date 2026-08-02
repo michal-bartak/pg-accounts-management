@@ -7,6 +7,10 @@ import starlightThemeRapide from 'starlight-theme-rapide';
 export default defineConfig({
   site: 'https://michal-bartak.github.io',
   base: '/pg-accounts-management',
+  // Pages that moved when the docs were split into Usage / Configuration sections.
+  redirects: {
+    '/call-templates': '/configuration/call-templates/',
+  },
   integrations: [
     starlight({
       title: 'DbAccounts',
@@ -66,8 +70,33 @@ export default defineConfig({
       sidebar: [
         { label: 'Overview', link: '/' },
         { label: 'Installation', link: '/installation/' },
-        { label: 'Usage', link: '/usage/' },
-        { label: 'Call templates', link: '/call-templates/' },
+        {
+          label: 'Usage',
+          items: [
+            { label: 'Overview', link: '/usage/' },
+            { label: 'Finding the role to alter', link: '/usage/find-role/' },
+            { label: 'Altering the comment', link: '/usage/comments/' },
+            { label: 'Altering privileges', link: '/usage/privileges/' },
+            { label: 'Altering attributes', link: '/usage/attributes/' },
+            { label: 'Altering settings', link: '/usage/role-settings/' },
+            { label: 'Setting a password', link: '/usage/password/' },
+            { label: 'Where a role exists', link: '/usage/presence/' },
+            { label: 'Creating a role', link: '/usage/creating-roles/' },
+            { label: 'Command log', link: '/usage/command-log/' },
+          ],
+        },
+        {
+          label: 'Configuration',
+          items: [
+            { label: 'Overview', link: '/configuration/' },
+            { label: 'Clusters', link: '/configuration/clusters/' },
+            { label: 'Comment fields', link: '/configuration/comment-fields/' },
+            { label: 'Call templates', link: '/configuration/call-templates/' },
+            { label: 'Preconfigured parent groups', link: '/configuration/parent-roles/' },
+            { label: 'Password generator', link: '/configuration/password-generator/' },
+            { label: 'General settings', link: '/configuration/general/' },
+          ],
+        },
         { label: 'Troubleshooting', link: '/troubleshooting/' },
         { label: 'Building from source', link: '/building/' },
         { label: 'Credits', link: '/credits/' },

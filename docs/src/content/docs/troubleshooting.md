@@ -18,12 +18,12 @@ message. Common causes:
 
 The app resolves credentials like `psql`:
 
-1. **User** — the cluster's `connect_user`, else `PGUSER`.
-2. **Password** — `PGPASSWORD`, else `~/.pgpass`, else none.
+1. **User** — the cluster's **Username**, else `PGUSER`, else your OS login name.
+2. **Password** — the cluster's **Password**, else `PGPASSWORD`, else `~/.pgpass`, else none.
 
 If you rely on `~/.pgpass`, check that it matches the host/port/database/user and has `0600`
 permissions. To try a one-off password without changing your environment, use **Test
-connection** inside the cluster editor.
+connection** inside the [cluster editor](/pg-accounts-management/configuration/clusters/).
 
 ## A change fails on one cluster
 
@@ -40,7 +40,7 @@ The connecting user needs enough privilege to run the operation. Two options:
 - Connect as a user that has the privilege.
 - Point the relevant template (write) or introspection query (read) at a wrapper
   function/view that runs with higher privilege, so a low-privilege connection can act
-  through it. See [Call templates](/pg-accounts-management/call-templates/).
+  through it. See [Call templates](/pg-accounts-management/configuration/call-templates/).
 
 ## macOS won't open the app
 
@@ -67,4 +67,6 @@ sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0
 | Linux | `~/.config/dbaccounts/config.yaml` |
 | Windows | `%AppData%\DbAccounts\config.yaml` |
 
-The file holds clusters, groups, and templates — never passwords.
+The file holds clusters, groups, and templates. It also holds the optional per-cluster
+password, in clear text, when you set one — see
+[Clusters](/pg-accounts-management/configuration/clusters/).

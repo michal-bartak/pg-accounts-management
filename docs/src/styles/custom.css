@@ -13,6 +13,32 @@ a[href="#_top"] {
   border-radius: 6px;
 }
 
+/* Placeholder for a screenshot that hasn't been captured yet. Replace the whole
+   <figure> with a normal ![alt](../../../assets/<data-shot>) when the image exists.
+   Find them all with:  grep -rn 'shot-todo' docs/src/content/docs  */
+.shot-todo {
+  margin: 1.5rem 0;
+  padding: 2rem 1rem;
+  border: 2px dashed var(--sl-color-gray-4);
+  border-radius: 6px;
+  text-align: center;
+  background: var(--sl-color-gray-7);
+}
+
+.shot-todo::before {
+  content: 'Screenshot placeholder — ' attr(data-shot);
+  display: block;
+  font-family: var(--sl-font-system-mono);
+  font-size: var(--sl-text-xs);
+  color: var(--sl-color-gray-3);
+}
+
+.shot-todo figcaption {
+  margin-top: 0.5rem;
+  font-size: var(--sl-text-sm);
+  color: var(--sl-color-gray-2);
+}
+
 .img-lightbox {
   position: fixed;
   inset: 0;

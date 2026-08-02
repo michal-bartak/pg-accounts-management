@@ -16,8 +16,8 @@ function or view so a low-privilege connection can act through it.
 :::note[Requirements]{icon="information"}
 
 - A reachable PostgreSQL server (or several) that the connecting user can act on.
-- Credentials come from the cluster's connect user, the `PG*` environment variables, or
-  `~/.pgpass`. The app has no password fields in its configuration.
+- Credentials come from the cluster's own user and optional password, the `PG*` environment
+  variables, or `~/.pgpass` — resolved in that order, like `psql`.
 
 :::
 
@@ -54,6 +54,7 @@ function or view so a low-privilege connection can act through it.
 ## Where to go next
 
 - [Installation](/pg-accounts-management/installation/) — download a build or install from source.
-- [Usage](/pg-accounts-management/usage/) — clusters, target selection, create, and alter.
-- [Call templates](/pg-accounts-management/call-templates/) — how the editable SQL works.
+- [Usage](/pg-accounts-management/usage/) — target selection, scope labels, and how a change is applied.
+- [Configuration](/pg-accounts-management/configuration/) — clusters, comment fields, templates, preferences.
+- [Call templates](/pg-accounts-management/configuration/call-templates/) — how the editable SQL works.
 - [Troubleshooting](/pg-accounts-management/troubleshooting/) — connection and permission issues.
