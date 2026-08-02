@@ -29,7 +29,8 @@ connection** inside the [cluster editor](/pg-accounts-management/configuration/c
 
 Each cluster's operations run as a single transaction: if one statement fails, that cluster
 is **rolled back** and its error names the failing operation. Other clusters are unaffected.
-Open the status panel and use the magnifier on a row to see the exact SQL that ran, then fix
+Open the [command log](/pg-accounts-management/usage/command-log/) and use the view button on
+a row to see the exact SQL that ran, then fix
 the cause (a missing parent role, insufficient privilege, an existing role) and Save again.
 Your pending edits are kept because a failed run doesn't touch the form.
 

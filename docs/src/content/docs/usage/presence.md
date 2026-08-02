@@ -6,17 +6,20 @@ description: Add the role to more clusters, drop it from some, or remove it enti
 The **Present on** block, just under the login name, shows which clusters the role exists on.
 
 <figure class="shot-todo" data-shot="present-on.png">
-  <figcaption>Present on — existing clusters, a pending addition in green, a pending removal struck through</figcaption>
+  <figcaption>Present on — existing clusters, a pending addition prefixed with +, a pending removal in red strikethrough</figcaption>
 </figure>
 
-- Plain labels — the role exists there now.
-- **Green** — a pending addition.
-- **Struck through** — a pending removal.
+It uses the shared [scope labels](/pg-accounts-management/usage/):
+
+- Plain label — the role exists there now.
+- Leading **`+`**, same colour — a pending addition.
+- **Red and struck through** — a pending removal.
 
 ## Editing presence
 
-The **✎** button opens a picker over the clusters that were in scope when you searched. Tick to
-add, untick to drop.
+The <svg class="doc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg> **edit** button opens a picker listing the role's
+[scope](/pg-accounts-management/usage/) — the clusters that Target selection resolved to when
+you searched. Tick to add, untick to drop.
 
 <figure class="shot-todo" data-shot="presence-editor.png">
   <figcaption>Presence picker — the clusters in scope, with the role's current presence ticked</figcaption>
@@ -28,14 +31,13 @@ add, untick to drop.
   [general setting](/pg-accounts-management/configuration/general/).
 - **Dropping** a cluster records a `DROP ROLE` for that cluster alone.
 
-A cluster must have been selected at search time to be addable here. To widen the scope,
-change Target selection and search again.
+The picker can only offer clusters that are in the role's scope. To bring in a cluster that
+wasn't part of Target selection when you searched, tick it in the sidebar and search again.
 
 ## Remove role
 
-The red **Remove role** button, kept apart on the far left of the footer, drops the role from
-**every** cluster it exists on. It always asks for confirmation first, and groups flagged
-*require confirmation* add their own.
+The red **Remove role** button drops the role from **every cluster in scope where it exists**.
+It always asks for confirmation first, and groups flagged *require confirmation* add their own.
 
 <figure class="shot-todo" data-shot="remove-role-confirm.png">
   <figcaption>Remove role confirmation, listing the affected clusters</figcaption>

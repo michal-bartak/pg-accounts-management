@@ -13,6 +13,16 @@ a[href="#_top"] {
   border-radius: 6px;
 }
 
+/* The app's own action icons, inlined so the docs show the exact glyph the UI does.
+   Geometry is copied from ICONS in frontend/app.js — keep the two in sync. */
+.doc-ic {
+  display: inline-block;
+  width: 1.05em;
+  height: 1.05em;
+  vertical-align: -0.18em;
+  color: var(--sl-color-white);
+}
+
 /* Placeholder for a screenshot that hasn't been captured yet. Replace the whole
    <figure> with a normal ![alt](../../../assets/<data-shot>) when the image exists.
    Find them all with:  grep -rn 'shot-todo' docs/src/content/docs  */

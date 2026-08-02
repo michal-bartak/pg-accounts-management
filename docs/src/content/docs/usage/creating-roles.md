@@ -40,11 +40,18 @@ password, the attributes, the settings, and the comment. Confirmation-flagged gr
 
 - The failing cluster is **rolled back** completely — no half-created role. The error names
   the operation that failed.
-- **Other clusters are unaffected.** They commit their own transaction. A run can therefore
-  succeed on some clusters and fail on others; the
+- **Other clusters are unaffected.** Each commits its own transaction, so a run can succeed on
+  some clusters and fail on others. The
   [command log](/pg-accounts-management/usage/command-log/) shows which.
-- **Your form is left untouched.** Nothing is cleared while anything failed, so you can fix the
-  cause and press Create again. Only a fully clean run resets the form.
-- Re-running after a partial failure will report *role already exists* on the clusters that
-  succeeded. Either drop it there first, or switch to **Alter role** and finish from the
-  remaining clusters.
+
+What happens next depends on how much got through:
+
+- **Every cluster failed** — you stay on the Create form with your input intact. Fix the cause
+  and press Create again.
+- **At least one cluster succeeded** — the form hands off to **Alter role** with the new role
+  loaded over the same clusters. The ones that failed appear as *not present* in
+  [Present on](/pg-accounts-management/usage/presence/), so you can retry just those with
+  **Save changes** instead of re-running the whole creation.
+
+Either way the [command log](/pg-accounts-management/usage/command-log/) keeps the creation
+results — the follow-up load is appended to it, not written over it.

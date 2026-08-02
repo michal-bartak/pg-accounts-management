@@ -30,12 +30,16 @@ Click the chip to open the results panel. It fills in while the run is still goi
 | **Duration** | How long that cluster took. |
 | **Message** | The error text, naming the operation that failed. |
 
-Each row has two actions: a **magnifier** and a **copy** button. Copy puts the cluster's
-message and all of its SQL on the clipboard.
+Each row has two actions:
+
+| Button | Effect |
+|--------|--------|
+| <svg class="doc-ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><line x1="10.5" y1="10.5" x2="15" y2="15"/></svg> **View** | Opens the SQL that ran on that cluster. |
+| <svg class="doc-ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="1" width="10" height="11" rx="2"/><rect x="1" y="4" width="10" height="11" rx="2"/></svg> **Copy** | Puts the cluster's message and all of its SQL on the clipboard. |
 
 ## The SQL that ran
 
-The magnifier opens the statements the app sent to that cluster, in order.
+The view button opens the statements the app sent to that cluster, in order.
 
 <figure class="shot-todo" data-shot="run-queries-dialog.png">
   <figcaption>Executed SQL for one cluster, with its own Copy button</figcaption>

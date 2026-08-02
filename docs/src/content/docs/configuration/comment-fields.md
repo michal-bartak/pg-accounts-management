@@ -13,7 +13,8 @@ form shows as labelled inputs, and in what order.
 ## The field list
 
 Each entry is a **key** (the JSON key, a bare identifier) and a **label** (what the form
-shows). Drag the handle to reorder; **×** removes an entry; **Add field…** appends one.
+shows). Drag the handle to reorder;
+<svg class="doc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> removes an entry; **Add field…** appends one.
 Defaults are `full_name` → *Full name* and `e_mail` → *Email*.
 
 Rules:
