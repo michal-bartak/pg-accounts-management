@@ -141,7 +141,8 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   (`reconcilePendingWithUniverse`).
 - **Per-cluster presence editor (Alter).** The static **Present on** block (`#role-present`, a
   sibling of `#alter-detail` with its own click listener) shows existing clusters (plain chips),
-  pending-**add** (green) and pending-**remove** (red strikethrough) plus a **✎** button
+  pending-**add** (`chip-scope-add`: a leading `+`, group colour kept via `data-cat`) and
+  pending-**remove** (`chip-scope-strike`: red strikethrough, `data-cat` dropped) plus a **✎** button
   (`#btn-present-edit`) that opens the scope dialog with `ctx.kind === 'presence'`. Adding a
   cluster inserts a **synthetic `exists:false` row** into `alterDetails` (empty baseline, like
   `synthCreateBaseline`) so the whole form (privileges/attributes/settings/comment editors) targets
@@ -339,10 +340,12 @@ for create; Save changes / Remove role for alter, toggled by `updateOpsFooter()`
 and Settings are single-column with a fixed toolbar / pinned Save-settings footer.
 **Action-button convention (keep consistent):** the primary/commit button is the emphasized
 (`.primary`) one, placed **rightmost**; Cancel/secondary sits to its left; destructive actions
-(e.g. Remove role) are separated on the **far left**. This holds for dialog `<menu>`s
-(`[Cancel] [Primary]`, all right-aligned) and page footers (Create role / Save changes /
-Settings & Clusters `[Discard] [Save]` right-aligned; Remove role far left via
-`#btn-alter-remove{order:-1}` + `space-between`). The **Test connections** button lives in the Clusters
+(e.g. Remove role) sit to the **left of the primary**, still in the right-aligned cluster.
+This holds for dialog `<menu>`s (`[Cancel] [Primary]`, all right-aligned) and page footers
+(Create role / Save changes / Settings & Clusters `[Discard] [Save]` right-aligned; Remove role
+renders left of Save via `#btn-alter-remove{order:-1}`, with `margin-left:auto` (styles.css
+~L1146) pulling the pair right — that later rule overrides the earlier `space-between`
+far-left intent at ~L450). The **Test connections** button lives in the Clusters
 toolbar (`btn-test-clusters` → `testAllClusters`): it tests every configured cluster and
 writes the outcome into a per-row **Status** column (`setClusterStatus`). Cluster rows have
 no per-row Test button (testing on-screen values is done from the cluster editor via
@@ -442,8 +445,10 @@ The header is a `.brand` row (accent dot + smaller title + version chip + round 
   `×` when nothing is granted/pending, `↺` when there are no pending changes.
   `buildAlterClusterOps` groups each cluster's ops into one transactional batch (all of a
   cluster's enable/disable attribute keywords combine into a single `set_attribute`);
-  `is-added` (green) applies only to a pending grant, not to attributes that are simply
-  off.
+  Pending state is rendered by `scopeLabelsHtml`'s two variants only — `chip-scope-add`
+  (leading `+`, group colour kept) for a pending grant/enable and `chip-scope-strike` (red
+  strikethrough) for a pending revoke/disable — never a green fill, and never for an
+  attribute that is simply off (that's `.scope-off`, de-emphasised).
 - **Settings** (role GUCs) reuse the same row/scope-editor as attributes but keyed by
   `name=value` (a name with different values per cluster shows multiple rows); pending
   state is `alterConfigSet: Map<"name=value", Set<clusterId>>` and

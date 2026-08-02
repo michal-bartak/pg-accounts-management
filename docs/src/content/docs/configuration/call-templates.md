@@ -4,14 +4,26 @@ description: How DbAccounts turns form input into the SQL it runs
 ---
 
 Every change the app makes runs through a **call template** — a short piece of SQL with
-`${placeholder}` fields. Templates live in **Settings → Call templates**, or in the config
-file under `db_functions.<operation>`. Each has an **execution mode**: `statement`, `block`,
-or `function`.
+`${placeholder}` fields. Templates live in **Settings → DB command templates**, or in the
+config file under `db_functions.<operation>`. Each has an **execution mode**: `statement`,
+`block`, or `function`.
 
 The defaults are plain PostgreSQL and cover everything out of the box. You only edit a
 template when you want the app to go through a wrapper function or view — for example, so a
 low-privilege connection can create roles via a `SECURITY DEFINER` function, or to add audit
-logging. Each template's dialog has a **Default** button that restores the built-in version.
+logging.
+
+<figure class="shot-todo" data-shot="settings-templates.png">
+  <figcaption>Settings → DB command templates and Introspection queries, side by side</figcaption>
+</figure>
+
+Clicking a command opens its editor: execution mode, the template text, clickable placeholder
+chips, and a **Default** button that restores the built-in version. The **?** in the title bar
+opens the full syntax reference.
+
+<figure class="shot-todo" data-shot="template-editor.png">
+  <figcaption>Template editor — execution mode, template text, placeholder chips, Default button</figcaption>
+</figure>
 
 ## Operations and their defaults
 
@@ -44,8 +56,9 @@ The app knows the kind of each field, so you don't quote them yourself:
   comma-separated list of quoted identifiers (`"a", "b"`); in **function** mode an inline
   `ARRAY['a', 'b']` literal (values verbatim, an empty selection → `NULL`).
 - **`new_password`**, **`comment`**, **`config_value`** → escaped string literals.
-- **Comment fields** — one placeholder per key configured under *Settings → Comments → Comment
-  fields* (e.g. `${full_name}`, `${e_mail}`), available in **`create_role`** and **`set_comment`**.
+- **Comment fields** — one placeholder per key configured under
+  [Comment fields](/pg-accounts-management/configuration/comment-fields/) (e.g. `${full_name}`,
+  `${e_mail}`), available in **`create_role`** and **`set_comment`**.
   The value comes from the role's JSON comment and is embedded by type: string → quoted literal,
   number/boolean → bare literal, array/object → JSON text, and an empty/`null`/missing value →
   bare `NULL`.
@@ -79,6 +92,15 @@ Introspection queries, or `db_reads` in config). Each takes a single `${rolename
 its result columns are matched **by name** against a fixed contract — so you can point one at
 a privileged wrapper function or view when the connecting user can't read the catalogs
 directly.
+
+| Query | Contract columns |
+|-------|------------------|
+| `search_roles` | `rolname`, `comment` |
+| `role_detail` | the seven `rol*` flags, `comment`, `rolconfig` |
+| `role_parents` | `rolname` |
+
+Column order doesn't matter and a missing column is tolerated, but an unexpected extra column
+is rejected.
 
 Full syntax, the field whitelist, YAML examples, and common mistakes are in the repository's
 [`sql/README.md`](https://github.com/michal-bartak/pg-accounts-management/blob/main/sql/README.md).

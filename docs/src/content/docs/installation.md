@@ -48,21 +48,22 @@ Settings tabs) or on disk.
 | Linux | `~/.config/dbaccounts/config.yaml` |
 | Windows | `%AppData%\DbAccounts\config.yaml` |
 
-The config holds clusters, groups, and call templates — **never passwords**. See
+The config holds clusters, groups, and call templates. See
 [`config.example.yaml`](https://github.com/michal-bartak/pg-accounts-management/blob/main/config.example.yaml)
-for a reference.
+for a reference, and [Configuration](/pg-accounts-management/configuration/) for what each
+part does.
 
 ## Credentials
 
-The app has no user/password fields in its configuration. It resolves them the way `psql`
-does:
+The app resolves credentials the way `psql` does. First match wins:
 
-1. **User** — the cluster's `connect_user`, else `PGUSER`.
-2. **Password** — `PGPASSWORD`, else a match in `~/.pgpass`, else none (works with trust
-   auth or an empty password).
+1. **User** — the cluster's **Username**, else `PGUSER`, else your OS login name.
+2. **Password** — the cluster's **Password**, else `PGPASSWORD`, else a match in `~/.pgpass`,
+   else none (works with trust auth or an empty password).
 
-The Clusters **Test connection** action is the one place that accepts a one-off password, so
-you can check a cluster without adding it to your environment. See the PostgreSQL docs on
+The per-cluster password is optional and stored in clear text in the config file, which is
+written with owner-only permissions. Leave it blank to keep credentials out of the file
+entirely. See the PostgreSQL docs on
 [`.pgpass`](https://www.postgresql.org/docs/current/libpq-pgpass.html).
 
 Building from source is covered under
