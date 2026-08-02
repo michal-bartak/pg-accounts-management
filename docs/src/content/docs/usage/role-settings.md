@@ -8,8 +8,18 @@ description: Role-level GUCs, which can hold a different value per cluster
 and use the same rows and per-cluster editor as
 [privileges](/pg-accounts-management/usage/privileges/).
 
-<figure class="shot-todo" data-shot="settings-rows.png">
-  <figcaption>Settings section — one row per name/value pair, with scope labels</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Settings section](../../../assets/usage/settings-rows-light.png)
+
+</div>
+<div class="dark-only">
+
+![Settings section](../../../assets/usage/settings-rows-dark.png)
+
+</div>
+<figcaption>Settings section — one row per name/value pair, with scope labels</figcaption>
 </figure>
 
 ## Rows are name **and** value
@@ -18,8 +28,18 @@ A setting can hold a different value on different clusters, so rows are keyed by
 The same parameter with two values shows as two rows, each with its own scope — the difference
 is visible instead of averaged away.
 
-<figure class="shot-todo" data-shot="settings-differing-values.png">
-  <figcaption>The same parameter with different values on different clusters, shown as two rows</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![The same parameter with different values on different clusters, shown as two rows](../../../assets/usage/settings-differing-values-light.png)
+
+</div>
+<div class="dark-only">
+
+![The same parameter with different values on different clusters, shown as two rows](../../../assets/usage/settings-differing-values-dark.png)
+
+</div>
+<figcaption>The same parameter with different values on different clusters, shown as two rows</figcaption>
 </figure>
 
 | Button | Effect |
@@ -33,8 +53,18 @@ is visible instead of averaged away.
 **Add setting…** takes a parameter **name** and a **value**, plus the clusters to apply them
 to.
 
-<figure class="shot-todo" data-shot="add-setting.png">
-  <figcaption>Add setting dialog — name, value, and cluster selection</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Add setting dialog](../../../assets/usage/add-setting-light.png)
+
+</div>
+<div class="dark-only">
+
+![Add setting dialog](../../../assets/usage/add-setting-dark.png)
+
+</div>
+<figcaption>Add setting dialog — name, value, and cluster selection</figcaption>
 </figure>
 
 On save these become `set_config` and `reset_config` operations

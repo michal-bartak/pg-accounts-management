@@ -3,8 +3,18 @@ title: General settings
 description: Appearance, concurrency, staged creation, and the update check
 ---
 
-<figure class="shot-todo" data-shot="settings-general.png">
-  <figcaption>Settings → General — Appearance, Max concurrency, and both checkboxes</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Settings → General](../../../assets/configuration/settings-general-light.png)
+
+</div>
+<div class="dark-only">
+
+![Settings → General](../../../assets/configuration/settings-general-dark.png)
+
+</div>
+<figcaption>Settings → General — Appearance, Max concurrency, and both checkboxes</figcaption>
 </figure>
 
 ## Appearance

@@ -6,8 +6,18 @@ description: Which JSON keys in a role comment get labelled inputs
 A role comment can be plain text or JSON. **Comment fields** decide which JSON keys the role
 form shows as labelled inputs, and in what order.
 
-<figure class="shot-todo" data-shot="settings-comments.png">
-  <figcaption>Settings → Comments — the field list with drag handles, Add field, and Preferred comment view</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Settings → Comments](../../../assets/configuration/settings-comments-light.png)
+
+</div>
+<div class="dark-only">
+
+![Settings → Comments](../../../assets/configuration/settings-comments-dark.png)
+
+</div>
+<figcaption>Settings → Comments — the field list with drag handles, Add field, and Preferred comment view</figcaption>
 </figure>
 
 ## The field list

@@ -5,8 +5,18 @@ description: The password row, the generator, and where it applies
 
 The password row sits with the rest of the form and is off until you ask for it.
 
-<figure class="shot-todo" data-shot="password-row.png">
-  <figcaption>Password row — Set password checkbox, masked field with Copy and reveal, Generate button</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Password row](../../../assets/usage/password-row-light.png)
+
+</div>
+<div class="dark-only">
+
+![Password row](../../../assets/usage/password-row-dark.png)
+
+</div>
+<figcaption>Password row — Set password checkbox, masked field with Copy and reveal, Generate button</figcaption>
 </figure>
 
 ## Set password

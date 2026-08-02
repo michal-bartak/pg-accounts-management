@@ -6,8 +6,18 @@ description: The role flags, enabled or disabled per cluster
 **Attributes** are PostgreSQL's role flags. They use the same rows and the same per-cluster
 editor as [privileges](/pg-accounts-management/usage/privileges/).
 
-<figure class="shot-todo" data-shot="attributes-rows.png">
-  <figcaption>Attributes section — all seven flags with their scope labels</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Attributes section](../../../assets/usage/attributes-rows-light.png)
+
+</div>
+<div class="dark-only">
+
+![Attributes section](../../../assets/usage/attributes-rows-dark.png)
+
+</div>
+<figcaption>Attributes section — all seven flags with their scope labels</figcaption>
 </figure>
 
 | Attribute | Keyword |

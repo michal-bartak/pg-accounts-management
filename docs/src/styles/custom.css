@@ -13,6 +13,39 @@ a[href="#_top"] {
   border-radius: 6px;
 }
 
+/* Theme-swapped screenshots. Wrap two markdown images in .light-only / .dark-only and
+   Starlight's theme toggle (which stamps data-theme on <html>) picks one. Markdown inside the
+   wrappers still goes through Astro's image pipeline, so both keep webp + width/height.
+   A figure with a single, un-wrapped image is unaffected and shows in both themes. */
+.dark-only {
+  display: none;
+}
+
+:root[data-theme='dark'] .dark-only {
+  display: block;
+}
+
+:root[data-theme='dark'] .light-only {
+  display: none;
+}
+
+/* The markdown image inside a wrapper is a <p>; drop its margin so the figure spacing wins. */
+.light-only > p,
+.dark-only > p {
+  margin: 0;
+}
+
+.shot {
+  margin: 1.5rem 0;
+}
+
+.shot figcaption {
+  margin-top: 0.5rem;
+  font-size: var(--sl-text-sm);
+  color: var(--sl-color-gray-2);
+  text-align: center;
+}
+
 /* The app's own action icons, inlined so the docs show the exact glyph the UI does.
    Geometry is copied from ICONS in frontend/app.js — keep the two in sync. */
 .doc-ic {
@@ -21,32 +54,6 @@ a[href="#_top"] {
   height: 1.05em;
   vertical-align: -0.18em;
   color: var(--sl-color-white);
-}
-
-/* Placeholder for a screenshot that hasn't been captured yet. Replace the whole
-   <figure> with a normal ![alt](../../../assets/<data-shot>) when the image exists.
-   Find them all with:  grep -rn 'shot-todo' docs/src/content/docs  */
-.shot-todo {
-  margin: 1.5rem 0;
-  padding: 2rem 1rem;
-  border: 2px dashed var(--sl-color-gray-4);
-  border-radius: 6px;
-  text-align: center;
-  background: var(--sl-color-gray-7);
-}
-
-.shot-todo::before {
-  content: 'Screenshot placeholder — ' attr(data-shot);
-  display: block;
-  font-family: var(--sl-font-system-mono);
-  font-size: var(--sl-text-xs);
-  color: var(--sl-color-gray-3);
-}
-
-.shot-todo figcaption {
-  margin-top: 0.5rem;
-  font-size: var(--sl-text-sm);
-  color: var(--sl-color-gray-2);
 }
 
 .img-lightbox {

@@ -10,8 +10,18 @@ plain text or arbitrary JSON, with no keys forced on you.
 
 The comment editor sits under the login name, with a **Fields ↔ Raw** toggle.
 
-<figure class="shot-todo" data-shot="comment-fields-view.png">
-  <figcaption>Comment editor, Fields view — configured fields plus an extra key labelled by its raw name</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Comment editor, Fields view](../../../assets/usage/comment-fields-view-light.png)
+
+</div>
+<div class="dark-only">
+
+![Comment editor, Fields view](../../../assets/usage/comment-fields-view-dark.png)
+
+</div>
+<figcaption>Comment editor, Fields view — configured fields plus an extra key labelled by its raw name</figcaption>
 </figure>
 
 - **Fields** — one labelled input per JSON key. It edits values only; it never adds or removes
@@ -21,8 +31,18 @@ The comment editor sits under the login name, with a **Fields ↔ Raw** toggle.
 - **Raw** — the whole comment as free text. Use it to add or remove keys, to write plain text,
   or to edit a value that Fields shows read-only.
 
-<figure class="shot-todo" data-shot="comment-raw-view.png">
-  <figcaption>Comment editor, Raw view</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Comment editor, Raw view](../../../assets/usage/comment-raw-view-light.png)
+
+</div>
+<div class="dark-only">
+
+![Comment editor, Raw view](../../../assets/usage/comment-raw-view-dark.png)
+
+</div>
+<figcaption>Comment editor, Raw view</figcaption>
 </figure>
 
 Details worth knowing:
@@ -40,7 +60,19 @@ Details worth knowing:
 If the same role carries different comments on different clusters, the inline editor is
 replaced by a **Comments differ** banner. Reconciliation moves to the **Comments** dialog.
 
-![Comments dialog](../../../assets/screenshot-comments.png)
+<figure class="shot">
+<div class="light-only">
+
+![Comments dialog](../../../assets/usage/comments-dialog-light.png)
+
+</div>
+<div class="dark-only">
+
+![Comments dialog](../../../assets/usage/comments-dialog-dark.png)
+
+</div>
+<figcaption>Comments dialog — one editor per distinct comment, grouped by content</figcaption>
+</figure>
 
 - Clusters are grouped by comment content. JSON is compared **by value**, so formatting and key
   order don't count as a difference.

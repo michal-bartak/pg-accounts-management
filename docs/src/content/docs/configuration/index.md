@@ -13,8 +13,18 @@ Both tabs are **staged**. Adds, edits, and deletes change an on-screen draft; no
 written until you press **Save**. **Discard** reverts to the saved state. Save is active only
 while there are unsaved changes.
 
-<figure class="shot-todo" data-shot="settings-overview.png">
-  <figcaption>Settings tab — all sections, with the Discard / Save footer</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Settings overview](../../../assets/configuration/settings-overview-light.png)
+
+</div>
+<div class="dark-only">
+
+![Settings tab](../../../assets/configuration/settings-overview-dark.png)
+
+</div>
+<figcaption>Settings tab — all sections, with the Discard / Save footer</figcaption>
 </figure>
 
 ## Sections

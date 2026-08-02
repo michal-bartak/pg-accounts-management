@@ -6,8 +6,18 @@ description: Parent-role memberships, granted and revoked per cluster
 **Privileges** are the role's parent-role memberships. Each parent is one row: the name on the
 left, [scope labels](/pg-accounts-management/usage/) on the right showing where it's granted.
 
-<figure class="shot-todo" data-shot="privileges-rows.png">
-  <figcaption>Privileges section — rows with scope labels and the three row actions</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Privileges section](../../../assets/usage/privileges-rows-light.png)
+
+</div>
+<div class="dark-only">
+
+![Privileges section](../../../assets/usage/privileges-rows-dark.png)
+
+</div>
+<figcaption>Privileges section — rows with scope labels and the three row actions</figcaption>
 </figure>
 
 ## Row actions
@@ -24,8 +34,18 @@ greyed out.
 The editor is a checkbox per cluster showing the desired end state — tick to grant, untick to
 revoke. The app works out the difference from what's there now.
 
-<figure class="shot-todo" data-shot="privilege-scope-editor.png">
-  <figcaption>Per-cluster editor — checkboxes for the desired end state</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Per-cluster editor](../../../assets/usage/privilege-scope-editor-light.png)
+
+</div>
+<div class="dark-only">
+
+![Per-cluster editor](../../../assets/usage/privilege-scope-editor-dark.png)
+
+</div>
+<figcaption>Per-cluster editor — checkboxes for the desired end state</figcaption>
 </figure>
 
 Pending changes are visible before you save, through the shared
@@ -38,8 +58,18 @@ Pending changes are visible before you save, through the shared
 [Preconfigured parent groups](/pg-accounts-management/configuration/parent-roles/) appear as
 chips, and you can pick several at once.
 
-<figure class="shot-todo" data-shot="add-privilege.png">
-  <figcaption>Add privilege dialog — parent chips, free-text name, and cluster selection</figcaption>
+<figure class="shot">
+<div class="light-only">
+
+![Add privilege dialog](../../../assets/usage/add-privilege-light.png)
+
+</div>
+<div class="dark-only">
+
+![Add privilege dialog](../../../assets/usage/add-privilege-dark.png)
+
+</div>
+<figcaption>Add privilege dialog — parent chips, free-text name, and cluster selection</figcaption>
 </figure>
 
 On **Save changes** these become `grant_parents` and `revoke_parents` operations, folded into
