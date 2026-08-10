@@ -250,7 +250,8 @@ is a single-quote-escaped literal (`E'…'` when it contains a backslash).
 
 ## Introspection queries (reads)
 
-The Alter-role flow (search + per-cluster detail) uses three **read** queries, configurable under
+The Alter-role flow (search, per-cluster detail, and the pre-flight check before a drop) uses four
+**read** queries, configurable under
 Settings → **Introspection queries** or in config `db_reads.<name>.query`. Unlike command
 templates they have **no execution mode**: each is plain SQL with a single named bind
 **`${rolename}`** (rewritten to `$1` before execution — it stays a bind, so it is injection-safe;
@@ -262,6 +263,15 @@ contract.
 | `search_roles` | ILIKE pattern | `rolname` (text), `comment` (text, nullable) |
 | `role_detail` | role name | one row: `rolsuper`, `rolcreaterole`, `rolcreatedb`, `rolinherit`, `rolcanlogin`, `rolreplication`, `rolbypassrls` (bool), `comment` (text, nullable), `rolconfig` (text[], nullable) |
 | `role_parents` | role name | one row per parent: `rolname` (text) |
+| `role_dependencies` | role name | one row per dependency: `database`, `dependency`, `class`, `object` (text, nullable) |
+
+`role_dependencies` is the **pre-flight check** run before a role is dropped — by the **Remove
+role** button and by a pending removal staged in the *Present on* editor. It runs on every cluster
+the drop targets and its result is shown per cluster in a confirmation popup: a cluster that
+reports rows (or that could not be checked) is **skipped** unless the user picks *Try anyway*; a
+cluster with no rows is dropped without further asking. The default query reads `pg_shdepend`,
+which only describes objects of the database the app connects to plus cluster-wide ones — rows
+belonging to other databases are listed but reported as `Located in other database`.
 
 Scan-by-name rules: **column order does not matter**; a NULL `comment`/`rolconfig` is fine (no
 `COALESCE` needed); a contract column your query **omits** is treated as its zero value; a column

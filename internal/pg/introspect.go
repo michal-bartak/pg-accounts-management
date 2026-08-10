@@ -45,6 +45,23 @@ type roleParentRow struct {
 	Rolname string `db:"rolname"`
 }
 
+// roleDependencyRow is the row contract for the role_dependencies query. Every column is a
+// pointer: the default query's CASE expressions yield NULL for an unrecognised deptype.
+type roleDependencyRow struct {
+	Database   *string `db:"database"`
+	Dependency *string `db:"dependency"`
+	Class      *string `db:"class"`
+	Object     *string `db:"object"`
+}
+
+// RoleDependency is one object that depends on a role, read from a cluster.
+type RoleDependency struct {
+	Database   string
+	Dependency string
+	Class      string
+	Object     string
+}
+
 // bindRoleName rewrites the named ${rolename} placeholder to pgx's positional $1 bind. The
 // value stays a bind (never string-interpolated), so it is injection-safe. A legacy query that
 // already uses $1 is left untouched.
@@ -75,15 +92,52 @@ func SearchRoles(ctx context.Context, conn *pgx.Conn, searchQuery, term string) 
 	return out, nil
 }
 
-// RoleDetailQueries returns the SQL that RoleDetail executes for loginName, with the bind
-// (${rolename}, or legacy $1) inlined as a quoted literal — for display in the load-status
-// popup (not re-executed).
-func RoleDetailQueries(detailQuery, parentsQuery, loginName string) []string {
+// inlineRoleName returns query with the bind (${rolename}, or legacy $1) replaced by loginName
+// as a quoted literal — for DISPLAY only (never executed).
+func inlineRoleName(query, loginName string) string {
 	lit := "'" + strings.ReplaceAll(loginName, "'", "''") + "'"
-	inline := func(q string) string {
-		return strings.ReplaceAll(strings.ReplaceAll(q, "${rolename}", lit), "$1", lit)
+	return strings.ReplaceAll(strings.ReplaceAll(query, "${rolename}", lit), "$1", lit)
+}
+
+// RoleDetailQueries returns the SQL that RoleDetail executes for loginName, with the bind
+// inlined — for display in the load-status popup (not re-executed).
+func RoleDetailQueries(detailQuery, parentsQuery, loginName string) []string {
+	return []string{inlineRoleName(detailQuery, loginName), inlineRoleName(parentsQuery, loginName)}
+}
+
+// RoleDependencyQueries returns the SQL that RoleDependencies executes for loginName, with the
+// bind inlined — for display in the dependency popup (not re-executed).
+func RoleDependencyQueries(query, loginName string) []string {
+	return []string{inlineRoleName(query, loginName)}
+}
+
+// RoleDependencies runs the pre-flight dependency read for loginName. query (${rolename} = role
+// name) must return the role_dependencies contract columns (database, dependency, class, object).
+func RoleDependencies(ctx context.Context, conn *pgx.Conn, query, loginName string) ([]RoleDependency, error) {
+	rows, err := conn.Query(ctx, bindRoleName(query), loginName)
+	if err != nil {
+		return nil, err
 	}
-	return []string{inline(detailQuery), inline(parentsQuery)}
+	items, err := pgx.CollectRows(rows, pgx.RowToStructByNameLax[roleDependencyRow])
+	if err != nil {
+		return nil, err
+	}
+	deref := func(p *string) string {
+		if p == nil {
+			return ""
+		}
+		return *p
+	}
+	out := make([]RoleDependency, 0, len(items))
+	for _, it := range items {
+		out = append(out, RoleDependency{
+			Database:   deref(it.Database),
+			Dependency: deref(it.Dependency),
+			Class:      deref(it.Class),
+			Object:     deref(it.Object),
+		})
+	}
+	return out, nil
 }
 
 // RoleDetail reads whether a login exists, its comment, attribute flags, role GUC settings

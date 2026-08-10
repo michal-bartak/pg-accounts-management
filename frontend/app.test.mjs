@@ -670,3 +670,55 @@ test('generatePassword: empty pool (no classes) defensively falls back to lowerc
   assert.equal(r.len, 12);
   assert.equal(r.allLower, true);
 });
+
+// ---------------------------------------------------------------------------------------------
+// Pre-flight dependency check before a role is dropped.
+test('initialDepsChoices: clusters with dependencies or an error default to Skip', () => {
+  const r = evalJSON(`(() => {
+    const rows = [
+      { clusterId: 'c-clean', dependencies: [] },
+      { clusterId: 'c-deps', dependencies: [{ database: 'app', dependency: 'owner', class: 'pg_class', object: 'table t' }] },
+      { clusterId: 'c-err', dependencies: [], error: 'connect failed' },
+      { clusterId: 'c-nodeps-undefined' },
+    ];
+    const m = initialDepsChoices(rows);
+    return { entries: [...m.entries()], size: m.size };
+  })()`);
+  assert.equal(r.size, 2);
+  assert.deepEqual(r.entries, [['c-deps', 'skip'], ['c-err', 'skip']]);
+});
+
+test('depsAllowedSet: clean clusters always allowed; flagged ones only when set to Try anyway', () => {
+  const r = evalJSON(`(() => {
+    const rows = [
+      { clusterId: 'c-clean', dependencies: [] },
+      { clusterId: 'c-deps', dependencies: [{ object: 'table t' }] },
+      { clusterId: 'c-err', dependencies: [], error: 'connect failed' },
+    ];
+    const skipAll = [...depsAllowedSet(rows, initialDepsChoices(rows))];
+    const choices = initialDepsChoices(rows);
+    choices.set('c-deps', 'try');
+    const oneTried = [...depsAllowedSet(rows, choices)];
+    return { skipAll, oneTried };
+  })()`);
+  assert.deepEqual(r.skipAll, ['c-clean']);
+  assert.deepEqual(r.oneTried, ['c-clean', 'c-deps']);
+});
+
+test('filterSkippedRemovals: drops skipped remove_role-only entries, keeps every other cluster', () => {
+  const r = evalJSON(`(() => {
+    const clusters = [
+      { clusterId: 'c-skip', operations: [{ operation: 'remove_role', removeRole: { loginName: 'u' } }] },
+      { clusterId: 'c-try', operations: [{ operation: 'remove_role', removeRole: { loginName: 'u' } }] },
+      { clusterId: 'c-edit', operations: [{ operation: 'grant_parents', grantParents: { loginName: 'u', parentRoles: 'app_ro' } }] },
+      { clusterId: 'c-multi', operations: [
+        { operation: 'create_role', createRole: { loginName: 'u' } },
+        { operation: 'remove_role', removeRole: { loginName: 'u' } },
+      ] },
+    ];
+    const kept = filterSkippedRemovals(clusters, new Set(['c-try'])).map((c) => c.clusterId);
+    return { kept };
+  })()`);
+  // c-skip is dropped; the unrelated edit and the multi-op cluster are untouched.
+  assert.deepEqual(r.kept, ['c-try', 'c-edit', 'c-multi']);
+});

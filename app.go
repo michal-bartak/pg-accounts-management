@@ -224,6 +224,15 @@ func (a *App) LoadRoleDetails(req model.RoleDetailsRequest) ([]model.ClusterRole
 	return a.batch.LoadRoleDetails(req.LoginName, req.CategoryIDs, req.ClusterIDs, req.Auth)
 }
 
+// LoadRoleDependencies runs the pre-flight dependency check (objects that depend on the role)
+// on the selected clusters, before the role is dropped there. Per-cluster failures carry Error.
+func (a *App) LoadRoleDependencies(req model.RoleDependenciesRequest) ([]model.ClusterRoleDependencies, error) {
+	if strings.TrimSpace(req.LoginName) == "" {
+		return nil, fmt.Errorf("login name is required")
+	}
+	return a.batch.LoadRoleDependencies(req.LoginName, req.CategoryIDs, req.ClusterIDs, req.Auth)
+}
+
 func (a *App) PreviewTargets(req model.RunRequest) ([]model.Cluster, error) {
 	if len(req.CategoryIDs) == 0 && len(req.ClusterIDs) == 0 {
 		return nil, fmt.Errorf("select at least one category or cluster")

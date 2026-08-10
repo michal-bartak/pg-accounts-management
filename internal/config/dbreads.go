@@ -42,14 +42,40 @@ JOIN pg_roles u ON u.oid = m.member
 WHERE u.rolname = ${rolename}
 ORDER BY g.rolname`
 
+// defaultRoleDependenciesQuery is the pre-flight check run before a role is dropped: every
+// object recorded in pg_shdepend as depending on the role (ownership, ACL entries, default
+// privileges, RLS policies, tablespaces). pg_shdepend only describes objects of the CURRENT
+// database plus shared ones, so rows from other databases are reported as such rather than
+// described. pg_database is LEFT joined so shared dependencies (dbid = 0) are kept.
+const defaultRoleDependenciesQuery = `SELECT COALESCE(d.datname, current_database()) AS database,
+       CASE s.deptype
+           WHEN 'o' THEN 'owner'
+           WHEN 'a' THEN 'privileges (ACL)'
+           WHEN 'i' THEN 'initial privileges'
+           WHEN 'r' THEN 'RLS policy'
+           WHEN 't' THEN 'tablespace'
+           WHEN 'p' THEN 'pinned (system)'
+       END AS dependency,
+       s.classid::regclass::TEXT AS class,
+       CASE WHEN s.dbid = 0 OR d.datname = current_database()
+            THEN pg_describe_object(s.classid, s.objid, s.objsubid)
+            ELSE 'Located in other database' END AS object
+FROM pg_shdepend s
+JOIN pg_authid r ON r.oid = s.refobjid
+LEFT JOIN pg_database d ON s.dbid = d.oid
+WHERE s.refclassid = 'pg_authid'::regclass
+  AND r.rolname = ${rolename}
+ORDER BY 1, 2, 3, 4`
+
 // migrateDBReads fills any blank read query with its built-in default, so an older config
-// (or a hand-edited one that dropped a key) still has all three introspection queries. A
-// user's non-empty query is kept verbatim.
+// (or a hand-edited one that dropped a key) still has every introspection query. A user's
+// non-empty query is kept verbatim.
 func migrateDBReads(reads *model.DBReads) {
 	def := DefaultConfig().DBReads
 	reads.SearchRoles = migrateReadOne(reads.SearchRoles, def.SearchRoles)
 	reads.RoleDetail = migrateReadOne(reads.RoleDetail, def.RoleDetail)
 	reads.RoleParents = migrateReadOne(reads.RoleParents, def.RoleParents)
+	reads.RoleDependencies = migrateReadOne(reads.RoleDependencies, def.RoleDependencies)
 }
 
 func migrateReadOne(read, def model.DBRead) model.DBRead {
@@ -71,6 +97,7 @@ func validateDBReads(reads model.DBReads) error {
 		{"search_roles", reads.SearchRoles},
 		{"role_detail", reads.RoleDetail},
 		{"role_parents", reads.RoleParents},
+		{"role_dependencies", reads.RoleDependencies},
 	}
 	for _, c := range checks {
 		q := strings.TrimSpace(c.read.Query)

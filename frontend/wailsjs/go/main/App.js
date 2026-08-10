@@ -38,6 +38,10 @@ export function GetPendingUpdate() {
   return window['go']['main']['App']['GetPendingUpdate']();
 }
 
+export function LoadRoleDependencies(arg1) {
+  return window['go']['main']['App']['LoadRoleDependencies'](arg1);
+}
+
 export function LoadRoleDetails(arg1) {
   return window['go']['main']['App']['LoadRoleDetails'](arg1);
 }

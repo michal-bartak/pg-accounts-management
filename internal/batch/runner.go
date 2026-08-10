@@ -226,6 +226,62 @@ func (r *Runner) LoadRoleDetails(loginName string, categoryIDs, clusterIDs []str
 	return out, nil
 }
 
+// LoadRoleDependencies runs the pre-flight dependency check for one login on the selected
+// clusters — the objects that would block (or be orphaned by) a DROP ROLE there.
+func (r *Runner) LoadRoleDependencies(loginName string, categoryIDs, clusterIDs []string, auth model.AuthContext) ([]model.ClusterRoleDependencies, error) {
+	clusters, err := r.ResolveClusters(model.RunRequest{CategoryIDs: categoryIDs, ClusterIDs: clusterIDs})
+	if err != nil {
+		return nil, err
+	}
+	query := r.store.Get().DBReads.RoleDependencies.Query
+
+	var mu sync.Mutex
+	var out []model.ClusterRoleDependencies
+
+	r.scanClusters(clusters, auth,
+		func(ctx context.Context, cl model.Cluster, conn *pgx.Conn) error {
+			start := time.Now()
+			deps, err := pg.RoleDependencies(ctx, conn, query, loginName)
+			if err != nil {
+				return err
+			}
+			rows := make([]model.RoleDependency, 0, len(deps))
+			for _, d := range deps {
+				rows = append(rows, model.RoleDependency{
+					Database:   d.Database,
+					Dependency: d.Dependency,
+					Class:      d.Class,
+					Object:     d.Object,
+				})
+			}
+			mu.Lock()
+			out = append(out, model.ClusterRoleDependencies{
+				ClusterID:    cl.ID,
+				Alias:        cl.Alias,
+				Host:         cl.Host,
+				Category:     cl.Category,
+				Dependencies: rows,
+				DurationMs:   time.Since(start).Milliseconds(),
+				Queries:      pg.RoleDependencyQueries(query, loginName),
+			})
+			mu.Unlock()
+			return nil
+		},
+		func(cl model.Cluster, msg string) {
+			mu.Lock()
+			out = append(out, model.ClusterRoleDependencies{
+				ClusterID: cl.ID,
+				Alias:     cl.Alias,
+				Host:      cl.Host,
+				Category:  cl.Category,
+				Error:     msg,
+			})
+			mu.Unlock()
+		},
+	)
+	return out, nil
+}
+
 func (r *Runner) runOne(cluster model.Cluster, operation string, fn model.DBFunction, args map[string]string, auth model.AuthContext) model.ClusterResult {
 	start := time.Now()
 	res := model.ClusterResult{

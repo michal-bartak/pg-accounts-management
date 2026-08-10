@@ -155,6 +155,25 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   the consistent inline comment then flows to new clusters as a `set_comment` (varies ⇒ created
   bare). All of it publishes on the one **Save changes** pass. `removeRole` (red button) targets
   only `exists:true` rows.
+- **Every `remove_role` is pre-flighted.** Before a role is dropped — by the red **Remove role**
+  button *and* by a presence removal published on **Save changes** — the frontend runs the
+  `role_dependencies` read on every targeted cluster (`App.LoadRoleDependencies` →
+  `batch.Runner.LoadRoleDependencies` → `pg.RoleDependencies`, same `scanClusters` fan-out and
+  errors-as-data as `LoadRoleDetails`) and shows `#deps-dialog`: one section per cluster with a
+  `.badge`, a summary, the executed SQL behind a magnifier (`showQueriesDialog`, shared with the
+  run-status popup) and, when it matters, a `.segmented` **Skip / Try anyway** toggle. **The popup
+  IS the confirmation** — it replaced the old `askConfirm('Remove role', …)`; the production gate
+  still fires afterwards inside `executeRoleBatch`. Rules: a cluster with **no dependencies** is
+  dropped without asking; a cluster with dependencies **or a failed check** defaults to **Skip**
+  and is excluded from the batch entirely; **Try anyway** sends the normal `remove_role`. The
+  dialog goes **wide** (`#deps-dialog.wide`, 98vw) as soon as any cluster reports rows — the
+  Object column carries full function/table identifiers — and stays narrow otherwise. Frontend
+  pieces (all in [frontend/app.js](frontend/app.js)): `preflightRemoval` (loads, orders results to
+  `alterDetails` order, opens the dialog, resolves to a `Set` of allowed cluster ids or `null` on
+  cancel/failure), `initialDepsChoices`, `depsAllowedSet`, `filterSkippedRemovals` (drops the
+  skipped remove_role-only entries from a `buildAlterClusterOps()` batch, leaving every other
+  cluster's edits intact). Cancelling aborts the whole action; a backend throw returns `null`, so a
+  role that could not be checked is never dropped.
 - **Run/build.** Both modes build **per-cluster ordered op lists** and send ONE
   `app.RunRoleBatch({clusters, auth, confirmProduction})` via `executeRoleBatch`; the backend runs
   each cluster's ops as a single transaction. `buildAlterClusterOps()` produces
@@ -219,9 +238,9 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
    comment, attribute flags, parent memberships from `pg_auth_members`, and role GUCs
    from `pg_roles.rolconfig` → `Settings` map), `ParseFullName` (JSON comment
    `full_name`), `likePattern` (escaped ILIKE). `batch.Runner.SearchRoles` /
-   `LoadRoleDetails` fan out over the **resolved selected clusters** (not all) and
-   collect per-cluster errors instead of failing. **These three queries are templatable**
-   (`Config.DBReads`, YAML `db_reads.<search_roles|role_detail|role_parents>.query`; vanilla
+   `LoadRoleDetails` / `LoadRoleDependencies` fan out over the **resolved selected clusters** (not
+   all) and collect per-cluster errors instead of failing. **These four queries are templatable**
+   (`Config.DBReads`, YAML `db_reads.<search_roles|role_detail|role_parents|role_dependencies>.query`; vanilla
    catalog defaults + migrate/validate in [internal/config/dbreads.go](internal/config/dbreads.go)).
    The SQL is no longer hardcoded in `pg` — `batch.Runner` reads `cfg.DBReads` and passes each
    query into `pg.SearchRoles(…, query, term)` / `pg.RoleDetail(…, detailQuery, parentsQuery, login)`
@@ -230,16 +249,18 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
    before the pgx `Query` so it stays a bind (a legacy raw `$1` still works). Result columns are
    scanned **BY NAME** against a fixed contract
    via `pgx.RowToStructByNameLax` into `db`-tagged structs (`searchRoleRow`/`roleDetailRow`/
-   `roleParentRow`): column **order is irrelevant**, a NULL `comment`/`rolconfig` scans cleanly
+   `roleParentRow`/`roleDependencyRow`): column **order is irrelevant**, a NULL `comment`/`rolconfig` scans cleanly
    (`*string` → `""`, nil `[]string`), an **omitted** contract column leaves its field zero-valued
    (lax), and an **extra** returned column with no matching struct field is **rejected** with a
    clear pgx error. So a deployment can point a read at a privileged wrapper function/view (e.g.
    `SELECT rolname, comment FROM admin.search_roles(${rolename})`) as long as it returns the
    contract's named columns. Contracts: `search_roles` → `rolname, comment`; `role_detail` → the 7
-   `rol*` bools + `comment` + `rolconfig`; `role_parents` → `rolname`. Editable in Settings →
+   `rol*` bools + `comment` + `rolconfig`; `role_parents` → `rolname`; `role_dependencies` →
+   `database, dependency, class, object`. Editable in Settings →
    **Introspection queries** (same `#fn-dialog` in read mode; **Default** button reverts to the
    vanilla built-in). `validateDBReads` only checks non-empty + references `${rolename}` (or legacy
    `$1`); the column contract is enforced at scan time. This was the planned **Step 2**, now done.
+   **`role_dependencies` is a pre-flight, not a display read** — see the remove-role decision below.
 
 ## Bound methods (`app.go` → `window.go.main.App`)
 
@@ -265,7 +286,8 @@ Run/test: `TestConnection` (by saved cluster id), `TestConnectionInput` (ad-hoc
 `PreviewTargets`, `RunRoleBatch(RoleBatchRequest)` (per-cluster transactional batch; the UI's
 create/update/remove path), `RunOperation(RunRequest)` (legacy single-op, kept but unused by the UI).
 Introspection (Alter role): `SearchRoles(RoleSearchRequest)`,
-`LoadRoleDetails(RoleDetailsRequest)`.
+`LoadRoleDetails(RoleDetailsRequest)`, `LoadRoleDependencies(RoleDependenciesRequest)` (the
+pre-flight dependency check run before any `remove_role`).
 
 ## Operations (call templates, `internal/calltemplate/`)
 
@@ -383,7 +405,7 @@ the `#fn-dialog` popup (execution type, call template, clickable placeholder chi
 reference — the old Settings-level *Template syntax help* button was removed, so the help now lives
 in **every** template editor popup. An **Introspection queries** section (`#db-reads-editor`,
 driven by `DB_READS`) sits in a two-column grid (`.settings-two-col`) beside DB command templates;
-it lists the three read queries and opens the **same** `#fn-dialog` in **read mode**
+it lists the four read queries (incl. `role_dependencies`) and opens the **same** `#fn-dialog` in **read mode**
 (`fnDialogMode`/`openReadDialog`): the execution select is hidden (`setFnDialogExecutionRow`),
 the placeholder chips show a single **`${rolename}`** chip (`renderFnPlaceholders(['rolename'])`),
 and the contract sentence + query textarea + **Default** button remain; Done stages into

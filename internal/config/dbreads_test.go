@@ -23,6 +23,9 @@ func TestDefaultDBReads_contract(t *testing.T) {
 			"rolcanlogin", "rolreplication", "rolbypassrls", "comment", "rolconfig",
 		}},
 		{"role_parents", reads.RoleParents.Query, []string{"rolname"}},
+		{"role_dependencies", reads.RoleDependencies.Query, []string{
+			"database", "dependency", "class", "object",
+		}},
 	}
 	for _, c := range cases {
 		if strings.TrimSpace(c.query) == "" {
@@ -55,6 +58,9 @@ func TestMigrateDBReads_fillsBlanksKeepsCustom(t *testing.T) {
 	if reads.RoleParents.Query != def.RoleParents.Query {
 		t.Fatalf("blank role_parents not filled with default")
 	}
+	if reads.RoleDependencies.Query != def.RoleDependencies.Query {
+		t.Fatalf("blank role_dependencies not filled with default")
+	}
 }
 
 func TestValidateDBReads(t *testing.T) {
@@ -73,6 +79,12 @@ func TestValidateDBReads(t *testing.T) {
 	bad.RoleDetail.Query = "SELECT rolsuper FROM pg_roles"
 	if err := validateDBReads(bad); err == nil {
 		t.Fatal("expected missing $1 to be rejected")
+	}
+	// The pre-flight read is validated like every other one.
+	bad = DefaultConfig().DBReads
+	bad.RoleDependencies.Query = "SELECT * FROM pg_shdepend"
+	if err := validateDBReads(bad); err == nil {
+		t.Fatal("expected role_dependencies without ${rolename} to be rejected")
 	}
 }
 

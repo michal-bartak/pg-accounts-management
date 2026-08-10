@@ -370,6 +370,68 @@ export namespace model {
 	        this.queries = source["queries"];
 	    }
 	}
+	export class RoleDependency {
+	    database: string;
+	    dependency: string;
+	    class: string;
+	    object: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RoleDependency(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.database = source["database"];
+	        this.dependency = source["dependency"];
+	        this.class = source["class"];
+	        this.object = source["object"];
+	    }
+	}
+	export class ClusterRoleDependencies {
+	    clusterId: string;
+	    alias: string;
+	    host: string;
+	    category: string;
+	    dependencies: RoleDependency[];
+	    error?: string;
+	    durationMs: number;
+	    queries?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ClusterRoleDependencies(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.clusterId = source["clusterId"];
+	        this.alias = source["alias"];
+	        this.host = source["host"];
+	        this.category = source["category"];
+	        this.dependencies = this.convertValues(source["dependencies"], RoleDependency);
+	        this.error = source["error"];
+	        this.durationMs = source["durationMs"];
+	        this.queries = source["queries"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class ClusterRoleDetail {
 	    clusterId: string;
 	    alias: string;
@@ -542,6 +604,7 @@ export namespace model {
 	    searchRoles: DBRead;
 	    roleDetail: DBRead;
 	    roleParents: DBRead;
+	    roleDependencies: DBRead;
 	
 	    static createFrom(source: any = {}) {
 	        return new DBReads(source);
@@ -552,6 +615,7 @@ export namespace model {
 	        this.searchRoles = this.convertValues(source["searchRoles"], DBRead);
 	        this.roleDetail = this.convertValues(source["roleDetail"], DBRead);
 	        this.roleParents = this.convertValues(source["roleParents"], DBRead);
+	        this.roleDependencies = this.convertValues(source["roleDependencies"], DBRead);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -735,6 +799,43 @@ export namespace model {
 		    return a;
 		}
 	}
+	export class RoleDependenciesRequest {
+	    loginName: string;
+	    categoryIds: string[];
+	    clusterIds: string[];
+	    auth: AuthContext;
+	
+	    static createFrom(source: any = {}) {
+	        return new RoleDependenciesRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.loginName = source["loginName"];
+	        this.categoryIds = source["categoryIds"];
+	        this.clusterIds = source["clusterIds"];
+	        this.auth = this.convertValues(source["auth"], AuthContext);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class RoleDetailsRequest {
 	    loginName: string;
 	    categoryIds: string[];

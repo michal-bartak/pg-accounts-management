@@ -96,7 +96,7 @@ db_functions:
 
 # db_reads: the read/introspection queries used by Alter role. Plain SQL with a single named bind
 # ${rolename} (converted to $1 before execution; a legacy $1 also works) — the search pattern for
-# search_roles; the role name for role_detail/role_parents. Result columns are scanned BY NAME
+# search_roles; the role name for role_detail/role_parents/role_dependencies. Result columns are scanned BY NAME
 # against a fixed contract (see sql/README.md → Introspection queries): column order is irrelevant,
 # NULL comment/rolconfig is fine, an omitted contract column is treated as zero, and an extra
 # unmapped column is an error. Defaults are vanilla catalog queries; override a read with a
@@ -139,6 +139,33 @@ db_reads:
       JOIN pg_roles u ON u.oid = m.member
       WHERE u.rolname = ${rolename}
       ORDER BY g.rolname
+  role_dependencies:
+    # Pre-flight check run before a role is dropped (Remove role / a pending presence removal):
+    # one row per object that depends on the role. A cluster that reports rows is skipped by
+    # default in the confirmation popup unless the user picks "Try anyway".
+    # Contract columns (one row per dependency): database, dependency, class, object (text).
+    # Note: pg_shdepend only describes objects of the database the app connects to, plus
+    # cluster-wide ones — rows from other databases are reported but not described.
+    query: |
+      SELECT COALESCE(d.datname, current_database()) AS database,
+             CASE s.deptype
+                 WHEN 'o' THEN 'owner'
+                 WHEN 'a' THEN 'privileges (ACL)'
+                 WHEN 'i' THEN 'initial privileges'
+                 WHEN 'r' THEN 'RLS policy'
+                 WHEN 't' THEN 'tablespace'
+                 WHEN 'p' THEN 'pinned (system)'
+             END AS dependency,
+             s.classid::regclass::TEXT AS class,
+             CASE WHEN s.dbid = 0 OR d.datname = current_database()
+                  THEN pg_describe_object(s.classid, s.objid, s.objsubid)
+                  ELSE 'Located in other database' END AS object
+      FROM pg_shdepend s
+      JOIN pg_authid r ON r.oid = s.refobjid
+      LEFT JOIN pg_database d ON s.dbid = d.oid
+      WHERE s.refclassid = 'pg_authid'::regclass
+        AND r.rolname = ${rolename}
+      ORDER BY 1, 2, 3, 4
 batch:
   max_concurrency: 5
 
