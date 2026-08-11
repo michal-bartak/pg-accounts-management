@@ -348,9 +348,7 @@
   <dialog id="deps-dialog">
     <div class="deps-dialog-body">
       <h2>Role dependencies <button type="button" class="q-hint" data-hint="Objects that depend on this role on each cluster (pg_shdepend), read before the role is dropped. A cluster with dependencies is skipped unless you choose Try anyway. pg_shdepend only describes objects of the database the app connects to, plus cluster-wide ones.">?</button></h2>
-      <p id="deps-intro" class="hint"></p>
       <div id="deps-list" class="deps-list"></div>
-      <div id="deps-error" class="form-error hidden"></div>
       <menu>
         <button type="button" id="deps-cancel">Cancel</button>
         <button type="button" id="deps-ok" class="primary">Remove role</button>
