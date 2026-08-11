@@ -541,29 +541,40 @@ tr:last-child td { border-bottom: none; }
 #deps-dialog.wide { max-width: 98vw; }
 .deps-dialog-body { padding: 1.25rem; display: block; min-width: 420px; }
 #deps-dialog.wide .deps-dialog-body { min-width: min(720px, 90vw); }
-.deps-dialog-body h2 { margin: 0 0 0.75rem; }
+/* The titlebar carries the ? hint and the one SQL magnifier (every cluster runs the same query). */
+.deps-dialog-body h2 { margin: 0 0 0.75rem; display: flex; align-items: center; gap: 0.4rem; }
 .deps-list {
   max-height: 60vh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1rem;
 }
-.deps-cluster-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; }
-.deps-alias { font-weight: 600; }
-/* The summary takes the slack, so Skip/Try anyway + the SQL magnifier stay right-aligned whether
-   or not the cluster needs a decision. */
+/* Three sections — no dependencies / could not be checked / dependencies found — each with a
+   small uppercase subheader (.alter-privs-label, the role form's section label). */
+.deps-group { display: flex; flex-direction: column; gap: 0.5rem; }
+.deps-subhead { display: block; }
+/* Clean clusters are just chips, on the line below their subheader. */
+.deps-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.deps-cluster { display: flex; flex-direction: column; gap: 0.35rem; }
+.deps-cluster + .deps-cluster { margin-top: 0.4rem; }
+.deps-cluster-head { display: flex; align-items: center; gap: 0.5rem; }
+/* The summary takes the slack, so Skip/Try anyway stays right-aligned. */
 .deps-summary { color: var(--muted); font-size: var(--fs-sm); margin-right: auto; }
-/* A failed check keeps the danger colour (both are single-class selectors, so be explicit). */
-.deps-summary.status-error { color: var(--danger); }
-.deps-view { color: var(--muted); }
-.deps-view:hover { color: var(--primary); }
+/* Cluster / Error / decision. The decision column hugs its buttons; the message wraps. */
+.deps-error-table td { vertical-align: middle; }
+.deps-error-table th:last-child,
+.deps-error-table td:last-child { width: 1%; white-space: nowrap; }
+.deps-error-table td.status-error { white-space: normal; word-break: break-word; }
+/* Every dependency table shares one <colgroup>, so the columns line up across clusters. */
+.deps-table { table-layout: fixed; }
 .deps-table td { vertical-align: top; }
 /* The short columns never wrap, so all remaining width goes to Object. */
 .deps-table th:not(:last-child),
 .deps-table td:not(:last-child) { white-space: nowrap; }
-/* Object identifiers can be very long — let them wrap instead of stretching the dialog further. */
-.deps-table td:last-child { white-space: normal; word-break: break-word; min-width: 20rem; }
+/* Object identifiers can be very long — the last <col> has no fixed width, so it absorbs the
+   remaining space and wraps rather than stretching the dialog further. */
+.deps-table td:last-child { white-space: normal; word-break: break-word; }
 .deps-dialog-body menu {
   display: flex;
   justify-content: flex-end;

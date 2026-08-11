@@ -81,16 +81,20 @@ the objects that depend on the role on every targeted cluster and shows them per
 <figcaption>Dependency check — per cluster, what depends on the role and whether to drop it there</figcaption>
 </figure>
 
-- A cluster with **no dependencies** is dropped without further asking.
-- A cluster that **reports dependencies** — or one that could not be checked at all, because it
-  is unreachable or the connect user lacks permission — is set to **Skip** and left out of the
-  run entirely. This is the default.
-- Switch a cluster to **Try anyway** to drop it regardless. PostgreSQL then decides, and the
-  outcome shows in the [command log](/pg-accounts-management/usage/command-log/) like any other
-  run.
+Clusters are grouped into three sections, in this order — and inside each by group, then alias:
 
-Each cluster's magnifier shows the exact query that produced its rows. The check itself is the
-configurable `role_dependencies`
+1. **No dependencies** — just the list of clusters. They are dropped without further asking.
+2. **Could not be checked** — the cluster and why (unreachable, or the connect user lacks
+   permission on the catalogs).
+3. **Dependencies found** — per cluster, the objects that depend on the role.
+
+Everything in the last two sections is set to **Skip** and left out of the run entirely. That is
+the default. Switch a cluster to **Try anyway** to drop it regardless: PostgreSQL then decides, and
+the outcome shows in the [command log](/pg-accounts-management/usage/command-log/) like any other
+run.
+
+Every cluster runs the same query, so the magnifier next to the popup's title shows it once. The
+check itself is the configurable `role_dependencies`
 [read query](/pg-accounts-management/configuration/call-templates/); its default reads
 `pg_shdepend`, which describes the objects of the database the app connects to plus cluster-wide
 ones — anything owned in another database on the same cluster is listed but not named.

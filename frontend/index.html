@@ -347,7 +347,7 @@
 
   <dialog id="deps-dialog">
     <div class="deps-dialog-body">
-      <h2>Role dependencies <button type="button" class="q-hint" data-hint="Objects that depend on this role on each cluster (pg_shdepend), read before the role is dropped. A cluster with dependencies is skipped unless you choose Try anyway. pg_shdepend only describes objects of the database the app connects to, plus cluster-wide ones.">?</button></h2>
+      <h2>Role dependencies <button type="button" class="q-hint" data-hint="Objects that depend on this role on each cluster (pg_shdepend), read before the role is dropped. A cluster with dependencies is skipped unless you choose Try anyway. pg_shdepend only describes objects of the database the app connects to, plus cluster-wide ones.">?</button><button type="button" id="deps-view-sql" class="config-path-copy" title="View the executed query" aria-label="View the executed query"></button></h2>
       <div id="deps-list" class="deps-list"></div>
       <menu>
         <button type="button" id="deps-cancel">Cancel</button>

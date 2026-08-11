@@ -275,6 +275,9 @@ func (r *Runner) LoadRoleDependencies(loginName string, categoryIDs, clusterIDs 
 				Host:      cl.Host,
 				Category:  cl.Category,
 				Error:     msg,
+				// The SQL is known whether or not the connection worked, and it is exactly what
+				// the user wants to see when the check failed — so the popup can always show it.
+				Queries: pg.RoleDependencyQueries(query, loginName),
 			})
 			mu.Unlock()
 		},

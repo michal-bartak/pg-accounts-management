@@ -159,17 +159,27 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   button *and* by a presence removal published on **Save changes** — the frontend runs the
   `role_dependencies` read on every targeted cluster (`App.LoadRoleDependencies` →
   `batch.Runner.LoadRoleDependencies` → `pg.RoleDependencies`, same `scanClusters` fan-out and
-  errors-as-data as `LoadRoleDetails`) and shows `#deps-dialog`: one section per cluster with a
-  `.badge`, a summary, the executed SQL behind a magnifier (`showQueriesDialog`, shared with the
-  run-status popup) and, when it matters, a `.segmented` **Skip / Try anyway** toggle. **The popup
-  IS the confirmation** — it replaced the old `askConfirm('Remove role', …)`; the production gate
-  still fires afterwards inside `executeRoleBatch`. Rules: a cluster with **no dependencies** is
-  dropped without asking; a cluster with dependencies **or a failed check** defaults to **Skip**
-  and is excluded from the batch entirely; **Try anyway** sends the normal `remove_role`. The
-  dialog goes **wide** (`#deps-dialog.wide`, 98vw) as soon as any cluster reports rows — the
-  Object column carries full function/table identifiers — and stays narrow otherwise. Frontend
-  pieces (all in [frontend/app.js](frontend/app.js)): `preflightRemoval` (loads, orders results to
-  `alterDetails` order, opens the dialog, resolves to a `Set` of allowed cluster ids or `null` on
+  errors-as-data as `LoadRoleDetails`) and shows `#deps-dialog`. **The popup IS the confirmation** —
+  it replaced the old `askConfirm('Remove role', …)`; the production gate still fires afterwards
+  inside `executeRoleBatch`. Rules: a cluster with **no dependencies** is dropped without asking; a
+  cluster with dependencies **or a failed check** defaults to **Skip** and is excluded from the
+  batch entirely; **Try anyway** sends the normal `remove_role`.
+  **Popup layout — three ordered sections** (`depsTier`: 0 clean / 1 check failed / 2 has
+  dependencies; empty ones omitted), each under a small-uppercase `.alter-privs-label` subheader,
+  ordered inside by **configured category order then alias** (`depsSortRows`, same category rule as
+  `describeScope` — not the alphabetical sort `renderClustersTable` uses): **No dependencies** = a
+  `.deps-chips` row of chips only; **Could not be checked** = a `Cluster | Error | Skip/Try` table;
+  **Dependencies found** = per cluster a header line (chip + count + toggle) plus its own table.
+  A cluster is identified by ONE group-coloured chip via the shared `scopeLabelsHtml` — there is no
+  alias text and no `.badge`. Every dependency table is `table-layout:fixed` and shares one
+  `depsColgroup(rows)` — the three short columns sized in `ch` to the widest value across **all**
+  clusters (capped, + `1.5rem` cell padding), Object left bare to absorb the rest — so columns line
+  up across clusters. **One magnifier** (`#deps-view-sql`, in the `<h2>` next to the `?`) shows the
+  SQL via `showQueriesDialog`, because every cluster runs the identical query; `LoadRoleDependencies`
+  therefore sets `Queries` on its **error** path too, so the SQL is available even when every
+  cluster failed. The dialog goes **wide** (`#deps-dialog.wide`, 98vw) only when some cluster
+  reports rows. Frontend pieces (all in [frontend/app.js](frontend/app.js)): `preflightRemoval`
+  (loads, `depsSortRows`, opens the dialog, resolves to a `Set` of allowed cluster ids or `null` on
   cancel/failure), `initialDepsChoices`, `depsAllowedSet`, `filterSkippedRemovals` (drops the
   skipped remove_role-only entries from a `buildAlterClusterOps()` batch, leaving every other
   cluster's edits intact). Cancelling aborts the whole action; a backend throw returns `null`, so a

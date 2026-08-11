@@ -63,11 +63,16 @@ Example template: [`config.example.yaml`](config.example.yaml). Implemented in `
   function/view that returns the contract columns.
 - **`role_dependencies` is a pre-flight**, not a display read: BOTH removal paths (the red
   **Remove role** button and a pending presence removal published by **Save changes**) first run
-  it on every targeted cluster and show `#deps-dialog` — a per-cluster table (`pg_shdepend`
-  default) with a **Skip / Try anyway** `.segmented` toggle. A cluster with rows, or one whose
+  it on every targeted cluster and show `#deps-dialog`. A cluster with rows, or one whose
   check failed, defaults to **Skip** and is left out of the batch; a clean cluster is dropped
   without asking. The popup **replaces** the old `askConfirm('Remove role', …)`; production
-  confirm still fires inside `executeRoleBatch`. Frontend: `preflightRemoval` /
+  confirm still fires inside `executeRoleBatch`. Layout = **three sections** (`depsTier`: clean →
+  could-not-be-checked → has-dependencies, ordered inside by configured category order then alias
+  via `depsSortRows`): chips only / a `Cluster|Error|Skip-Try` table / per-cluster header + table.
+  Clusters are labelled by ONE group-coloured `scopeLabelsHtml` chip (no alias text, no `.badge`);
+  all dependency tables are `table-layout:fixed` sharing one `depsColgroup` so columns line up; ONE
+  magnifier in the `<h2>` (`#deps-view-sql`) shows the SQL, since every cluster runs the identical
+  query (`LoadRoleDependencies` sets `Queries` on the error path too). Frontend: `preflightRemoval` /
   `initialDepsChoices` / `depsAllowedSet` / `filterSkippedRemovals` in `frontend/app.js`.
 
 ## Call templates (`internal/calltemplate/`)

@@ -722,3 +722,61 @@ test('filterSkippedRemovals: drops skipped remove_role-only entries, keeps every
   // c-skip is dropped; the unrelated edit and the multi-op cluster are untouched.
   assert.deepEqual(r.kept, ['c-try', 'c-edit', 'c-multi']);
 });
+
+test('depsSortRows: clean → unchecked → with-dependencies, then category order, then alias', () => {
+  const r = evalJSON(`(() => {
+    // Configured category order is prod, then uat (NOT alphabetical).
+    state = { categories: [{ id: 'prod', label: 'Production' }, { id: 'uat', label: 'UAT' }] };
+    const rows = [
+      { clusterId: 'uat-deps',   alias: 'uat-9',  category: 'uat',  dependencies: [{ object: 'table t' }] },
+      { clusterId: 'uat-clean-b',alias: 'uat-b',  category: 'uat',  dependencies: [] },
+      { clusterId: 'prod-err',   alias: 'prod-2', category: 'prod', dependencies: [], error: 'refused' },
+      { clusterId: 'prod-deps',  alias: 'prod-1', category: 'prod', dependencies: [{ object: 'table t' }] },
+      { clusterId: 'uat-clean-a',alias: 'uat-a',  category: 'uat',  dependencies: [] },
+      { clusterId: 'prod-clean', alias: 'prod-0', category: 'prod', dependencies: [] },
+      { clusterId: 'uat-err',    alias: 'uat-1',  category: 'uat',  dependencies: [], error: 'timeout' },
+    ];
+    return { order: depsSortRows(rows).map((x) => x.clusterId), tiers: depsSortRows(rows).map(depsTier) };
+  })()`);
+  assert.deepEqual(r.order, [
+    // tier 0 (clean): prod before uat (configured order), then alias within uat
+    'prod-clean', 'uat-clean-a', 'uat-clean-b',
+    // tier 1 (could not be checked)
+    'prod-err', 'uat-err',
+    // tier 2 (dependencies found)
+    'prod-deps', 'uat-deps',
+  ]);
+  assert.deepEqual(r.tiers, [0, 0, 0, 1, 1, 2, 2]);
+});
+
+test('depsColgroup: short columns sized to the widest value across ALL clusters, Object bare', () => {
+  const r = evalJSON(`(() => {
+    const rows = [
+      { dependencies: [{ database: 'postgres', dependency: 'owner', class: 'pg_class', object: 'table t' }] },
+      { dependencies: [{ database: 'analytics_warehouse', dependency: 'privileges (ACL)', class: 'pg_proc', object: 'x' }] },
+    ];
+    return { html: depsColgroup(rows) };
+  })()`);
+  // 'analytics_warehouse' = 19 chars wins over the 'Database' header; the last <col> has no width.
+  assert.match(r.html, /width:calc\(19ch \+ 1\.5rem\)/);
+  // 'privileges (ACL)' = 16 chars wins over the 'Dependency' header (10).
+  assert.match(r.html, /width:calc\(16ch \+ 1\.5rem\)/);
+  // 'pg_class'/'pg_proc' are shorter than the 'Class' header? No — 8 > 5, so 8 wins.
+  assert.match(r.html, /width:calc\(8ch \+ 1\.5rem\)/);
+  assert.match(r.html, /<col><\/colgroup>$/);
+});
+
+test('depsColgroup: caps a pathologically long value and falls back to the header width', () => {
+  const r = evalJSON(`(() => {
+    const rows = [
+      { dependencies: [{ database: 'd'.repeat(200), dependency: 'o', class: 'c', object: 'x' }] },
+      { dependencies: [] },
+    ];
+    return { html: depsColgroup(rows), empty: depsColgroup([]) };
+  })()`);
+  assert.match(r.html, /width:calc\(28ch \+ 1\.5rem\)/); // capped at 28
+  assert.match(r.html, /width:calc\(10ch \+ 1\.5rem\)/); // 'Dependency' header wins over 'o'
+  // No rows at all → every column falls back to its header length.
+  assert.match(r.empty, /width:calc\(8ch \+ 1\.5rem\)/);  // 'Database'
+  assert.match(r.empty, /width:calc\(5ch \+ 1\.5rem\)/);  // 'Class'
+});
