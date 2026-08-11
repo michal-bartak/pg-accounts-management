@@ -152,7 +152,11 @@ keyboard-focused, not on plain focus).
 
 **Shared UI conventions (solve once, don't re-patch per popup):** open every `<dialog>` via
 the `openModal(dlgOrId)` helper (never bare `.showModal()`) — it drops `showModal()`'s
-auto-focus ring on the first Close/OK button unless the dialog has an `[autofocus]` element.
+auto-focus ring on the first Close/OK button unless the dialog has an `[autofocus]` element — and
+close every one via `closeModal(dlgOrId)` (never bare `.close()`): closing synchronously restores
+focus to the opener and the engine rings it even for a mouse-driven open, so `closeModal` blurs it
+when `lastInputWasPointer` (capture-phase `pointerdown`/`keydown`). Keyboard/Esc keeps the ring. It
+relies on neither the `close` event nor a focus event — some engines fire neither.
 Focus indicators are keyboard-only (`:focus-visible`) and **inset** (border + `inset`
 box-shadow; light ring on primary-filled controls) so scroll/`overflow:hidden` containers
 can't clip them — one `styles.css` rule for text fields/buttons/checkboxes. Base `dialog` is

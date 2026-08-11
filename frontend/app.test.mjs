@@ -1009,3 +1009,30 @@ test('byGroupThenAlias: configured group order wins over the label, alias breaks
   assert.deepEqual(r.aliases, ['a', 'b']);     // same group → alias
   assert.deepEqual(r.unknownLast, ['z', 'a']); // a group no longer configured sorts last
 });
+
+test('closeModal: drops the focus the UA restores after a pointer-driven open, keeps it for keyboard', () => {
+  const r = evalJSON(`(() => {
+    const blurs = [];
+    // Closing a <dialog> restores focus to its opener synchronously; stand in for that opener.
+    const opener = { id: 'search-status', blur() { blurs.push('blurred'); } };
+    const dlg = { closed: 0, close() { this.closed++; document.activeElement = opener; } };
+    const run = (pointer) => {
+      blurs.length = 0;
+      document.activeElement = null;
+      lastInputWasPointer = pointer;
+      closeModal(dlg);
+      return { closed: dlg.closed, blurs: blurs.length, active: document.activeElement === opener };
+    };
+    const byPointer = run(true);
+    const byKeyboard = run(false);
+    document.activeElement = null; // leave the stub as we found it
+    return { byPointer, byKeyboard };
+  })()`);
+  // Mouse: the dialog closed and the ring the engine put back on the chip is dropped.
+  assert.equal(r.byPointer.closed, 1);
+  assert.equal(r.byPointer.blurs, 1);
+  // Keyboard (including Esc): focus stays on the opener, so the ring and tab position survive.
+  assert.equal(r.byKeyboard.closed, 2);
+  assert.equal(r.byKeyboard.blurs, 0);
+  assert.equal(r.byKeyboard.active, true);
+});

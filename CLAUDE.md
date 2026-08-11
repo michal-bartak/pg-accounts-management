@@ -457,7 +457,17 @@ Open every `<dialog>` via the **`openModal(dlgOrId)`** helper in
 auto-focus (which otherwise leaves a keyboard focus ring on the first Close/OK button, or
 pops a `?` hint) **unless** the dialog declares intentional initial focus via an `[autofocus]`
 element (e.g. the Find-role search input, and the first field of the add/edit forms — the
-group **Label** and cluster **Alias** inputs). Settings list editors focus the new row's
+group **Label** and cluster **Alias** inputs). Close every `<dialog>` via the mirror-image
+**`closeModal(dlgOrId)`**, never a bare `.close()`: closing restores focus (synchronously) to
+whatever opened the dialog, and the engine then paints the keyboard focus ring there **even for a
+mouse-driven open** — so clicking a control that opens a popup left it ringed once the popup closed
+(reported for the status chip inside the Find-role popup). `closeModal` drops that restored focus
+when the last interaction was a **pointer** (tracked by `lastInputWasPointer`, capture-phase
+`pointerdown`/`keydown` listeners); a keyboard user — including Esc-to-close, which counts as
+keyboard — keeps the ring and their place in the tab order. Note the mechanism deliberately does
+**not** rely on the `close` event (some engines don't fire it for a programmatic `.close()`) nor on
+a focus event (the restore can happen without one). A `<form method="dialog">` submit still closes
+natively, bypassing the helper. Settings list editors focus the new row's
 input after an Add (parent-group `.pr-value`, comment-field `.cf-key`). Focus indicators are
 **keyboard-only** (`:focus-visible`) and **inset** (border-colour + `inset` box-shadow; a
 light ring on primary-filled controls where a primary ring would vanish) so scroll containers
