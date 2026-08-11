@@ -780,3 +780,112 @@ test('depsColgroup: caps a pathologically long value and falls back to the heade
   assert.match(r.empty, /width:calc\(8ch \+ 1\.5rem\)/);  // 'Database'
   assert.match(r.empty, /width:calc\(5ch \+ 1\.5rem\)/);  // 'Class'
 });
+
+test('depsErrorRowsFor: one unchecked row per cluster, alias/category resolved from known rows', () => {
+  const r = evalJSON(`(() => {
+    const known = [
+      { clusterId: 'c1', alias: 'prod-1', host: 'h1', category: 'prod', queries: ['SELECT 1'] },
+      { clusterId: 'c2', alias: 'uat-1', host: 'h2', category: 'uat' },
+    ];
+    return { rows: depsErrorRowsFor(['c1', 'c2', 'c-unknown'], 'backend exploded', known) };
+  })()`);
+  assert.equal(r.rows.length, 3);
+  assert.deepEqual(r.rows.map((x) => x.alias), ['prod-1', 'uat-1', 'c-unknown']); // falls back to the id
+  assert.deepEqual(r.rows.map((x) => x.category), ['prod', 'uat', '']);
+  assert.ok(r.rows.every((x) => x.error === 'backend exploded' && x.dependencies.length === 0));
+  // A previously reported query is kept so the titlebar magnifier survives a failed reload.
+  assert.deepEqual(r.rows[0].queries, ['SELECT 1']);
+  assert.deepEqual(r.rows[1].queries, []);
+});
+
+test('mergeDepsChoices: keeps still-relevant picks, defaults new ones, drops now-clean clusters', () => {
+  const r = evalJSON(`(() => {
+    const prev = new Map([['still-deps', 'try'], ['now-clean', 'try'], ['gone', 'skip']]);
+    const rows = [
+      { clusterId: 'still-deps', dependencies: [{ object: 'table t' }] },
+      { clusterId: 'now-clean',  dependencies: [] },
+      { clusterId: 'newly-bad',  dependencies: [{ object: 'table u' }] },
+    ];
+    return { entries: [...mergeDepsChoices(rows, prev).entries()] };
+  })()`);
+  assert.deepEqual(r.entries, [
+    ['still-deps', 'try'], // survived the reload
+    ['newly-bad', 'skip'], // newly flagged → safe default
+  ]); // 'now-clean' needs no decision any more, 'gone' is not in the new rows at all
+});
+
+test('reloadDeps: re-reads the same clusters, re-sorts, and preserves a Try anyway pick', async () => {
+  const p = vm.runInContext(`(async () => {
+    const _backend = backend, _getAuth = getAuth, _render = renderDepsDialog;
+    let req = null, busyDuringLoad = null;
+    try {
+      state = { categories: [{ id: 'prod', label: 'Production' }, { id: 'uat', label: 'UAT' }] };
+      alterSelected = 'bob';
+      getAuth = () => ({ user: '', password: '' });
+      renderDepsDialog = () => {};
+      // Opening state: one cluster with deps (set to Try anyway), one clean.
+      depsRows = [
+        { clusterId: 'c1', alias: 'prod-1', category: 'prod', dependencies: [{ object: 'table t' }] },
+        { clusterId: 'c2', alias: 'uat-1', category: 'uat', dependencies: [] },
+      ];
+      depsChoices = new Map([['c1', 'try']]);
+      depsClusterIds = ['c1', 'c2'];
+      backend = () => ({ LoadRoleDependencies: async (r) => {
+        req = r;
+        busyDuringLoad = depsBusy;
+        // c1 still has deps; c2 came back dirty this time — deliberately out of order.
+        return [
+          { clusterId: 'c2', alias: 'uat-1', category: 'uat', dependencies: [{ object: 'table u' }] },
+          { clusterId: 'c1', alias: 'prod-1', category: 'prod', dependencies: [{ object: 'table t' }] },
+        ];
+      } });
+      await reloadDeps();
+      return JSON.stringify({
+        req, busyDuringLoad, busyAfter: depsBusy,
+        order: depsRows.map((x) => x.clusterId),
+        choices: [...depsChoices.entries()],
+      });
+    } finally {
+      backend = _backend; getAuth = _getAuth; renderDepsDialog = _render;
+    }
+  })()`, ctx);
+  const r = JSON.parse(await p);
+  assert.deepEqual(r.req.clusterIds, ['c1', 'c2']); // same clusters re-checked
+  assert.equal(r.req.loginName, 'bob');
+  assert.equal(r.busyDuringLoad, true);  // spinner state held during the read
+  assert.equal(r.busyAfter, false);      // and released afterwards
+  assert.deepEqual(r.order, ['c1', 'c2']); // re-sorted by category order, not response order
+  assert.deepEqual(r.choices, [['c1', 'try'], ['c2', 'skip']]); // pick survived, new one defaults
+});
+
+test('reloadDeps: a thrown read lands every cluster under "could not be checked", not an empty list', async () => {
+  const p = vm.runInContext(`(async () => {
+    const _backend = backend, _getAuth = getAuth, _render = renderDepsDialog, _err = console.error;
+    try {
+      state = { categories: [{ id: 'prod', label: 'Production' }] };
+      alterSelected = 'bob';
+      getAuth = () => ({ user: '', password: '' });
+      renderDepsDialog = () => {};
+      console.error = () => {};
+      depsRows = [{ clusterId: 'c1', alias: 'prod-1', category: 'prod', dependencies: [{ object: 't' }] }];
+      depsChoices = new Map([['c1', 'try']]);
+      depsClusterIds = ['c1'];
+      backend = () => ({ LoadRoleDependencies: async () => { throw new Error('no route to host'); } });
+      await reloadDeps();
+      return JSON.stringify({
+        rows: depsRows.map((x) => ({ id: x.clusterId, alias: x.alias, tier: depsTier(x), error: x.error })),
+        allowed: [...depsAllowedSet()],
+        busy: depsBusy,
+      });
+    } finally {
+      backend = _backend; getAuth = _getAuth; renderDepsDialog = _render; console.error = _err;
+    }
+  })()`, ctx);
+  const r = JSON.parse(await p);
+  assert.equal(r.rows.length, 1);
+  assert.equal(r.rows[0].tier, 1);            // "could not be checked"
+  assert.equal(r.rows[0].alias, 'prod-1');    // identity kept from the previous rows
+  assert.match(r.rows[0].error, /no route to host/);
+  assert.deepEqual(r.allowed, ['c1']);        // the earlier "Try anyway" still applies...
+  assert.equal(r.busy, false);
+});

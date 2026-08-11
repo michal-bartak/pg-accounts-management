@@ -174,16 +174,23 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   alias text and no `.badge`. Every dependency table is `table-layout:fixed` and shares one
   `depsColgroup(rows)` — the three short columns sized in `ch` to the widest value across **all**
   clusters (capped, + `1.5rem` cell padding), Object left bare to absorb the rest — so columns line
-  up across clusters. **One magnifier** (`#deps-view-sql`, in the `<h2>` next to the `?`) shows the
-  SQL via `showQueriesDialog`, because every cluster runs the identical query; `LoadRoleDependencies`
-  therefore sets `Queries` on its **error** path too, so the SQL is available even when every
-  cluster failed. The dialog goes **wide** (`#deps-dialog.wide`, 98vw) only when some cluster
-  reports rows. Frontend pieces (all in [frontend/app.js](frontend/app.js)): `preflightRemoval`
-  (loads, `depsSortRows`, opens the dialog, resolves to a `Set` of allowed cluster ids or `null` on
-  cancel/failure), `initialDepsChoices`, `depsAllowedSet`, `filterSkippedRemovals` (drops the
-  skipped remove_role-only entries from a `buildAlterClusterOps()` batch, leaving every other
-  cluster's edits intact). Cancelling aborts the whole action; a backend throw returns `null`, so a
-  role that could not be checked is never dropped.
+  up across clusters. The `<h2>` carries, after the `?`: **Reload** (`#deps-reload` → `reloadDeps`,
+  re-reads the same `depsClusterIds` in place — for when the user has just gone and fixed the
+  dependencies elsewhere — keeping the picks that still apply via `mergeDepsChoices`; `depsBusy`
+  spins the icon by reusing the `run-status-spin` keyframes and holds `#deps-ok`, Cancel stays
+  live), then **one magnifier** (`#deps-view-sql`) showing the SQL via `showQueriesDialog`, because
+  every cluster runs the identical query — `LoadRoleDependencies` therefore sets `Queries` on its
+  **error** path too, so the SQL is available even when every cluster failed. The dialog goes
+  **wide** (`#deps-dialog.wide`, 98vw) only when some cluster reports rows. Frontend pieces (all in
+  [frontend/app.js](frontend/app.js)): `preflightRemoval` (records `depsClusterIds`, loads, opens
+  the dialog, resolves to a `Set` of allowed cluster ids or `null` on cancel), the shared
+  `loadDepsRows`, `depsSortRows`, `initialDepsChoices`/`mergeDepsChoices`, `depsAllowedSet`,
+  `filterSkippedRemovals` (drops the skipped remove_role-only entries from a
+  `buildAlterClusterOps()` batch, leaving every other cluster's edits intact). Cancelling aborts the
+  whole action. **A thrown read is rendered as all-clusters-failed** (`depsErrorRowsFor`, carrying
+  each cluster's identity and any SQL a previous load reported) rather than an `#ops-error` the
+  modal would hide — which keeps the safe default, every cluster on Skip, so a role that could not
+  be checked is still never dropped without an explicit *Try anyway*.
 - **Run/build.** Both modes build **per-cluster ordered op lists** and send ONE
   `app.RunRoleBatch({clusters, auth, confirmProduction})` via `executeRoleBatch`; the backend runs
   each cluster's ops as a single transaction. `buildAlterClusterOps()` produces

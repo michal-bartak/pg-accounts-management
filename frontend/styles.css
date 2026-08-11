@@ -541,8 +541,12 @@ tr:last-child td { border-bottom: none; }
 #deps-dialog.wide { max-width: 98vw; }
 .deps-dialog-body { padding: 1.25rem; display: block; min-width: 420px; }
 #deps-dialog.wide .deps-dialog-body { min-width: min(720px, 90vw); }
-/* The titlebar carries the ? hint and the one SQL magnifier (every cluster runs the same query). */
+/* The titlebar carries the ? hint, Reload, and the one SQL magnifier (every cluster runs the
+   same query). Reload spins its icon while the re-check is in flight, reusing the run-status
+   keyframes rather than defining a second spin. */
 .deps-dialog-body h2 { margin: 0 0 0.75rem; display: flex; align-items: center; gap: 0.4rem; }
+#deps-reload.busy .ic { animation: run-status-spin 0.7s linear infinite; }
+#deps-reload:disabled { opacity: 0.6; cursor: default; }
 .deps-list {
   max-height: 60vh;
   overflow-y: auto;

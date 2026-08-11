@@ -93,6 +93,11 @@ the default. Switch a cluster to **Try anyway** to drop it regardless: PostgreSQ
 the outcome shows in the [command log](/pg-accounts-management/usage/command-log/) like any other
 run.
 
+If you go and clear the dependencies while the popup is open — reassigning ownership or dropping
+the objects in psql — the **reload** button next to the title re-runs the check on the same
+clusters without closing the dialog. Any *Try anyway* you already picked is kept where it still
+applies.
+
 Every cluster runs the same query, so the magnifier next to the popup's title shows it once. The
 check itself is the configurable `role_dependencies`
 [read query](/pg-accounts-management/configuration/call-templates/); its default reads
