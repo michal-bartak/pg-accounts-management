@@ -210,6 +210,9 @@ by `searchState` = `buildStatusState(SearchRoles rows)` — independent of `runS
 only `SearchRoles`; the detail load comes later via `pickUser`→`reloadDetails` and owns the footer
 chip). Clicking it opens the shared `#run-status-dialog` via `openRunStatusDialog(rs)`, which sets
 `statusDialogState`; `runStatusSummary(rs)`/`renderRunStatusDialog(rs)` take the state explicitly.
+The status table's rows are ordered by **configured group then alias** for every usage
+(`statusRowOrder` → the shared `byGroupThenAlias`, also used by `depsSortRows`), never by arrival
+order.
 Search failures are a **one-liner** (`searchFailureLine`) — `renderAlterErrors`' per-cluster list is
 gone, and `stripClusterPrefix` removes the `connect to <alias>: ` that `pg.Connect` adds when a
 Cluster column already names it. `pg.cleanConnectError` dedupes pgx's interleaved TLS+plaintext

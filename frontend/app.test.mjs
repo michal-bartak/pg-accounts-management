@@ -975,3 +975,37 @@ test('stripClusterPrefix: the alias is not repeated in a table that has a Cluste
   assert.equal(r[2], 'operation 1/2 (remove_role): dependent objects'); // non-connect messages untouched
   assert.equal(r[3], 'connect to uat-2: x');                  // no alias → nothing to strip
 });
+
+test('statusRowOrder: the status table is ordered by configured group, then alias', () => {
+  const r = evalJSON(`(() => {
+    // Configured order is prod, then uat (deliberately NOT alphabetical by label).
+    state = { categories: [{ id: 'prod', label: 'Production' }, { id: 'uat', label: 'Alpha UAT' }] };
+    // Insertion order = the order results arrived in, which is what we are replacing.
+    const st = buildStatusState([
+      { clusterId: 'u2', alias: 'uat-9',  category: 'uat',     status: 'ok' },
+      { clusterId: 'p2', alias: 'prod-9', category: 'prod',    status: 'ok' },
+      { clusterId: 'x1', alias: 'orphan', category: 'deleted', status: 'error' },
+      { clusterId: 'u1', alias: 'uat-1',  category: 'uat',     status: 'ok' },
+      { clusterId: 'p1', alias: 'prod-1', category: 'prod',    status: 'ok' },
+    ]);
+    return { arrived: st.order, displayed: statusRowOrder(st) };
+  })()`);
+  assert.deepEqual(r.arrived, ['u2', 'p2', 'x1', 'u1', 'p1']); // as reported by the backend
+  // prod before uat (configured order), alias within each group, unknown group last.
+  assert.deepEqual(r.displayed, ['p1', 'p2', 'u1', 'u2', 'x1']);
+});
+
+test('byGroupThenAlias: configured group order wins over the label, alias breaks ties', () => {
+  const r = evalJSON(`(() => {
+    state = { categories: [{ id: 'zeta', label: 'Zeta' }, { id: 'alpha', label: 'Alpha' }] };
+    const sort = (rows) => rows.slice().sort(byGroupThenAlias).map((c) => c.alias);
+    return {
+      groups: sort([{ category: 'alpha', alias: 'a' }, { category: 'zeta', alias: 'b' }]),
+      aliases: sort([{ category: 'zeta', alias: 'b' }, { category: 'zeta', alias: 'a' }]),
+      unknownLast: sort([{ category: 'nope', alias: 'a' }, { category: 'zeta', alias: 'z' }]),
+    };
+  })()`);
+  assert.deepEqual(r.groups, ['b', 'a']);      // zeta is configured first, despite 'Alpha' < 'Zeta'
+  assert.deepEqual(r.aliases, ['a', 'b']);     // same group → alias
+  assert.deepEqual(r.unknownLast, ['z', 'a']); // a group no longer configured sorts last
+});

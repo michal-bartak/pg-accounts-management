@@ -167,8 +167,9 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   batch entirely; **Try anyway** sends the normal `remove_role`.
   **Popup layout — three ordered sections** (`depsTier`: 0 clean / 1 check failed / 2 has
   dependencies; empty ones omitted), each under a small-uppercase `.alter-privs-label` subheader,
-  ordered inside by **configured category order then alias** (`depsSortRows`, same category rule as
-  `describeScope` — not the alphabetical sort `renderClustersTable` uses): **No dependencies** = a
+  ordered inside by **configured category order then alias** (`depsSortRows` over the shared
+  `byGroupThenAlias`, same category rule as `describeScope` — not the alphabetical sort
+  `renderClustersTable` uses): **No dependencies** = a
   `.deps-chips` row of chips only; **Could not be checked** = a `Cluster | Error | Skip/Try` table;
   **Dependencies found** = per cluster a header line (chip + count + toggle) plus its own table.
   A cluster is identified by ONE group-coloured chip via the shared `scopeLabelsHtml` — there is no
@@ -543,7 +544,10 @@ The header is a `.brand` row (accent dot + smaller title + version chip + round 
   `renderRunStatus`, state in `runState`). The chip is **button-sized, neutral-colored, and
   glyph-free** (spinner only while running; the *word* OK/Error carries the result — no ✓/✕).
   Clicking it opens `#run-status-dialog` (columns Cluster/Category/Status/Duration/Message +
-  actions; **no Host column**), live while running. Each done row's actions cell has a
+  actions; **no Host column**), live while running. Rows are **ordered by configured group then
+  alias** — `statusRowOrder(rs)` sorts at render with the shared `byGroupThenAlias`, so the table is
+  stable regardless of the order clusters were queued in or results arrived in, for **every** use of
+  it (runs, role loads, search). Each done row's actions cell has a
   **magnifier** (`.rst-view`) that opens a separate, larger `#run-queries-dialog` listing that
   cluster's executed SQL (`ClusterResult.Queries`/`ClusterProgress.Queries` — the queries are
   NOT shown inline in the table) and a **copy button** (`.rst-copy`) that copies the cluster's
