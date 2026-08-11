@@ -474,7 +474,8 @@ type ClusterRoleDependencies struct {
 	Queries      []string         `json:"queries,omitempty"`
 }
 
-// RoleMatch is one role found on one cluster during a search.
+// RoleMatch is one role found on one cluster during a search. Per-cluster failures live on the
+// enclosing ClusterRoleMatches, not here.
 type RoleMatch struct {
 	ClusterID string `json:"clusterId"`
 	Alias     string `json:"alias"`
@@ -483,7 +484,21 @@ type RoleMatch struct {
 	LoginName string `json:"loginName"`
 	Comment   string `json:"comment"`
 	FullName  string `json:"fullName"`
-	Error     string `json:"error,omitempty"` // per-cluster connect/query error, if any
+}
+
+// ClusterRoleMatches is one cluster's search outcome — its matches, or why it could not be
+// scanned. It mirrors ClusterRoleDetail (same identity fields + DurationMs/Queries) so a search
+// reports through the same status chip, and unlike a flat match list it also represents a cluster
+// that was scanned successfully but matched nothing.
+type ClusterRoleMatches struct {
+	ClusterID  string      `json:"clusterId"`
+	Alias      string      `json:"alias"`
+	Host       string      `json:"host"`
+	Category   string      `json:"category"`
+	Matches    []RoleMatch `json:"matches"`
+	Error      string      `json:"error,omitempty"` // per-cluster connect/query error, if any
+	DurationMs int64       `json:"durationMs"`
+	Queries    []string    `json:"queries,omitempty"`
 }
 
 // ClusterRoleDetail is one login's state on one cluster (parents = direct memberships).

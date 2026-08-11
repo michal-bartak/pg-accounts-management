@@ -70,6 +70,7 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   `.tabs`, `.ops-footer`, and Settings/Clusters footers all align to the 1.25rem panel edge). Errors/validation render **inline** in a `.form-error` next to the control
   (`showInlineError`/`clearInlineError`) — `#ops-error` (Operations footer), `#settings-error`,
   `#clusters-error`, `#scope-error`, `#group-error`, `#cluster-test-error`, `#alter-search-errors`
+  (a **one-liner** only — see the search-status decision below)
   — plus a red button flash. Run/batch outcomes stay in the **run-status chip** (unchanged); rare
   clipboard failures log to the console.
 - **Preconfigured parent groups** (`Config.ParentRoles`, YAML `parent_roles`) are a
@@ -256,7 +257,11 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
    from `pg_roles.rolconfig` → `Settings` map), `ParseFullName` (JSON comment
    `full_name`), `likePattern` (escaped ILIKE). `batch.Runner.SearchRoles` /
    `LoadRoleDetails` / `LoadRoleDependencies` fan out over the **resolved selected clusters** (not
-   all) and collect per-cluster errors instead of failing. **These four queries are templatable**
+   all) and collect per-cluster errors instead of failing. All three return **one entry per
+   cluster** — `ClusterRoleMatches` / `ClusterRoleDetail` / `ClusterRoleDependencies`, each with
+   `Error`/`DurationMs`/`Queries` so the read reports through a status chip. For the search that
+   also means a cluster scanned successfully with **no** matches is still represented (a flat match
+   list could not distinguish it from a cluster that was never scanned). **These four queries are templatable**
    (`Config.DBReads`, YAML `db_reads.<search_roles|role_detail|role_parents|role_dependencies>.query`; vanilla
    catalog defaults + migrate/validate in [internal/config/dbreads.go](internal/config/dbreads.go)).
    The SQL is no longer hardcoded in `pg` — `batch.Runner` reads `cfg.DBReads` and passes each
@@ -302,7 +307,8 @@ Run/test: `TestConnection` (by saved cluster id), `TestConnectionInput` (ad-hoc
 `ClusterInput`+`Auth`, used by the cluster editor to test on-screen values),
 `PreviewTargets`, `RunRoleBatch(RoleBatchRequest)` (per-cluster transactional batch; the UI's
 create/update/remove path), `RunOperation(RunRequest)` (legacy single-op, kept but unused by the UI).
-Introspection (Alter role): `SearchRoles(RoleSearchRequest)`,
+Introspection (Alter role): `SearchRoles(RoleSearchRequest)` (→ `[]ClusterRoleMatches`, one per
+cluster),
 `LoadRoleDetails(RoleDetailsRequest)`, `LoadRoleDependencies(RoleDependenciesRequest)` (the
 pre-flight dependency check run before any `remove_role`).
 
@@ -469,6 +475,21 @@ The header is a `.brand` row (accent dot + smaller title + version chip + round 
   shared form. Search + detail load are **restricted to the selected clusters**
   (`alterTargets`/`alterScopeClusters` captured at search time). Clicking **Create role**
   resets the form to an empty synthetic baseline over the selected clusters.
+  **The search popup has its own status chip** (`#search-status`, bottom-left of its `<menu>`,
+  Close staying right): `SearchRoles` returns one `ClusterRoleMatches` per cluster, which
+  `buildStatusState` turns into `searchState` — a state **independent of `runState`**, because a
+  search only runs `SearchRoles` while the role-detail load happens later (`pickUser` →
+  `reloadDetails`) and owns the footer chip. Clicking it opens the shared `#run-status-dialog`:
+  `openRunStatusDialog(rs)` records `statusDialogState`, and `runStatusSummary(rs)` /
+  `renderRunStatusDialog(rs)` / the row magnifier+copy all read the state they were given, so the
+  two chips never bleed into each other. `searchState` is cleared by `openSearchDialog` (it belongs
+  to the search that produced it); `clearRunStatus` still owns `runState` only.
+  **Failures are a one-liner, never a list** — `searchFailureLine(failed, total)` in
+  `#alter-search-errors` ("2 of 5 clusters could not be searched — click Status for details."), with
+  the per-cluster detail in the status popup. `renderAlterErrors` (the last surviving copy of the
+  deleted `renderDetailErrors`) is gone, and with it the alias-printed-twice duplication;
+  `stripClusterPrefix` drops the `connect to <alias>: ` that `pg.Connect` adds when the message
+  renders in a table that already has a Cluster column.
 - **Privileges** (parent roles) and **Attributes** (superuser/createrole/createdb/
   inherit/login/replication/bypassrls) render one-per-row: name left, **scope labels**
   right. Completeness is judged **per group**: all selected clusters of a group matched

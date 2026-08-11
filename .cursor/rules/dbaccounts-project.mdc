@@ -205,6 +205,15 @@ right-aligned action buttons + op-tabs align to the 1.25rem panel edge. Errors/v
 inline in a `.form-error` (`showInlineError` →
 `#ops-error`/`#settings-error`/`#clusters-error`/`#scope-error`/`#group-error`/
 `#cluster-test-error`/`#alter-search-errors`) + a red button flash; run outcomes stay in the chip.
+The **Find-role popup** has its OWN status chip (`#search-status`, bottom-left of its `<menu>`) fed
+by `searchState` = `buildStatusState(SearchRoles rows)` — independent of `runState` (a search runs
+only `SearchRoles`; the detail load comes later via `pickUser`→`reloadDetails` and owns the footer
+chip). Clicking it opens the shared `#run-status-dialog` via `openRunStatusDialog(rs)`, which sets
+`statusDialogState`; `runStatusSummary(rs)`/`renderRunStatusDialog(rs)` take the state explicitly.
+Search failures are a **one-liner** (`searchFailureLine`) — `renderAlterErrors`' per-cluster list is
+gone, and `stripClusterPrefix` removes the `connect to <alias>: ` that `pg.Connect` adds when a
+Cluster column already names it. `pg.cleanConnectError` dedupes pgx's interleaved TLS+plaintext
+dial attempts ("A B A B" → "A B").
 `buildAlterClusterOps` orders grant→revoke→password→**set_attribute (all keywords
 combined)**→set_config→reset_config→set_comment; create prepends `create_role`
 (`buildCreateClusterOps`). Comment persists via `set_comment` (per-cluster `commentOverrides` wins,

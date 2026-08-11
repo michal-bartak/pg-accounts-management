@@ -99,6 +99,12 @@ func inlineRoleName(query, loginName string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(query, "${rolename}", lit), "$1", lit)
 }
 
+// SearchRoleQueries returns the SQL that SearchRoles executes for term, with the bind inlined as
+// the ILIKE pattern actually sent — for display in the search-status popup (not re-executed).
+func SearchRoleQueries(query, term string) []string {
+	return []string{inlineRoleName(query, likePattern(term))}
+}
+
 // RoleDetailQueries returns the SQL that RoleDetail executes for loginName, with the bind
 // inlined — for display in the load-status popup (not re-executed).
 func RoleDetailQueries(detailQuery, parentsQuery, loginName string) []string {

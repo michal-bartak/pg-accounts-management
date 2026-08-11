@@ -1100,12 +1100,12 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .alter-search { display: flex; gap: 0.5rem; align-items: center; }
 .alter-search input[type="search"] { flex: 1; }
 
+/* One counted line about failed clusters; the per-cluster detail lives in the status popup. */
 .alter-errors {
   margin: 0.5rem 0;
   font-size: var(--fs-sm);
   color: var(--danger);
 }
-.alter-error-row { margin-top: 0.2rem; }
 .alter-cluster-host { color: var(--muted); font-size: var(--fs-sm); }
 
 .alter-results { margin-top: 0.75rem; display: grid; gap: 0.4rem; }
@@ -1301,6 +1301,9 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .search-dialog-body h2,
 .comments-dialog-body h2 { margin: 0 0 0.75rem; }
 .search-dialog-body .alter-results { margin-top: 0.75rem; max-height: 50vh; overflow-y: auto; }
+/* Status chip on the left of the popup's button row, Close staying right (the same margin-right
+   trick as #fn-dialog-default / #btn-test-cluster). */
+#search-status { margin-right: auto; }
 .search-dialog-body menu,
 .comments-dialog-body menu,
 .about-dialog-body menu {

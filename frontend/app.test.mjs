@@ -889,3 +889,89 @@ test('reloadDeps: a thrown read lands every cluster under "could not be checked"
   assert.deepEqual(r.allowed, ['c1']);        // the earlier "Try anyway" still applies...
   assert.equal(r.busy, false);
 });
+
+// --- Find-role popup: one-liner failures + its own independent status chip --------------------
+test('searchFailureLine: one counted line, singular/plural aware', () => {
+  const r = evalJSON(`[searchFailureLine(1, 5), searchFailureLine(3, 3), searchFailureLine(1, 1)]`);
+  assert.equal(r[0], '1 of 5 clusters could not be searched — click Status for details.');
+  assert.equal(r[1], '3 of 3 clusters could not be searched — click Status for details.');
+  assert.equal(r[2], '1 of 1 cluster could not be searched — click Status for details.');
+});
+
+test('buildStatusState: per-cluster rows become a finished single-segment state, order preserved', () => {
+  const r = evalJSON(`(() => {
+    const st = buildStatusState([
+      { clusterId: 'c2', alias: 'uat-1', host: 'h2', category: 'uat', status: 'ok', durationMs: 12, queries: ['SELECT 1'] },
+      { clusterId: 'c1', alias: 'prod-1', host: 'h1', category: 'prod', status: 'error', message: 'refused' },
+    ]);
+    return {
+      total: st.total,
+      order: st.order,
+      rows: st.order.map((id) => {
+        const row = st.byId.get(id);
+        return { alias: row.alias, phase: row.phase, segs: row.segments.length,
+                 status: row.segments[0].status, msg: row.segments[0].message,
+                 ms: rowDurationMs(row), queries: rowQueries(row) };
+      }),
+      summary: runStatusSummary(st),
+    };
+  })()`);
+  assert.equal(r.total, 2);
+  assert.deepEqual(r.order, ['c2', 'c1']); // insertion order, not re-sorted
+  assert.deepEqual(r.rows[0], { alias: 'uat-1', phase: 'done', segs: 1, status: 'ok', msg: '', ms: 12, queries: ['SELECT 1'] });
+  assert.equal(r.rows[1].status, 'error');
+  assert.equal(r.rows[1].msg, 'refused');
+  assert.deepEqual(r.rows[1].queries, ['-- ERROR: refused']); // no SQL ran, the error shows instead
+  // Unnamed single phase → the legacy chip wording, counted not concatenated.
+  assert.deepEqual(r.summary, { stateClass: 'error', text: 'Status: Error (1/2 failed)' });
+});
+
+test('runStatusSummary: takes an explicit state, so the two chips stay independent', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    state.clusters = [{id:'c1',alias:'c1',category:'p'}];
+    // Footer state: a failed run.
+    runState = null;
+    beginRunStatus([{clusterId:'c1'}]);
+    finishRunStatus([{clusterId:'c1', status:'error', message:'nope'}]);
+    // Search state: all good. Neither must affect the other.
+    const search = buildStatusState([{ clusterId:'c1', alias:'c1', category:'p', status:'ok', durationMs:3 }]);
+    return { footer: runStatusSummary(runState), search: runStatusSummary(search), bare: runStatusSummary() };
+  })()`);
+  assert.equal(r.footer.text, 'Status: Error (1/1 failed)');
+  assert.equal(r.search.text, 'Status: OK (1 cluster)');
+  assert.equal(r.bare.text, r.footer.text); // the default argument still means runState
+});
+
+test('groupMatches: works on the flattened per-cluster matches (no error rows to skip any more)', () => {
+  const r = evalJSON(`(() => {
+    const scanned = [
+      { clusterId:'c1', alias:'prod-1', category:'prod', matches:[
+        { clusterId:'c1', loginName:'bob', fullName:'', comment:'' },
+        { clusterId:'c1', loginName:'alice', fullName:'Alice A', comment:'' }] },
+      { clusterId:'c2', alias:'uat-1', category:'uat', matches:[] },           // scanned, no match
+      { clusterId:'c3', alias:'uat-2', category:'uat', matches:[], error:'refused' }, // never scanned
+      { clusterId:'c4', alias:'uat-3', category:'uat', matches:[
+        { clusterId:'c4', loginName:'bob', fullName:'Bob B', comment:'' }] },
+    ];
+    const groups = groupMatches(scanned.flatMap((c) => c.matches || []));
+    return groups.map((g) => ({ login: g.loginName, full: g.fullName, clusters: g.clusters.map((m) => m.clusterId) }));
+  })()`);
+  assert.deepEqual(r, [
+    { login: 'alice', full: 'Alice A', clusters: ['c1'] },
+    { login: 'bob', full: 'Bob B', clusters: ['c1', 'c4'] }, // fullName = first non-empty in group
+  ]);
+});
+
+test('stripClusterPrefix: the alias is not repeated in a table that has a Cluster column', () => {
+  const r = evalJSON(`[
+    stripClusterPrefix('connect to uat-2: failed to connect to \`db=x\`: refused', 'uat-2'),
+    stripClusterPrefix('connect to other: failed', 'uat-2'),
+    stripClusterPrefix('operation 1/2 (remove_role): dependent objects', 'uat-2'),
+    stripClusterPrefix('connect to uat-2: x', ''),
+  ]`);
+  assert.equal(r[0], 'failed to connect to `db=x`: refused'); // own alias stripped
+  assert.equal(r[1], 'connect to other: failed');             // a different alias is left alone
+  assert.equal(r[2], 'operation 1/2 (remove_role): dependent objects'); // non-connect messages untouched
+  assert.equal(r[3], 'connect to uat-2: x');                  // no alias → nothing to strip
+});

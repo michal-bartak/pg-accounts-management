@@ -206,9 +206,8 @@ func (a *App) RunRoleBatch(req model.RoleBatchRequest) ([]model.ClusterResult, e
 }
 
 // SearchRoles scans the selected clusters/categories for roles matching the term
-// (role name or comment). Per-cluster failures are returned as RoleMatch entries
-// with Error set.
-func (a *App) SearchRoles(req model.RoleSearchRequest) ([]model.RoleMatch, error) {
+// (role name or comment). One entry per cluster; a per-cluster failure carries Error.
+func (a *App) SearchRoles(req model.RoleSearchRequest) ([]model.ClusterRoleMatches, error) {
 	if len(strings.TrimSpace(req.Term)) < 2 {
 		return nil, fmt.Errorf("enter at least 2 characters to search")
 	}

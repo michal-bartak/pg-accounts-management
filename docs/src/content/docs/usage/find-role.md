@@ -32,6 +32,17 @@ Altering starts with a search, so you never act on a mistyped name.
   showing where each one exists.
 - An unreachable cluster is reported but doesn't stop the search.
 
+## When a cluster can't be searched
+
+Failures are summarised in **one line** ("2 of 5 clusters could not be searched"), never a wall of
+repeated messages. The per-cluster detail lives behind the **Status** at the bottom of the popup:
+click it for the same panel used for runs — every cluster with its status, how long it took, the
+error, and the exact query that ran. Clusters that were searched fine but matched nothing show up
+there too, so you can tell "nothing matched" from "never reached".
+
+This status covers the **search** only. Once you pick a role, loading its details gets its own
+status in the main window's bottom bar.
+
 ## Picking a role
 
 Picking a result loads **one form** for the role's whole identity across those clusters — not
