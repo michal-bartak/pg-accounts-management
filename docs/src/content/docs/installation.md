@@ -3,39 +3,73 @@ title: Installation
 description: Download a pre-built release or install and run from source
 ---
 
-## Download a release
+## Download an installer
 
-Pre-built binaries are on the
-[GitHub Releases page](https://github.com/michal-bartak/pg-accounts-management/releases).
-CI builds are **not** signed with an Apple or Microsoft developer certificate, so the first
+Each release on the
+[GitHub Releases page](https://github.com/michal-bartak/pg-accounts-management/releases)
+ships a native installer per platform:
+
+| Platform | File |
+|----------|------|
+| macOS (Intel + Apple silicon) | `DbAccounts-v{VERSION}-macos-universal.dmg` |
+| Windows 10/11 (x64) | `DbAccounts-v{VERSION}-windows-amd64.msi` |
+| Debian, Ubuntu (x64) | `DbAccounts-v{VERSION}-linux-amd64.deb` |
+| Fedora, RHEL, openSUSE (x64) | `DbAccounts-v{VERSION}-linux-amd64.rpm` |
+
+`{VERSION}` here and in the commands below stands for the release you downloaded, e.g. `1.0.0`.
+
+Builds are **not** signed with an Apple or Microsoft developer certificate, so the first
 launch may show a security warning.
 
 ### macOS
 
-1. Extract `DbAccounts.app` from the `.tar.gz`.
-2. **Right-click** the app → **Open** → confirm **Open** (a plain double-click is blocked the
-   first time).
-
-Alternatively, allow it from **System Settings → Privacy & Security → Open Anyway**, or clear
-the quarantine flag in Terminal:
+Open the `.dmg` and drag **DbAccounts** to the Applications folder, then eject the disk
+image. Gatekeeper blocks the first launch of an unsigned app; clear the quarantine flag
+once:
 
 ```bash
-xattr -dr com.apple.quarantine /path/to/DbAccounts.app
-open /path/to/DbAccounts.app
+xattr -dr com.apple.quarantine /Applications/DbAccounts.app
+open -a DbAccounts
 ```
+
+Downloading with `curl -LJO <url>` rather than a browser avoids the quarantine flag
+altogether. **Right-click → Open**, or **System Settings → Privacy & Security → Open
+Anyway** after a blocked launch, works too.
+
+To uninstall, move `/Applications/DbAccounts.app` to the Trash.
 
 ### Windows
 
-If SmartScreen blocks the `.exe`, click **More info → Run anyway**.
+Run the `.msi`. It installs to `C:\Program Files\DbAccounts`, adds a Start-menu entry, and
+registers an uninstaller under **Settings → Apps**. Installing a newer version upgrades in
+place, keeping the install location.
+
+SmartScreen may warn about the unsigned installer: click **More info → Run anyway**.
+
+Silent install (per machine, needs an elevated prompt):
+
+```bat
+msiexec /i DbAccounts-v{VERSION}-windows-amd64.msi /qn
+```
 
 ### Linux
 
-Extract the tarball and run `./DbAccounts`. If it fails to start, install the WebView
-libraries:
+The packages install `/usr/bin/DbAccounts` plus a desktop entry and icon, and pull in the
+GTK and WebKit runtime libraries.
 
 ```bash
-sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0
+# Debian / Ubuntu
+sudo apt install ./DbAccounts-v{VERSION}-linux-amd64.deb
+
+# Fedora / RHEL
+sudo dnf install ./DbAccounts-v{VERSION}-linux-amd64.rpm
 ```
+
+To remove: `sudo apt remove dbaccounts` or `sudo dnf remove dbaccounts`.
+
+If the app fails to start, the WebView libraries are missing or the wrong version —
+DbAccounts links against webkit2gtk **4.1** (`libwebkit2gtk-4.1-0` on Debian/Ubuntu,
+`webkit2gtk4.1` on Fedora/RHEL).
 
 ## Configuration file
 

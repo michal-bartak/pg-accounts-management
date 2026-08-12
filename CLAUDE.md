@@ -12,7 +12,8 @@ Cross-platform desktop app (**Wails v2** + embedded WebView, vanilla HTML/CSS/JS
 frontend, **pgx/v5** backend) for maintaining **PostgreSQL roles across many
 clusters**. Real DDL/privilege changes are performed by **user-defined SQL call
 templates** run against each cluster — the app does not hardcode DDL. Module:
-`github.com/michalbartak/dbaccounts`. Current version: see [VERSION](VERSION) (`0.3.0`).
+`github.com/michalbartak/dbaccounts`. Current version: read [VERSION](VERSION) — don't copy it
+into prose, it goes stale.
 
 ## Product decisions (don't regress)
 
@@ -578,6 +579,9 @@ internal/commands/        Op validation + arg maps + attribute keyword whitelist
 internal/update/          GitHub-Releases version check (stdlib http + semver compare)
 internal/version/         App version + git-remote-derived RepoURL/DocsURL (ldflags)
 frontend/                 Vanilla JS UI (app.js via backend())
+build/scripts/            Installer recipes: make-dmg.sh, make-msi.ps1, make-linux-packages.sh
+build/windows/installer/  WiX v3 source (product.wxs, License.rtf) — hand-written, committed
+build/linux/              dbaccounts.desktop (installed by the deb/rpm)
 sql/README.md             Docs for the user's PostgreSQL functions / templates
 ```
 
@@ -602,7 +606,7 @@ test → config cycle). Test SQL via `calltemplate` alone or with `commands`.
 export PATH="/opt/homebrew/bin:$HOME/go/bin:$PATH"
 go build ./... && go test ./... -count=1   # or: make test-vet
 wails dev            # dev window (regenerates frontend/wailsjs/)
-make package         # build/bin/DbAccounts.app + dist/*.tar.gz
+make package         # build/bin/DbAccounts.app + the host OS installer in dist/
 ```
 
 - Run `go test ./... -count=1`, `node --check frontend/app.js`, and `node --test frontend/app.test.mjs`
@@ -628,8 +632,51 @@ make package         # build/bin/DbAccounts.app + dist/*.tar.gz
 runtime version: `main.go` embeds it (`//go:embed VERSION`) and sets `version.Version` at startup,
 so `go run` / `wails dev` / `make` all reflect it without ldflags (the `internal/version.Version`
 literal is only an empty-embed fallback). `-ldflags` inject only `Commit`/`BuildDate`/`Repo`.
-`make sync-wails-version` aligns `wails.json` `productVersion` (packaging metadata);
 `GetAppVersion()` surfaces the version. Config YAML `version:` is the **schema** version only.
+
+**`wails.json` `info.productVersion` is a generated mirror of VERSION — never hand-edit it**, and
+don't restate a version number in prose or docs either (use a `{VERSION}` placeholder, as
+[docs installation](docs/src/content/docs/installation.md) does). `make sync-wails-version` owns
+that field and `build`/`build-ci` depend on it, so `make package` and the release workflow always
+package matching bundle metadata (macOS `CFBundleVersion`/`CFBundleShortVersionString`, the Windows
+exe version resource — installer names and the MSI `ProductVersion` read VERSION directly). The copy
+exists only because Wails v2 hardcodes its config path to `<cwd>/wails.json` and offers **no** CLI
+flag or env var for the version; dropping the key makes Wails default to a hardcoded `1.0.0`, and a
+`preBuildHook` can't help (the project config is parsed before hooks run). The sync **writes only on
+a real change** (printing `… (updated - commit this)`), so builds don't churn the tracked file —
+which is how a stale `productVersion` once rode along in an unrelated commit. A build that bypasses
+`make` (bare `wails dev`/`wails build`) uses whatever is committed; that only affects dev bundle
+metadata, never a release.
+
+## Packaging (installers, not archives)
+
+Releases ship **native installers only** — `.dmg` (macOS), `.msi` (Windows), `.deb` + `.rpm`
+(Linux). `make package` builds the host OS's installer into `dist/` by running one script per
+platform from [build/scripts/](build/scripts/), and
+[.github/workflows/release.yml](.github/workflows/release.yml) runs the **same** scripts via
+`make package-ci`, so a local package matches a released one — fix packaging bugs in the script,
+never in the YAML. Artifact names are `DbAccounts-v<VERSION>-<macos|windows|linux>-<arch>.<ext>`;
+`PLATFORM=darwin/universal` (passed to `wails build`, last element = the arch label) builds the
+universal macOS bundle CI releases. `internal/update` only reads a release's `tag_name`, so
+renaming artifacts never breaks the update check.
+
+- **MSI** ([build/windows/installer/product.wxs](build/windows/installer/product.wxs), WiX v3
+  compiled by `make-msi.ps1`): per-machine into `C:\Program Files\DbAccounts`, Start-menu
+  shortcut, `MajorUpgrade` in-place upgrades, install path remembered under
+  `HKLM\Software\MichalBartak\DbAccounts`. The **`UpgradeCode` GUID must never change** or
+  upgrades turn into parallel installs. UI banner/dialog bitmaps are generated from
+  `build/appicon.png` at package time; `build/windows/icon.ico` is committed (the rest of
+  `build/windows/` is Wails-generated and gitignored — note the negation block in
+  [.gitignore](.gitignore) that keeps the WiX sources and the icon tracked).
+- **DMG** (`make-dmg.sh`): rebuilds the bundle icon as a full multi-size `.icns`, ad-hoc
+  re-signs, then stages the app + an `/Applications` symlink + a background image. Both the
+  background (needs Pillow) and the Finder-scripted window layout degrade to a warning rather
+  than failing the build.
+- **deb/rpm** (`make-linux-packages.sh`, fpm): package `dbaccounts` installs
+  `/usr/bin/DbAccounts`, [build/linux/dbaccounts.desktop](build/linux/dbaccounts.desktop) and an
+  icon. Runtime deps name the WebKit the binary is linked against
+  (`libwebkit2gtk-4.1-0` / `webkit2gtk4.1`) — keep them in step with the Makefile's
+  `webkit2_41` build tag.
 
 ## Out of scope (v1)
 

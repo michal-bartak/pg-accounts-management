@@ -57,6 +57,9 @@ jobs:
       - run: go test ./... -count=1
       - run: go vet ./...
 
+  # Each job builds the app and then its platform's native installer, via the same
+  # build/scripts/* the local `make package` uses:
+  #   Linux → .deb + .rpm (fpm)   Windows → .msi (WiX)   macOS → .dmg (hdiutil)
   build:
     needs:
       - prepare
@@ -67,13 +70,16 @@ jobs:
         include:
           - os: ubuntu-latest
             goos: linux
-            goarch: amd64
+            arch: amd64
+            platform: ""
           - os: windows-latest
             goos: windows
-            goarch: amd64
+            arch: amd64
+            platform: ""
           - os: macos-latest
             goos: darwin
-            goarch: arm64
+            arch: universal
+            platform: darwin/universal
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -82,30 +88,36 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+
+      # WebKit 4.1 dev headers (Ubuntu 24.04+); the Makefile detects them and adds -tags webkit2_41
       - name: Install Linux WebView dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
-      - name: Install Make (Windows)
+
+      - name: Install Linux packaging tools (fpm, rpm)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y --no-install-recommends rpm ruby-dev
+          sudo gem install --no-document fpm
+
+      - name: Install Windows packaging tools (WiX, make)
         if: runner.os == 'Windows'
-        run: choco install make -y
+        run: choco install wixtoolset make --no-progress -y
+
+      # Optional: only used to draw the DMG background; the script skips it when absent.
+      - name: Install macOS packaging tools (Pillow)
+        if: runner.os == 'macOS'
+        run: pip3 install --quiet --break-system-packages Pillow || true
+
       - name: Build and package
         shell: bash
-        run: make package-ci
-      - name: Zip Windows executable
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $version = (Get-Content VERSION -Raw).Trim()
-          $exe = "dist/DbAccounts-v${version}-windows-amd64.exe"
-          $zip = "dist/DbAccounts-v${version}-windows-amd64.zip"
-          if (-not (Test-Path $exe)) { throw "Missing $exe" }
-          Compress-Archive -Path $exe -DestinationPath $zip -Force
-          Remove-Item $exe
+        run: make package-ci PLATFORM=${{ matrix.platform }}
+
       - uses: actions/upload-artifact@v4
         with:
-          name: dist-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: dist-${{ matrix.goos }}-${{ matrix.arch }}
           path: dist/*
           if-no-files-found: error
 
@@ -128,7 +140,14 @@ jobs:
           body: |
             ### Installing
 
-            - **macOS:** First launch requires **Right-click → Open** (unsigned build). See [README](https://github.com/michal-bartak/pg-accounts-management#installing-releases).
-            - **Windows:** SmartScreen may warn; choose **More info → Run anyway**.
-            - **Linux:** Install runtime libs `libgtk-3-0` and `libwebkit2gtk-4.1-0` if needed.
+            - **macOS** — open `DbAccounts-${{ needs.prepare.outputs.tag }}-macos-universal.dmg` and drag **DbAccounts** to Applications. The build is unsigned, so Gatekeeper blocks the first launch; clear the quarantine flag once:
+              ```
+              xattr -dr com.apple.quarantine /Applications/DbAccounts.app
+              ```
+              Downloading with `curl -LJO <url>` instead of a browser avoids the flag entirely.
+            - **Windows** — run `DbAccounts-${{ needs.prepare.outputs.tag }}-windows-amd64.msi`. SmartScreen may warn about the unsigned installer: **More info → Run anyway**.
+            - **Linux (Debian/Ubuntu)** — `sudo apt install ./DbAccounts-${{ needs.prepare.outputs.tag }}-linux-amd64.deb`
+            - **Linux (Fedora/RHEL)** — `sudo dnf install ./DbAccounts-${{ needs.prepare.outputs.tag }}-linux-amd64.rpm`
+
+            See the [installation guide](https://michal-bartak.github.io/pg-accounts-management/installation/) for upgrade and uninstall notes.
           files: dist/*

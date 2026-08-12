@@ -1,5 +1,6 @@
 .PHONY: version sync-wails-version ensure-wails test test-frontend test-vet build build-ci package package-ci clean dist docs-install docs-dev docs-build docs-preview docs-clean docs-lint docs-shots docs-shots-status
 
+APP := DbAccounts
 VERSION := $(shell tr -d ' \n\r' < VERSION)
 VERSION_PKG := github.com/michalbartak/dbaccounts/internal/version
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -9,6 +10,16 @@ BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 GIT_REMOTE := $(shell git config --get remote.origin.url 2>/dev/null)
 GOOS := $(shell go env GOOS)
 GOARCH := $(shell go env GOARCH)
+
+# Cross/universal builds: make package PLATFORM=darwin/universal (empty = host platform).
+# The trailing element of PLATFORM also names the artifact (…-macos-universal.dmg).
+PLATFORM ?=
+ifneq ($(strip $(PLATFORM)),)
+WAILS_PLATFORM_FLAG := -platform $(PLATFORM)
+ARCH_LABEL := $(lastword $(subst /, ,$(PLATFORM)))
+else
+ARCH_LABEL := $(GOARCH)
+endif
 GOPATH_DIR := $(subst \,/,$(shell go env GOPATH))
 ifeq ($(GOOS),windows)
 WAILS := $(GOPATH_DIR)/bin/wails.exe
@@ -32,30 +43,50 @@ ifneq ($(strip $(GIT_REMOTE)),)
 LDFLAGS += -X $(VERSION_PKG).Repo=$(GIT_REMOTE)
 endif
 
+# Native installer for the host OS: .dmg (macOS), .msi (Windows), .deb + .rpm (Linux).
+# One script per platform under build/scripts/, shared with the release workflow so a local
+# package and a CI package are built the same way. Prerequisites: WiX Toolset (Windows),
+# fpm + rpm (Linux); macOS needs only the system tools.
 define package_dist
 	@mkdir -p dist
-	@if [ -d build/bin/DbAccounts.app ]; then \
-		tar -czf dist/DbAccounts-v$(VERSION)-$(GOOS)-$(GOARCH).tar.gz -C build/bin DbAccounts.app; \
-		echo "dist/DbAccounts-v$(VERSION)-$(GOOS)-$(GOARCH).tar.gz"; \
-	elif [ -f build/bin/DbAccounts.exe ]; then \
-		cp build/bin/DbAccounts.exe dist/DbAccounts-v$(VERSION)-$(GOOS)-$(GOARCH).exe; \
-		echo "dist/DbAccounts-v$(VERSION)-$(GOOS)-$(GOARCH).exe"; \
-	elif [ -f build/bin/DbAccounts ]; then \
-		tar -czf dist/DbAccounts-v$(VERSION)-$(GOOS)-$(GOARCH).tar.gz -C build/bin DbAccounts; \
-		echo "dist/DbAccounts-v$(VERSION)-$(GOOS)-$(GOARCH).tar.gz"; \
-	else \
-		echo "No build artifact in build/bin/"; exit 1; \
-	fi
+	@case "$(GOOS)" in \
+	  darwin) OUTPUT=$(APP) VERSION=$(VERSION) ARCH_LABEL=$(ARCH_LABEL) build/scripts/make-dmg.sh ;; \
+	  linux) OUTPUT=$(APP) VERSION=$(VERSION) ARCH_LABEL=$(ARCH_LABEL) build/scripts/make-linux-packages.sh ;; \
+	  windows) powershell -ExecutionPolicy Bypass -File build/scripts/make-msi.ps1 \
+	             -Output $(APP) -Version $(VERSION) -ArchLabel $(ARCH_LABEL) ;; \
+	  *) echo "No installer recipe for GOOS=$(GOOS)"; exit 1 ;; \
+	esac
 endef
 
 # Print application version (matches VERSION file / git tag v$(VERSION)).
 version:
 	@echo $(VERSION)
 
-# Align wails.json productVersion with VERSION (run before release build).
+# wails.json info.productVersion is a GENERATED mirror of VERSION — never hand-edit it. It exists
+# only because Wails v2 hardcodes its config path and offers no flag/env to supply the version (and
+# dropping the key makes Wails default to a hardcoded 1.0.0). It feeds the macOS Info.plist
+# CFBundleVersion/CFBundleShortVersionString and the Windows exe version resource; installer names
+# and the MSI ProductVersion read the VERSION file directly. build/build-ci depend on this target,
+# so every release package is in sync. Writes only on a real change, so builds don't churn a tracked
+# file — when it does write, commit the one-line change.
+define SYNC_WAILS_VERSION_PY
+import json, pathlib
+want = pathlib.Path('VERSION').read_text().strip()
+path = pathlib.Path('wails.json')
+cfg = json.loads(path.read_text())
+have = cfg.get('info', {}).get('productVersion')
+if have == want:
+    print('wails.json productVersion already ' + want)
+else:
+    cfg.setdefault('info', {})['productVersion'] = want
+    # write_bytes: text mode would rewrite every line as CRLF on Windows (no .gitattributes here).
+    path.write_bytes((json.dumps(cfg, indent=2, ensure_ascii=False) + '\n').encode())
+    print('wails.json productVersion %s -> %s (updated - commit this)' % (have, want))
+endef
+export SYNC_WAILS_VERSION_PY
+
 sync-wails-version:
-	@python3 -c "import json, pathlib; v=pathlib.Path('VERSION').read_text().strip(); p=pathlib.Path('wails.json'); w=json.loads(p.read_text()); w.setdefault('info', {})['productVersion']=v; p.write_text(json.dumps(w, indent=2)+'\n')"
-	@echo "wails.json productVersion -> $(VERSION)"
+	@python3 -c "$$SYNC_WAILS_VERSION_PY"
 
 ensure-wails:
 	@if [ ! -f "$(WAILS)" ]; then go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0; fi
@@ -76,15 +107,15 @@ test-vet: test test-frontend
 
 # Production app bundle (macOS: build/bin/DbAccounts.app). Requires Wails CLI.
 build: sync-wails-version test-vet ensure-wails
-	"$(WAILS)" build $(WAILS_BUILD_FLAGS) -ldflags "$(LDFLAGS)"
+	"$(WAILS)" build $(WAILS_BUILD_FLAGS) $(WAILS_PLATFORM_FLAG) -ldflags "$(LDFLAGS)"
 	@echo "Built DbAccounts $(VERSION) ($(GIT_COMMIT)) -> build/bin/"
 
 # CI build (no tests; test job gates release pipeline).
 build-ci: sync-wails-version ensure-wails
-	"$(WAILS)" build $(WAILS_BUILD_FLAGS) -ldflags "$(LDFLAGS)"
+	"$(WAILS)" build $(WAILS_BUILD_FLAGS) $(WAILS_PLATFORM_FLAG) -ldflags "$(LDFLAGS)"
 	@echo "Built DbAccounts $(VERSION) ($(GIT_COMMIT)) -> build/bin/"
 
-# Archive for distribution under dist/ (adjust platform when cross-compiling).
+# Installer for distribution under dist/ (see package_dist above for prerequisites).
 package: build
 	$(package_dist)
 
@@ -94,7 +125,7 @@ package-ci: build-ci
 dist: package
 
 clean:
-	rm -rf build/bin dist/*.tar.gz dist/*.exe dist/*.zip
+	rm -rf build/bin dist
 
 # ---- Docs (Astro + Starlight): read them offline, or let CI publish to GitHub Pages ----
 DOCS_DIR := docs

@@ -237,8 +237,21 @@ re-renders only when that reload is itself clean (never clobbers on transient un
 ## Versioning & packaging
 
 - App semver: [`VERSION`](VERSION) — git tags `v$(cat VERSION)` (see [`RELEASING.md`](RELEASING.md)).
-- `make sync-wails-version` updates `wails.json` `productVersion`.
-- `make package` — `wails build` with `-ldflags` (version/commit/date) + `dist/` archive.
+  The **only** place a version is maintained by hand: `main.go` embeds it (no ldflags needed), the
+  installer scripts read it for artifact names + the MSI `ProductVersion`. Don't restate a version
+  number in prose/docs — use a `{VERSION}` placeholder.
+- `wails.json` `info.productVersion` is a **generated mirror** — never hand-edit it.
+  `make sync-wails-version` owns it (writes only on a real change, printing
+  `… (updated - commit this)`), and `build`/`build-ci` depend on it, so every release package has
+  matching bundle metadata. It exists only because Wails v2 hardcodes its config path and has no
+  flag/env for the version; dropping the key defaults it to a hardcoded `1.0.0`.
+- `make package` — `wails build` with `-ldflags` (version/commit/date) + the host OS's **native
+  installer** in `dist/`: `.dmg` (macOS), `.msi` (Windows, WiX v3 from
+  `build/windows/installer/product.wxs`), `.deb` + `.rpm` (Linux, fpm). No archives.
+- One script per platform in `build/scripts/`; `.github/workflows/release.yml` runs the same
+  scripts through `make package-ci`, so fix packaging in the script, not the YAML.
+  `PLATFORM=darwin/universal` builds the universal macOS bundle. Never change the MSI
+  `UpgradeCode` GUID.
 - UI: `GetAppVersion()`; config YAML `version:` is **schema** version only.
 
 ## Build & run (macOS)
@@ -248,7 +261,7 @@ export PATH="/opt/homebrew/bin:$HOME/go/bin:$PATH"
 cd /Users/michalbartak/GitRepo/pg-accounts-management
 go mod tidy
 wails dev          # dev window + http://localhost:34115
-make package       # → build/bin/DbAccounts.app + dist/*.tar.gz
+make package       # → build/bin/DbAccounts.app + dist/DbAccounts-v*-macos-*.dmg
 ```
 
 Go was installed via `brew install go` on this machine. Self-signed dev build warning on darwin is expected.

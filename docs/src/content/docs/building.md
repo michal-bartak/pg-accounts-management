@@ -21,12 +21,26 @@ go mod tidy
 wails dev
 ```
 
-## Build a release bundle
+## Build a release installer
+
+`make package` builds the app and then the native installer for the machine you are on,
+under `dist/`:
+
+| Host | Artifact | Extra tooling |
+|------|----------|---------------|
+| macOS | `DbAccounts-v*-macos-<arch>.dmg` | none (`hdiutil`; Pillow only to draw the DMG background) |
+| Windows | `DbAccounts-v*-windows-amd64.msi` | [WiX Toolset](https://wixtoolset.org/) v3 — `choco install wixtoolset` |
+| Linux | `DbAccounts-v*-linux-amd64.deb` and `.rpm` | `sudo apt install rpm ruby-dev && sudo gem install fpm` |
 
 ```bash
 go install github.com/wailsapp/wails/v2/cmd/wails@latest
-make package    # release build + dist/DbAccounts-v*.tar.gz
+make package                            # host platform
+make package PLATFORM=darwin/universal  # Intel + Apple silicon in one bundle
 ```
+
+The per-platform recipes live in `build/scripts/` (`make-dmg.sh`,
+`make-msi.ps1`, `make-linux-packages.sh`) and are the same scripts the release workflow
+runs, so a local package matches a released one.
 
 Other useful targets:
 

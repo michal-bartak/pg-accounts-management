@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=DbAccounts
+GenericName=PostgreSQL role manager
+Comment=Maintain PostgreSQL roles across many clusters
+Exec=/usr/bin/DbAccounts
+Icon=dbaccounts
+Categories=Development;Database;
+Keywords=postgres;postgresql;database;roles;
+StartupWMClass=DbAccounts
+Terminal=false
