@@ -634,6 +634,19 @@ so `go run` / `wails dev` / `make` all reflect it without ldflags (the `internal
 literal is only an empty-embed fallback). `-ldflags` inject only `Commit`/`BuildDate`/`Repo`.
 `GetAppVersion()` surfaces the version. Config YAML `version:` is the **schema** version only.
 
+**[CHANGELOG.md](CHANGELOG.md) is the user-facing history** ([Keep a
+Changelog](https://keepachangelog.com/en/1.1.0/) format). Record user-visible changes under
+`## [Unreleased]` **as part of the change itself** — **one terse line each** (bold feature name,
+then what it does; no narration, no multi-sentence entries), written for someone who uses the app,
+not for someone reading the diff (internal refactors, test-only and docs-only work don't belong
+there). At release time `[Unreleased]` is renamed to `## [X.Y.Z] - YYYY-MM-DD` and a
+fresh empty `[Unreleased]` opened above it; **the heading must match `VERSION`**, because the
+release job extracts that section with awk (everything up to the next `## [` heading) into the
+GitHub release description — above the install instructions and GitHub's auto-generated,
+commit-level "What's Changed" list — followed by a link to the full `CHANGELOG.md` at the released
+tag. A missing section only logs a `::warning::` and yields an empty summary. See
+[RELEASING.md](RELEASING.md).
+
 **`wails.json` `info.productVersion` is a generated mirror of VERSION — never hand-edit it**, and
 don't restate a version number in prose or docs either (use a `{VERSION}` placeholder, as
 [docs installation](docs/src/content/docs/installation.md) does). `make sync-wails-version` owns

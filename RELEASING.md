@@ -9,6 +9,7 @@
 | [`VERSION`](VERSION) | Application semver (e.g. `0.1.0`) — git tags, installer names, bundle metadata, UI |
 | [`wails.json`](wails.json) `info.productVersion` | **Generated mirror** of `VERSION` — `make sync-wails-version` owns it, never hand-edit |
 | [`config.yaml`](config.example.yaml) `version:` | **Config schema** version (not app version) |
+| [`CHANGELOG.md`](CHANGELOG.md) | User-facing release notes — the section heading must match `VERSION` |
 
 Everything else derives from `VERSION` at build time: the app embeds it (`//go:embed VERSION` in
 [`main.go`](main.go)), the installer scripts read it for artifact names and the MSI `ProductVersion`,
@@ -17,15 +18,31 @@ always package a bundle whose metadata matches. The `wails.json` copy exists onl
 hardcodes its config path and has no flag or env var for the version — deleting the key would make
 Wails fall back to a hardcoded `1.0.0`.
 
+## Changelog
+
+[`CHANGELOG.md`](CHANGELOG.md) is the human-readable history
+([Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format). Add user-facing changes to
+`## [Unreleased]` **as you work**, not at release time. **One terse line per change** — bold
+feature name, then what it does, no narration. Written for someone who uses the app, not for
+someone reading the diff.
+
+When cutting a release, rename that heading to `## [X.Y.Z] - YYYY-MM-DD` and start a fresh empty
+`## [Unreleased]` above it. **The heading must match `VERSION` exactly** — the release workflow
+finds the section by `## [<VERSION>]` and puts its body at the top of the release description. A
+mismatch is not fatal: the workflow logs `::warning::No CHANGELOG.md section found for version …`
+and publishes the release with an empty summary.
+
 ## Bump version
 
 1. Edit `VERSION` (semver: `MAJOR.MINOR.PATCH`).
-2. Run `make sync-wails-version` — prints `productVersion <old> -> <new> (updated - commit this)`.
-3. Commit both files: `git commit -am "chore: release v0.1.0"` (example).
-4. Tag: `git tag -a v0.1.0 -m "DbAccounts 0.1.0"`.
-5. Push branch and tags to GitLab and/or GitHub remotes.
+2. Move `CHANGELOG.md`'s `## [Unreleased]` section to `## [X.Y.Z] - YYYY-MM-DD` and open a new
+   empty `## [Unreleased]`.
+3. Run `make sync-wails-version` — prints `productVersion <old> -> <new> (updated - commit this)`.
+4. Commit all three files: `git commit -am "chore: release v0.1.0"` (example).
+5. Tag: `git tag -a v0.1.0 -m "DbAccounts 0.1.0"`.
+6. Push branch and tags to GitLab and/or GitHub remotes.
 
-Step 2 is a convenience — any `make build`/`make package` runs it too, and it rewrites `wails.json`
+Step 3 is a convenience — any `make build`/`make package` runs it too, and it rewrites `wails.json`
 only when the value actually differs, so builds never churn the file.
 
 Tag names must match `VERSION` with a `v` prefix: `v` + contents of `VERSION`.
@@ -42,9 +59,9 @@ Published from [pg-accounts-management](https://github.com/michal-bartak/pg-acco
 
 ### Release steps
 
-1. Bump version and sync:
+1. Bump version, close the changelog section, and sync:
    ```bash
-   # edit VERSION, then:
+   # edit VERSION and CHANGELOG.md (Unreleased -> [0.2.0] - YYYY-MM-DD), then:
    make sync-wails-version
    git commit -am "chore: release v0.2.0"
    git push github main
@@ -57,6 +74,19 @@ Published from [pg-accounts-management](https://github.com/michal-bartak/pg-acco
 3. GitHub → **Actions** → **release** → **Run workflow**.
 4. Enter the tag (`v0.1.0` or `0.1.0` — the workflow adds `v` if omitted). Optionally check **draft**.
 5. When the workflow completes, download assets from **Releases**.
+
+### Release description
+
+The workflow assembles it from four parts, in order:
+
+1. **What's new** — the `CHANGELOG.md` section matching `VERSION`, extracted by the
+   *Extract changelog section* step.
+2. A link to the **full changelog** (`CHANGELOG.md` on `main` — not the tag, so it resolves for
+   tags cut before the file existed and always shows the complete history), so a user who wants
+   every version gets the readable file rather than the commit list.
+3. The **install instructions** per platform.
+4. GitHub's auto-generated **What's Changed** — the raw commit/PR list
+   (`generate_release_notes: true`). Accurate but noisy; the changelog is what most users want.
 
 GitLab (`origin`) pushes are independent; the release workflow runs only on GitHub.
 
@@ -131,6 +161,7 @@ default repo URL from [`internal/version/version.go`](internal/version/version.g
 ## Git tag checklist
 
 - [ ] `VERSION` updated
+- [ ] `CHANGELOG.md` `[Unreleased]` renamed to `[$(cat VERSION)] - <today>`, new empty `[Unreleased]` added
 - [ ] `make sync-wails-version` run and the `wails.json` change committed
 - [ ] `make test` passes
 - [ ] `make package` produces the expected installer under `dist/` (local smoke test)

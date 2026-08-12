@@ -127,17 +127,51 @@ jobs:
       - build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
       - uses: actions/download-artifact@v4
         with:
           pattern: dist-*
           merge-multiple: true
           path: dist
+
+      # The release description opens with this version's CHANGELOG.md section — the
+      # human-readable summary. GitHub's auto-generated "What's Changed" commit list is
+      # appended below it by generate_release_notes.
+      - name: Extract changelog section
+        id: changelog
+        run: |
+          version="$(tr -d ' \n\r' < VERSION)"
+          # Print the body of the "## [<version>] ..." section, up to the next "## [" heading.
+          notes="$(awk -v ver="$version" '
+            index($0, "## [" ver "]") == 1 { flag=1; next }
+            /^## \[/ && flag { flag=0 }
+            flag { print }
+          ' CHANGELOG.md)"
+          # Trim leading/trailing blank lines.
+          notes="$(printf '%s\n' "$notes" | sed -e '/./,$!d' | tac | sed -e '/./,$!d' | tac)"
+          if [ -z "$notes" ]; then
+            echo "::warning::No CHANGELOG.md section found for version $version"
+          fi
+          {
+            echo "notes<<__CHANGELOG_EOF__"
+            echo "$notes"
+            echo "__CHANGELOG_EOF__"
+          } >> "$GITHUB_OUTPUT"
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
           draft: ${{ inputs.draft }}
           generate_release_notes: true
           body: |
+            ## What's new
+
+            ${{ steps.changelog.outputs.notes }}
+
+            📖 [Full changelog](https://github.com/michal-bartak/pg-accounts-management/blob/main/CHANGELOG.md) — every release, summarised for users. The commit-level list is under **What's Changed** below. (Pinned to `main`, not the tag, so it always resolves and always shows the complete history.)
+
             ### Installing
 
             - **macOS** — open `DbAccounts-${{ needs.prepare.outputs.tag }}-macos-universal.dmg` and drag **DbAccounts** to Applications. The build is unsigned, so Gatekeeper blocks the first launch; clear the quarantine flag once:

@@ -253,6 +253,12 @@ re-renders only when that reload is itself clean (never clobbers on transient un
   `PLATFORM=darwin/universal` builds the universal macOS bundle. Never change the MSI
   `UpgradeCode` GUID.
 - UI: `GetAppVersion()`; config YAML `version:` is **schema** version only.
+- [`CHANGELOG.md`](CHANGELOG.md) (Keep a Changelog) is the user-facing history. Add user-facing
+  changes under `## [Unreleased]` **as part of the change** — one terse line each (bold feature
+  name + what it does, no narration), phrased for a user, not a diff reader.
+  At release time `[Unreleased]` becomes `## [X.Y.Z] - YYYY-MM-DD`; the heading must match `VERSION`
+  because `release.yml` extracts that section (awk, up to the next `## [`) into the release body,
+  above the install notes and GitHub's auto-generated commit list, plus a link to the whole file.
 
 ## Build & run (macOS)
 

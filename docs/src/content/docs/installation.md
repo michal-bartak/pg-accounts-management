@@ -18,6 +18,10 @@ ships a native installer per platform:
 
 `{VERSION}` here and in the commands below stands for the release you downloaded, e.g. `1.0.0`.
 
+Each release description opens with what is new in that version; the
+[changelog](https://github.com/michal-bartak/pg-accounts-management/blob/main/CHANGELOG.md)
+covers every version in one page.
+
 Builds are **not** signed with an Apple or Microsoft developer certificate, so the first
 launch may show a security warning.
 
