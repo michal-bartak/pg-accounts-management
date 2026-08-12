@@ -127,8 +127,10 @@ func (r *Runner) scanClusters(clusters []model.Cluster, auth model.AuthContext, 
 	wg.Wait()
 }
 
-// SearchRoles scans the selected clusters for roles matching term (name or comment).
-func (r *Runner) SearchRoles(term string, categoryIDs, clusterIDs []string, auth model.AuthContext) ([]model.RoleMatch, error) {
+// SearchRoles scans the selected clusters for roles matching term (name or comment). One entry
+// per cluster — including a cluster that was scanned fine but matched nothing — so the caller can
+// tell "nothing matched" from "never scanned" and report timings/SQL through the status chip.
+func (r *Runner) SearchRoles(term string, categoryIDs, clusterIDs []string, auth model.AuthContext) ([]model.ClusterRoleMatches, error) {
 	clusters, err := r.ResolveClusters(model.RunRequest{CategoryIDs: categoryIDs, ClusterIDs: clusterIDs})
 	if err != nil {
 		return nil, err
@@ -136,17 +138,18 @@ func (r *Runner) SearchRoles(term string, categoryIDs, clusterIDs []string, auth
 	searchQuery := r.store.Get().DBReads.SearchRoles.Query
 
 	var mu sync.Mutex
-	var out []model.RoleMatch
+	var out []model.ClusterRoleMatches
 
 	r.scanClusters(clusters, auth,
 		func(ctx context.Context, cl model.Cluster, conn *pgx.Conn) error {
+			start := time.Now()
 			rows, err := pg.SearchRoles(ctx, conn, searchQuery, term)
 			if err != nil {
 				return err
 			}
-			mu.Lock()
+			matches := make([]model.RoleMatch, 0, len(rows))
 			for _, row := range rows {
-				out = append(out, model.RoleMatch{
+				matches = append(matches, model.RoleMatch{
 					ClusterID: cl.ID,
 					Alias:     cl.Alias,
 					Host:      cl.Host,
@@ -156,17 +159,30 @@ func (r *Runner) SearchRoles(term string, categoryIDs, clusterIDs []string, auth
 					FullName:  pg.ParseFullName(row.Comment),
 				})
 			}
+			mu.Lock()
+			out = append(out, model.ClusterRoleMatches{
+				ClusterID:  cl.ID,
+				Alias:      cl.Alias,
+				Host:       cl.Host,
+				Category:   cl.Category,
+				Matches:    matches,
+				DurationMs: time.Since(start).Milliseconds(),
+				Queries:    pg.SearchRoleQueries(searchQuery, term),
+			})
 			mu.Unlock()
 			return nil
 		},
 		func(cl model.Cluster, msg string) {
 			mu.Lock()
-			out = append(out, model.RoleMatch{
+			out = append(out, model.ClusterRoleMatches{
 				ClusterID: cl.ID,
 				Alias:     cl.Alias,
 				Host:      cl.Host,
 				Category:  cl.Category,
 				Error:     msg,
+				// The SQL is known whether or not the connection worked — it is what the user
+				// wants to see when the scan failed.
+				Queries: pg.SearchRoleQueries(searchQuery, term),
 			})
 			mu.Unlock()
 		},
@@ -219,6 +235,65 @@ func (r *Runner) LoadRoleDetails(loginName string, categoryIDs, clusterIDs []str
 				Host:      cl.Host,
 				Category:  cl.Category,
 				Error:     msg,
+			})
+			mu.Unlock()
+		},
+	)
+	return out, nil
+}
+
+// LoadRoleDependencies runs the pre-flight dependency check for one login on the selected
+// clusters — the objects that would block (or be orphaned by) a DROP ROLE there.
+func (r *Runner) LoadRoleDependencies(loginName string, categoryIDs, clusterIDs []string, auth model.AuthContext) ([]model.ClusterRoleDependencies, error) {
+	clusters, err := r.ResolveClusters(model.RunRequest{CategoryIDs: categoryIDs, ClusterIDs: clusterIDs})
+	if err != nil {
+		return nil, err
+	}
+	query := r.store.Get().DBReads.RoleDependencies.Query
+
+	var mu sync.Mutex
+	var out []model.ClusterRoleDependencies
+
+	r.scanClusters(clusters, auth,
+		func(ctx context.Context, cl model.Cluster, conn *pgx.Conn) error {
+			start := time.Now()
+			deps, err := pg.RoleDependencies(ctx, conn, query, loginName)
+			if err != nil {
+				return err
+			}
+			rows := make([]model.RoleDependency, 0, len(deps))
+			for _, d := range deps {
+				rows = append(rows, model.RoleDependency{
+					Database:   d.Database,
+					Dependency: d.Dependency,
+					Class:      d.Class,
+					Object:     d.Object,
+				})
+			}
+			mu.Lock()
+			out = append(out, model.ClusterRoleDependencies{
+				ClusterID:    cl.ID,
+				Alias:        cl.Alias,
+				Host:         cl.Host,
+				Category:     cl.Category,
+				Dependencies: rows,
+				DurationMs:   time.Since(start).Milliseconds(),
+				Queries:      pg.RoleDependencyQueries(query, loginName),
+			})
+			mu.Unlock()
+			return nil
+		},
+		func(cl model.Cluster, msg string) {
+			mu.Lock()
+			out = append(out, model.ClusterRoleDependencies{
+				ClusterID: cl.ID,
+				Alias:     cl.Alias,
+				Host:      cl.Host,
+				Category:  cl.Category,
+				Error:     msg,
+				// The SQL is known whether or not the connection worked, and it is exactly what
+				// the user wants to see when the check failed — so the popup can always show it.
+				Queries: pg.RoleDependencyQueries(query, loginName),
 			})
 			mu.Unlock()
 		},

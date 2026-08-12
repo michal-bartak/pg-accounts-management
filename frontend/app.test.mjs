@@ -670,3 +670,369 @@ test('generatePassword: empty pool (no classes) defensively falls back to lowerc
   assert.equal(r.len, 12);
   assert.equal(r.allLower, true);
 });
+
+// ---------------------------------------------------------------------------------------------
+// Pre-flight dependency check before a role is dropped.
+test('initialDepsChoices: clusters with dependencies or an error default to Skip', () => {
+  const r = evalJSON(`(() => {
+    const rows = [
+      { clusterId: 'c-clean', dependencies: [] },
+      { clusterId: 'c-deps', dependencies: [{ database: 'app', dependency: 'owner', class: 'pg_class', object: 'table t' }] },
+      { clusterId: 'c-err', dependencies: [], error: 'connect failed' },
+      { clusterId: 'c-nodeps-undefined' },
+    ];
+    const m = initialDepsChoices(rows);
+    return { entries: [...m.entries()], size: m.size };
+  })()`);
+  assert.equal(r.size, 2);
+  assert.deepEqual(r.entries, [['c-deps', 'skip'], ['c-err', 'skip']]);
+});
+
+test('depsAllowedSet: clean clusters always allowed; flagged ones only when set to Try anyway', () => {
+  const r = evalJSON(`(() => {
+    const rows = [
+      { clusterId: 'c-clean', dependencies: [] },
+      { clusterId: 'c-deps', dependencies: [{ object: 'table t' }] },
+      { clusterId: 'c-err', dependencies: [], error: 'connect failed' },
+    ];
+    const skipAll = [...depsAllowedSet(rows, initialDepsChoices(rows))];
+    const choices = initialDepsChoices(rows);
+    choices.set('c-deps', 'try');
+    const oneTried = [...depsAllowedSet(rows, choices)];
+    return { skipAll, oneTried };
+  })()`);
+  assert.deepEqual(r.skipAll, ['c-clean']);
+  assert.deepEqual(r.oneTried, ['c-clean', 'c-deps']);
+});
+
+test('filterSkippedRemovals: drops skipped remove_role-only entries, keeps every other cluster', () => {
+  const r = evalJSON(`(() => {
+    const clusters = [
+      { clusterId: 'c-skip', operations: [{ operation: 'remove_role', removeRole: { loginName: 'u' } }] },
+      { clusterId: 'c-try', operations: [{ operation: 'remove_role', removeRole: { loginName: 'u' } }] },
+      { clusterId: 'c-edit', operations: [{ operation: 'grant_parents', grantParents: { loginName: 'u', parentRoles: 'app_ro' } }] },
+      { clusterId: 'c-multi', operations: [
+        { operation: 'create_role', createRole: { loginName: 'u' } },
+        { operation: 'remove_role', removeRole: { loginName: 'u' } },
+      ] },
+    ];
+    const kept = filterSkippedRemovals(clusters, new Set(['c-try'])).map((c) => c.clusterId);
+    return { kept };
+  })()`);
+  // c-skip is dropped; the unrelated edit and the multi-op cluster are untouched.
+  assert.deepEqual(r.kept, ['c-try', 'c-edit', 'c-multi']);
+});
+
+test('depsSortRows: clean → unchecked → with-dependencies, then category order, then alias', () => {
+  const r = evalJSON(`(() => {
+    // Configured category order is prod, then uat (NOT alphabetical).
+    state = { categories: [{ id: 'prod', label: 'Production' }, { id: 'uat', label: 'UAT' }] };
+    const rows = [
+      { clusterId: 'uat-deps',   alias: 'uat-9',  category: 'uat',  dependencies: [{ object: 'table t' }] },
+      { clusterId: 'uat-clean-b',alias: 'uat-b',  category: 'uat',  dependencies: [] },
+      { clusterId: 'prod-err',   alias: 'prod-2', category: 'prod', dependencies: [], error: 'refused' },
+      { clusterId: 'prod-deps',  alias: 'prod-1', category: 'prod', dependencies: [{ object: 'table t' }] },
+      { clusterId: 'uat-clean-a',alias: 'uat-a',  category: 'uat',  dependencies: [] },
+      { clusterId: 'prod-clean', alias: 'prod-0', category: 'prod', dependencies: [] },
+      { clusterId: 'uat-err',    alias: 'uat-1',  category: 'uat',  dependencies: [], error: 'timeout' },
+    ];
+    return { order: depsSortRows(rows).map((x) => x.clusterId), tiers: depsSortRows(rows).map(depsTier) };
+  })()`);
+  assert.deepEqual(r.order, [
+    // tier 0 (clean): prod before uat (configured order), then alias within uat
+    'prod-clean', 'uat-clean-a', 'uat-clean-b',
+    // tier 1 (could not be checked)
+    'prod-err', 'uat-err',
+    // tier 2 (dependencies found)
+    'prod-deps', 'uat-deps',
+  ]);
+  assert.deepEqual(r.tiers, [0, 0, 0, 1, 1, 2, 2]);
+});
+
+test('depsColgroup: short columns sized to the widest value across ALL clusters, Object bare', () => {
+  const r = evalJSON(`(() => {
+    const rows = [
+      { dependencies: [{ database: 'postgres', dependency: 'owner', class: 'pg_class', object: 'table t' }] },
+      { dependencies: [{ database: 'analytics_warehouse', dependency: 'privileges (ACL)', class: 'pg_proc', object: 'x' }] },
+    ];
+    return { html: depsColgroup(rows) };
+  })()`);
+  // 'analytics_warehouse' = 19 chars wins over the 'Database' header; the last <col> has no width.
+  assert.match(r.html, /width:calc\(19ch \+ 1\.5rem\)/);
+  // 'privileges (ACL)' = 16 chars wins over the 'Dependency' header (10).
+  assert.match(r.html, /width:calc\(16ch \+ 1\.5rem\)/);
+  // 'pg_class'/'pg_proc' are shorter than the 'Class' header? No — 8 > 5, so 8 wins.
+  assert.match(r.html, /width:calc\(8ch \+ 1\.5rem\)/);
+  assert.match(r.html, /<col><\/colgroup>$/);
+});
+
+test('depsColgroup: caps a pathologically long value and falls back to the header width', () => {
+  const r = evalJSON(`(() => {
+    const rows = [
+      { dependencies: [{ database: 'd'.repeat(200), dependency: 'o', class: 'c', object: 'x' }] },
+      { dependencies: [] },
+    ];
+    return { html: depsColgroup(rows), empty: depsColgroup([]) };
+  })()`);
+  assert.match(r.html, /width:calc\(28ch \+ 1\.5rem\)/); // capped at 28
+  assert.match(r.html, /width:calc\(10ch \+ 1\.5rem\)/); // 'Dependency' header wins over 'o'
+  // No rows at all → every column falls back to its header length.
+  assert.match(r.empty, /width:calc\(8ch \+ 1\.5rem\)/);  // 'Database'
+  assert.match(r.empty, /width:calc\(5ch \+ 1\.5rem\)/);  // 'Class'
+});
+
+test('depsErrorRowsFor: one unchecked row per cluster, alias/category resolved from known rows', () => {
+  const r = evalJSON(`(() => {
+    const known = [
+      { clusterId: 'c1', alias: 'prod-1', host: 'h1', category: 'prod', queries: ['SELECT 1'] },
+      { clusterId: 'c2', alias: 'uat-1', host: 'h2', category: 'uat' },
+    ];
+    return { rows: depsErrorRowsFor(['c1', 'c2', 'c-unknown'], 'backend exploded', known) };
+  })()`);
+  assert.equal(r.rows.length, 3);
+  assert.deepEqual(r.rows.map((x) => x.alias), ['prod-1', 'uat-1', 'c-unknown']); // falls back to the id
+  assert.deepEqual(r.rows.map((x) => x.category), ['prod', 'uat', '']);
+  assert.ok(r.rows.every((x) => x.error === 'backend exploded' && x.dependencies.length === 0));
+  // A previously reported query is kept so the titlebar magnifier survives a failed reload.
+  assert.deepEqual(r.rows[0].queries, ['SELECT 1']);
+  assert.deepEqual(r.rows[1].queries, []);
+});
+
+test('mergeDepsChoices: keeps still-relevant picks, defaults new ones, drops now-clean clusters', () => {
+  const r = evalJSON(`(() => {
+    const prev = new Map([['still-deps', 'try'], ['now-clean', 'try'], ['gone', 'skip']]);
+    const rows = [
+      { clusterId: 'still-deps', dependencies: [{ object: 'table t' }] },
+      { clusterId: 'now-clean',  dependencies: [] },
+      { clusterId: 'newly-bad',  dependencies: [{ object: 'table u' }] },
+    ];
+    return { entries: [...mergeDepsChoices(rows, prev).entries()] };
+  })()`);
+  assert.deepEqual(r.entries, [
+    ['still-deps', 'try'], // survived the reload
+    ['newly-bad', 'skip'], // newly flagged → safe default
+  ]); // 'now-clean' needs no decision any more, 'gone' is not in the new rows at all
+});
+
+test('reloadDeps: re-reads the same clusters, re-sorts, and preserves a Try anyway pick', async () => {
+  const p = vm.runInContext(`(async () => {
+    const _backend = backend, _getAuth = getAuth, _render = renderDepsDialog;
+    let req = null, busyDuringLoad = null;
+    try {
+      state = { categories: [{ id: 'prod', label: 'Production' }, { id: 'uat', label: 'UAT' }] };
+      alterSelected = 'bob';
+      getAuth = () => ({ user: '', password: '' });
+      renderDepsDialog = () => {};
+      // Opening state: one cluster with deps (set to Try anyway), one clean.
+      depsRows = [
+        { clusterId: 'c1', alias: 'prod-1', category: 'prod', dependencies: [{ object: 'table t' }] },
+        { clusterId: 'c2', alias: 'uat-1', category: 'uat', dependencies: [] },
+      ];
+      depsChoices = new Map([['c1', 'try']]);
+      depsClusterIds = ['c1', 'c2'];
+      backend = () => ({ LoadRoleDependencies: async (r) => {
+        req = r;
+        busyDuringLoad = depsBusy;
+        // c1 still has deps; c2 came back dirty this time — deliberately out of order.
+        return [
+          { clusterId: 'c2', alias: 'uat-1', category: 'uat', dependencies: [{ object: 'table u' }] },
+          { clusterId: 'c1', alias: 'prod-1', category: 'prod', dependencies: [{ object: 'table t' }] },
+        ];
+      } });
+      await reloadDeps();
+      return JSON.stringify({
+        req, busyDuringLoad, busyAfter: depsBusy,
+        order: depsRows.map((x) => x.clusterId),
+        choices: [...depsChoices.entries()],
+      });
+    } finally {
+      backend = _backend; getAuth = _getAuth; renderDepsDialog = _render;
+    }
+  })()`, ctx);
+  const r = JSON.parse(await p);
+  assert.deepEqual(r.req.clusterIds, ['c1', 'c2']); // same clusters re-checked
+  assert.equal(r.req.loginName, 'bob');
+  assert.equal(r.busyDuringLoad, true);  // spinner state held during the read
+  assert.equal(r.busyAfter, false);      // and released afterwards
+  assert.deepEqual(r.order, ['c1', 'c2']); // re-sorted by category order, not response order
+  assert.deepEqual(r.choices, [['c1', 'try'], ['c2', 'skip']]); // pick survived, new one defaults
+});
+
+test('reloadDeps: a thrown read lands every cluster under "could not be checked", not an empty list', async () => {
+  const p = vm.runInContext(`(async () => {
+    const _backend = backend, _getAuth = getAuth, _render = renderDepsDialog, _err = console.error;
+    try {
+      state = { categories: [{ id: 'prod', label: 'Production' }] };
+      alterSelected = 'bob';
+      getAuth = () => ({ user: '', password: '' });
+      renderDepsDialog = () => {};
+      console.error = () => {};
+      depsRows = [{ clusterId: 'c1', alias: 'prod-1', category: 'prod', dependencies: [{ object: 't' }] }];
+      depsChoices = new Map([['c1', 'try']]);
+      depsClusterIds = ['c1'];
+      backend = () => ({ LoadRoleDependencies: async () => { throw new Error('no route to host'); } });
+      await reloadDeps();
+      return JSON.stringify({
+        rows: depsRows.map((x) => ({ id: x.clusterId, alias: x.alias, tier: depsTier(x), error: x.error })),
+        allowed: [...depsAllowedSet()],
+        busy: depsBusy,
+      });
+    } finally {
+      backend = _backend; getAuth = _getAuth; renderDepsDialog = _render; console.error = _err;
+    }
+  })()`, ctx);
+  const r = JSON.parse(await p);
+  assert.equal(r.rows.length, 1);
+  assert.equal(r.rows[0].tier, 1);            // "could not be checked"
+  assert.equal(r.rows[0].alias, 'prod-1');    // identity kept from the previous rows
+  assert.match(r.rows[0].error, /no route to host/);
+  assert.deepEqual(r.allowed, ['c1']);        // the earlier "Try anyway" still applies...
+  assert.equal(r.busy, false);
+});
+
+// --- Find-role popup: one-liner failures + its own independent status chip --------------------
+test('searchFailureLine: one counted line, singular/plural aware', () => {
+  const r = evalJSON(`[searchFailureLine(1, 5), searchFailureLine(3, 3), searchFailureLine(1, 1)]`);
+  assert.equal(r[0], '1 of 5 clusters could not be searched — click Status for details.');
+  assert.equal(r[1], '3 of 3 clusters could not be searched — click Status for details.');
+  assert.equal(r[2], '1 of 1 cluster could not be searched — click Status for details.');
+});
+
+test('buildStatusState: per-cluster rows become a finished single-segment state, order preserved', () => {
+  const r = evalJSON(`(() => {
+    const st = buildStatusState([
+      { clusterId: 'c2', alias: 'uat-1', host: 'h2', category: 'uat', status: 'ok', durationMs: 12, queries: ['SELECT 1'] },
+      { clusterId: 'c1', alias: 'prod-1', host: 'h1', category: 'prod', status: 'error', message: 'refused' },
+    ]);
+    return {
+      total: st.total,
+      order: st.order,
+      rows: st.order.map((id) => {
+        const row = st.byId.get(id);
+        return { alias: row.alias, phase: row.phase, segs: row.segments.length,
+                 status: row.segments[0].status, msg: row.segments[0].message,
+                 ms: rowDurationMs(row), queries: rowQueries(row) };
+      }),
+      summary: runStatusSummary(st),
+    };
+  })()`);
+  assert.equal(r.total, 2);
+  assert.deepEqual(r.order, ['c2', 'c1']); // insertion order, not re-sorted
+  assert.deepEqual(r.rows[0], { alias: 'uat-1', phase: 'done', segs: 1, status: 'ok', msg: '', ms: 12, queries: ['SELECT 1'] });
+  assert.equal(r.rows[1].status, 'error');
+  assert.equal(r.rows[1].msg, 'refused');
+  assert.deepEqual(r.rows[1].queries, ['-- ERROR: refused']); // no SQL ran, the error shows instead
+  // Unnamed single phase → the legacy chip wording, counted not concatenated.
+  assert.deepEqual(r.summary, { stateClass: 'error', text: 'Status: Error (1/2 failed)' });
+});
+
+test('runStatusSummary: takes an explicit state, so the two chips stay independent', () => {
+  const r = evalJSON(`(() => {
+    ${SETUP_STATE}
+    state.clusters = [{id:'c1',alias:'c1',category:'p'}];
+    // Footer state: a failed run.
+    runState = null;
+    beginRunStatus([{clusterId:'c1'}]);
+    finishRunStatus([{clusterId:'c1', status:'error', message:'nope'}]);
+    // Search state: all good. Neither must affect the other.
+    const search = buildStatusState([{ clusterId:'c1', alias:'c1', category:'p', status:'ok', durationMs:3 }]);
+    return { footer: runStatusSummary(runState), search: runStatusSummary(search), bare: runStatusSummary() };
+  })()`);
+  assert.equal(r.footer.text, 'Status: Error (1/1 failed)');
+  assert.equal(r.search.text, 'Status: OK (1 cluster)');
+  assert.equal(r.bare.text, r.footer.text); // the default argument still means runState
+});
+
+test('groupMatches: works on the flattened per-cluster matches (no error rows to skip any more)', () => {
+  const r = evalJSON(`(() => {
+    const scanned = [
+      { clusterId:'c1', alias:'prod-1', category:'prod', matches:[
+        { clusterId:'c1', loginName:'bob', fullName:'', comment:'' },
+        { clusterId:'c1', loginName:'alice', fullName:'Alice A', comment:'' }] },
+      { clusterId:'c2', alias:'uat-1', category:'uat', matches:[] },           // scanned, no match
+      { clusterId:'c3', alias:'uat-2', category:'uat', matches:[], error:'refused' }, // never scanned
+      { clusterId:'c4', alias:'uat-3', category:'uat', matches:[
+        { clusterId:'c4', loginName:'bob', fullName:'Bob B', comment:'' }] },
+    ];
+    const groups = groupMatches(scanned.flatMap((c) => c.matches || []));
+    return groups.map((g) => ({ login: g.loginName, full: g.fullName, clusters: g.clusters.map((m) => m.clusterId) }));
+  })()`);
+  assert.deepEqual(r, [
+    { login: 'alice', full: 'Alice A', clusters: ['c1'] },
+    { login: 'bob', full: 'Bob B', clusters: ['c1', 'c4'] }, // fullName = first non-empty in group
+  ]);
+});
+
+test('stripClusterPrefix: the alias is not repeated in a table that has a Cluster column', () => {
+  const r = evalJSON(`[
+    stripClusterPrefix('connect to uat-2: failed to connect to \`db=x\`: refused', 'uat-2'),
+    stripClusterPrefix('connect to other: failed', 'uat-2'),
+    stripClusterPrefix('operation 1/2 (remove_role): dependent objects', 'uat-2'),
+    stripClusterPrefix('connect to uat-2: x', ''),
+  ]`);
+  assert.equal(r[0], 'failed to connect to `db=x`: refused'); // own alias stripped
+  assert.equal(r[1], 'connect to other: failed');             // a different alias is left alone
+  assert.equal(r[2], 'operation 1/2 (remove_role): dependent objects'); // non-connect messages untouched
+  assert.equal(r[3], 'connect to uat-2: x');                  // no alias → nothing to strip
+});
+
+test('statusRowOrder: the status table is ordered by configured group, then alias', () => {
+  const r = evalJSON(`(() => {
+    // Configured order is prod, then uat (deliberately NOT alphabetical by label).
+    state = { categories: [{ id: 'prod', label: 'Production' }, { id: 'uat', label: 'Alpha UAT' }] };
+    // Insertion order = the order results arrived in, which is what we are replacing.
+    const st = buildStatusState([
+      { clusterId: 'u2', alias: 'uat-9',  category: 'uat',     status: 'ok' },
+      { clusterId: 'p2', alias: 'prod-9', category: 'prod',    status: 'ok' },
+      { clusterId: 'x1', alias: 'orphan', category: 'deleted', status: 'error' },
+      { clusterId: 'u1', alias: 'uat-1',  category: 'uat',     status: 'ok' },
+      { clusterId: 'p1', alias: 'prod-1', category: 'prod',    status: 'ok' },
+    ]);
+    return { arrived: st.order, displayed: statusRowOrder(st) };
+  })()`);
+  assert.deepEqual(r.arrived, ['u2', 'p2', 'x1', 'u1', 'p1']); // as reported by the backend
+  // prod before uat (configured order), alias within each group, unknown group last.
+  assert.deepEqual(r.displayed, ['p1', 'p2', 'u1', 'u2', 'x1']);
+});
+
+test('byGroupThenAlias: configured group order wins over the label, alias breaks ties', () => {
+  const r = evalJSON(`(() => {
+    state = { categories: [{ id: 'zeta', label: 'Zeta' }, { id: 'alpha', label: 'Alpha' }] };
+    const sort = (rows) => rows.slice().sort(byGroupThenAlias).map((c) => c.alias);
+    return {
+      groups: sort([{ category: 'alpha', alias: 'a' }, { category: 'zeta', alias: 'b' }]),
+      aliases: sort([{ category: 'zeta', alias: 'b' }, { category: 'zeta', alias: 'a' }]),
+      unknownLast: sort([{ category: 'nope', alias: 'a' }, { category: 'zeta', alias: 'z' }]),
+    };
+  })()`);
+  assert.deepEqual(r.groups, ['b', 'a']);      // zeta is configured first, despite 'Alpha' < 'Zeta'
+  assert.deepEqual(r.aliases, ['a', 'b']);     // same group → alias
+  assert.deepEqual(r.unknownLast, ['z', 'a']); // a group no longer configured sorts last
+});
+
+test('closeModal: drops the focus the UA restores after a pointer-driven open, keeps it for keyboard', () => {
+  const r = evalJSON(`(() => {
+    const blurs = [];
+    // Closing a <dialog> restores focus to its opener synchronously; stand in for that opener.
+    const opener = { id: 'search-status', blur() { blurs.push('blurred'); } };
+    const dlg = { closed: 0, close() { this.closed++; document.activeElement = opener; } };
+    const run = (pointer) => {
+      blurs.length = 0;
+      document.activeElement = null;
+      lastInputWasPointer = pointer;
+      closeModal(dlg);
+      return { closed: dlg.closed, blurs: blurs.length, active: document.activeElement === opener };
+    };
+    const byPointer = run(true);
+    const byKeyboard = run(false);
+    document.activeElement = null; // leave the stub as we found it
+    return { byPointer, byKeyboard };
+  })()`);
+  // Mouse: the dialog closed and the ring the engine put back on the chip is dropped.
+  assert.equal(r.byPointer.closed, 1);
+  assert.equal(r.byPointer.blurs, 1);
+  // Keyboard (including Esc): focus stays on the opener, so the ring and tab position survive.
+  assert.equal(r.byKeyboard.closed, 2);
+  assert.equal(r.byKeyboard.blurs, 0);
+  assert.equal(r.byKeyboard.active, true);
+});

@@ -20,6 +20,8 @@ export function GetConfigPath():Promise<string>;
 
 export function GetPendingUpdate():Promise<model.UpdateInfo>;
 
+export function LoadRoleDependencies(arg1:model.RoleDependenciesRequest):Promise<Array<model.ClusterRoleDependencies>>;
+
 export function LoadRoleDetails(arg1:model.RoleDetailsRequest):Promise<Array<model.ClusterRoleDetail>>;
 
 export function PreviewTargets(arg1:model.RunRequest):Promise<Array<model.Cluster>>;
@@ -48,7 +50,7 @@ export function SaveUISettings(arg1:model.UISettings):Promise<void>;
 
 export function SaveWindowSize(arg1:number,arg2:number):Promise<void>;
 
-export function SearchRoles(arg1:model.RoleSearchRequest):Promise<Array<model.RoleMatch>>;
+export function SearchRoles(arg1:model.RoleSearchRequest):Promise<Array<model.ClusterRoleMatches>>;
 
 export function SetUpdateSeenVersion(arg1:string):Promise<void>;
 

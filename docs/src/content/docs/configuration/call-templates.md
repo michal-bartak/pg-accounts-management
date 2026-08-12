@@ -107,20 +107,24 @@ admin_access.create_role(
 
 ## Read (introspection) queries
 
-Alter-role search and detail use three **read** queries, also editable (Settings →
-Introspection queries, or `db_reads` in config). Each takes a single `${rolename}` bind, and
-its result columns are matched **by name** against a fixed contract — so you can point one at
-a privileged wrapper function or view when the connecting user can't read the catalogs
-directly.
+Alter-role search and detail, plus the dependency check run before a role is dropped, use four
+**read** queries, also editable (Settings → Introspection queries, or `db_reads` in config).
+Each takes a single `${rolename}` bind, and its result columns are matched **by name** against
+a fixed contract — so you can point one at a privileged wrapper function or view when the
+connecting user can't read the catalogs directly.
 
 | Query | Contract columns |
 |-------|------------------|
 | `search_roles` | `rolname`, `comment` |
 | `role_detail` | the seven `rol*` flags, `comment`, `rolconfig` |
 | `role_parents` | `rolname` |
+| `role_dependencies` | `database`, `dependency`, `class`, `object` |
 
 Column order doesn't matter and a missing column is tolerated, but an unexpected extra column
 is rejected.
+
+`role_dependencies` is the pre-flight check: it runs on every cluster a removal targets and its
+rows are shown per cluster before anything is dropped.
 
 Full syntax, the field whitelist, YAML examples, and common mistakes are in the repository's
 [`sql/README.md`](https://github.com/michal-bartak/pg-accounts-management/blob/main/sql/README.md).

@@ -46,19 +46,38 @@ Example template: [`config.example.yaml`](config.example.yaml). Implemented in `
 - `SaveDBFunctions`, `SaveBatchSettings`, `SaveUISettings`, `SaveParentRoles`, `SaveTargetSelection`
 - `TestConnection`, `PreviewTargets`, `RunRoleBatch` (per-cluster transactional batch — the
   create/update/remove path), `RunOperation` (legacy single-op, unused by the UI)
-- **Introspection (reads, for Alter role):** `SearchRoles`, `LoadRoleDetails` — scan the
+- **Introspection (reads, for Alter role):** `SearchRoles`, `LoadRoleDetails`,
+  `LoadRoleDependencies` — scan the
   **selected** clusters concurrently (`internal/pg/introspect.go` + `batch.Runner`),
-  collecting per-cluster errors instead of failing. The three read queries are **templatable**
-  (`Config.DBReads`, YAML `db_reads.<search_roles|role_detail|role_parents>.query`; vanilla
+  collecting per-cluster errors instead of failing. The four read queries are **templatable**
+  (`Config.DBReads`, YAML `db_reads.<search_roles|role_detail|role_parents|role_dependencies>.query`; vanilla
   catalog defaults + migrate/validate in `internal/config/dbreads.go`). `batch.Runner` passes
   each query into `pg` (which stays config-free); each takes one named `${rolename}` bind (rewritten
   to `$1` before Query; legacy `$1` still works) and its result columns
   are scanned **by name** via `pgx.RowToStructByNameLax` (order-independent; NULL comment/rolconfig
   OK; omitted contract column → zero; **extra** column → error). Contracts: search_roles →
   `rolname, comment`; role_detail → 7 `rol*` bools + `comment` + `rolconfig`; role_parents →
-  `rolname`. Editable in Settings → **Introspection queries** (`#fn-dialog` read mode; Default
+  `rolname`; role_dependencies → `database, dependency, class, object`. Editable in Settings →
+  **Introspection queries** (`#fn-dialog` read mode; Default
   button reverts). Bound method `SaveDBReads`. Override a read with a privileged wrapper
   function/view that returns the contract columns.
+- **`role_dependencies` is a pre-flight**, not a display read: BOTH removal paths (the red
+  **Remove role** button and a pending presence removal published by **Save changes**) first run
+  it on every targeted cluster and show `#deps-dialog`. A cluster with rows, or one whose
+  check failed, defaults to **Skip** and is left out of the batch; a clean cluster is dropped
+  without asking. The popup **replaces** the old `askConfirm('Remove role', …)`; production
+  confirm still fires inside `executeRoleBatch`. Layout = **three sections** (`depsTier`: clean →
+  could-not-be-checked → has-dependencies, ordered inside by configured category order then alias
+  via `depsSortRows`): chips only / a `Cluster|Error|Skip-Try` table / per-cluster header + table.
+  Clusters are labelled by ONE group-coloured `scopeLabelsHtml` chip (no alias text, no `.badge`);
+  all dependency tables are `table-layout:fixed` sharing one `depsColgroup` so columns line up. The
+  `<h2>` holds `?` + **Reload** (`#deps-reload` → `reloadDeps`, re-reads the same clusters in place,
+  keeping still-applicable Skip/Try picks via `mergeDepsChoices`) + ONE magnifier
+  (`#deps-view-sql`), since every cluster runs the identical query (`LoadRoleDependencies` sets
+  `Queries` on the error path too). A thrown read renders as all-clusters-failed
+  (`depsErrorRowsFor`), never an `#ops-error` hidden behind the modal. Frontend: `preflightRemoval` /
+  `loadDepsRows` / `initialDepsChoices` / `depsAllowedSet` / `filterSkippedRemovals` in
+  `frontend/app.js`.
 
 ## Call templates (`internal/calltemplate/`)
 
@@ -133,7 +152,11 @@ keyboard-focused, not on plain focus).
 
 **Shared UI conventions (solve once, don't re-patch per popup):** open every `<dialog>` via
 the `openModal(dlgOrId)` helper (never bare `.showModal()`) — it drops `showModal()`'s
-auto-focus ring on the first Close/OK button unless the dialog has an `[autofocus]` element.
+auto-focus ring on the first Close/OK button unless the dialog has an `[autofocus]` element — and
+close every one via `closeModal(dlgOrId)` (never bare `.close()`): closing synchronously restores
+focus to the opener and the engine rings it even for a mouse-driven open, so `closeModal` blurs it
+when `lastInputWasPointer` (capture-phase `pointerdown`/`keydown`). Keyboard/Esc keeps the ring. It
+relies on neither the `close` event nor a focus event — some engines fire neither.
 Focus indicators are keyboard-only (`:focus-visible`) and **inset** (border + `inset`
 box-shadow; light ring on primary-filled controls) so scroll/`overflow:hidden` containers
 can't clip them — one `styles.css` rule for text fields/buttons/checkboxes. Base `dialog` is
@@ -186,6 +209,18 @@ right-aligned action buttons + op-tabs align to the 1.25rem panel edge. Errors/v
 inline in a `.form-error` (`showInlineError` →
 `#ops-error`/`#settings-error`/`#clusters-error`/`#scope-error`/`#group-error`/
 `#cluster-test-error`/`#alter-search-errors`) + a red button flash; run outcomes stay in the chip.
+The **Find-role popup** has its OWN status chip (`#search-status`, bottom-left of its `<menu>`) fed
+by `searchState` = `buildStatusState(SearchRoles rows)` — independent of `runState` (a search runs
+only `SearchRoles`; the detail load comes later via `pickUser`→`reloadDetails` and owns the footer
+chip). Clicking it opens the shared `#run-status-dialog` via `openRunStatusDialog(rs)`, which sets
+`statusDialogState`; `runStatusSummary(rs)`/`renderRunStatusDialog(rs)` take the state explicitly.
+The status table's rows are ordered by **configured group then alias** for every usage
+(`statusRowOrder` → the shared `byGroupThenAlias`, also used by `depsSortRows`), never by arrival
+order.
+Search failures are a **one-liner** (`searchFailureLine`) — `renderAlterErrors`' per-cluster list is
+gone, and `stripClusterPrefix` removes the `connect to <alias>: ` that `pg.Connect` adds when a
+Cluster column already names it. `pg.cleanConnectError` dedupes pgx's interleaved TLS+plaintext
+dial attempts ("A B A B" → "A B").
 `buildAlterClusterOps` orders grant→revoke→password→**set_attribute (all keywords
 combined)**→set_config→reset_config→set_comment; create prepends `create_role`
 (`buildCreateClusterOps`). Comment persists via `set_comment` (per-cluster `commentOverrides` wins,

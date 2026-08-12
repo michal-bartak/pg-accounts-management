@@ -70,6 +70,7 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   `.tabs`, `.ops-footer`, and Settings/Clusters footers all align to the 1.25rem panel edge). Errors/validation render **inline** in a `.form-error` next to the control
   (`showInlineError`/`clearInlineError`) — `#ops-error` (Operations footer), `#settings-error`,
   `#clusters-error`, `#scope-error`, `#group-error`, `#cluster-test-error`, `#alter-search-errors`
+  (a **one-liner** only — see the search-status decision below)
   — plus a red button flash. Run/batch outcomes stay in the **run-status chip** (unchanged); rare
   clipboard failures log to the console.
 - **Preconfigured parent groups** (`Config.ParentRoles`, YAML `parent_roles`) are a
@@ -155,6 +156,43 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
   the consistent inline comment then flows to new clusters as a `set_comment` (varies ⇒ created
   bare). All of it publishes on the one **Save changes** pass. `removeRole` (red button) targets
   only `exists:true` rows.
+- **Every `remove_role` is pre-flighted.** Before a role is dropped — by the red **Remove role**
+  button *and* by a presence removal published on **Save changes** — the frontend runs the
+  `role_dependencies` read on every targeted cluster (`App.LoadRoleDependencies` →
+  `batch.Runner.LoadRoleDependencies` → `pg.RoleDependencies`, same `scanClusters` fan-out and
+  errors-as-data as `LoadRoleDetails`) and shows `#deps-dialog`. **The popup IS the confirmation** —
+  it replaced the old `askConfirm('Remove role', …)`; the production gate still fires afterwards
+  inside `executeRoleBatch`. Rules: a cluster with **no dependencies** is dropped without asking; a
+  cluster with dependencies **or a failed check** defaults to **Skip** and is excluded from the
+  batch entirely; **Try anyway** sends the normal `remove_role`.
+  **Popup layout — three ordered sections** (`depsTier`: 0 clean / 1 check failed / 2 has
+  dependencies; empty ones omitted), each under a small-uppercase `.alter-privs-label` subheader,
+  ordered inside by **configured category order then alias** (`depsSortRows` over the shared
+  `byGroupThenAlias`, same category rule as `describeScope` — not the alphabetical sort
+  `renderClustersTable` uses): **No dependencies** = a
+  `.deps-chips` row of chips only; **Could not be checked** = a `Cluster | Error | Skip/Try` table;
+  **Dependencies found** = per cluster a header line (chip + count + toggle) plus its own table.
+  A cluster is identified by ONE group-coloured chip via the shared `scopeLabelsHtml` — there is no
+  alias text and no `.badge`. Every dependency table is `table-layout:fixed` and shares one
+  `depsColgroup(rows)` — the three short columns sized in `ch` to the widest value across **all**
+  clusters (capped, + `1.5rem` cell padding), Object left bare to absorb the rest — so columns line
+  up across clusters. The `<h2>` carries, after the `?`: **Reload** (`#deps-reload` → `reloadDeps`,
+  re-reads the same `depsClusterIds` in place — for when the user has just gone and fixed the
+  dependencies elsewhere — keeping the picks that still apply via `mergeDepsChoices`; `depsBusy`
+  spins the icon by reusing the `run-status-spin` keyframes and holds `#deps-ok`, Cancel stays
+  live), then **one magnifier** (`#deps-view-sql`) showing the SQL via `showQueriesDialog`, because
+  every cluster runs the identical query — `LoadRoleDependencies` therefore sets `Queries` on its
+  **error** path too, so the SQL is available even when every cluster failed. The dialog goes
+  **wide** (`#deps-dialog.wide`, 98vw) only when some cluster reports rows. Frontend pieces (all in
+  [frontend/app.js](frontend/app.js)): `preflightRemoval` (records `depsClusterIds`, loads, opens
+  the dialog, resolves to a `Set` of allowed cluster ids or `null` on cancel), the shared
+  `loadDepsRows`, `depsSortRows`, `initialDepsChoices`/`mergeDepsChoices`, `depsAllowedSet`,
+  `filterSkippedRemovals` (drops the skipped remove_role-only entries from a
+  `buildAlterClusterOps()` batch, leaving every other cluster's edits intact). Cancelling aborts the
+  whole action. **A thrown read is rendered as all-clusters-failed** (`depsErrorRowsFor`, carrying
+  each cluster's identity and any SQL a previous load reported) rather than an `#ops-error` the
+  modal would hide — which keeps the safe default, every cluster on Skip, so a role that could not
+  be checked is still never dropped without an explicit *Try anyway*.
 - **Run/build.** Both modes build **per-cluster ordered op lists** and send ONE
   `app.RunRoleBatch({clusters, auth, confirmProduction})` via `executeRoleBatch`; the backend runs
   each cluster's ops as a single transaction. `buildAlterClusterOps()` produces
@@ -219,9 +257,13 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
    comment, attribute flags, parent memberships from `pg_auth_members`, and role GUCs
    from `pg_roles.rolconfig` → `Settings` map), `ParseFullName` (JSON comment
    `full_name`), `likePattern` (escaped ILIKE). `batch.Runner.SearchRoles` /
-   `LoadRoleDetails` fan out over the **resolved selected clusters** (not all) and
-   collect per-cluster errors instead of failing. **These three queries are templatable**
-   (`Config.DBReads`, YAML `db_reads.<search_roles|role_detail|role_parents>.query`; vanilla
+   `LoadRoleDetails` / `LoadRoleDependencies` fan out over the **resolved selected clusters** (not
+   all) and collect per-cluster errors instead of failing. All three return **one entry per
+   cluster** — `ClusterRoleMatches` / `ClusterRoleDetail` / `ClusterRoleDependencies`, each with
+   `Error`/`DurationMs`/`Queries` so the read reports through a status chip. For the search that
+   also means a cluster scanned successfully with **no** matches is still represented (a flat match
+   list could not distinguish it from a cluster that was never scanned). **These four queries are templatable**
+   (`Config.DBReads`, YAML `db_reads.<search_roles|role_detail|role_parents|role_dependencies>.query`; vanilla
    catalog defaults + migrate/validate in [internal/config/dbreads.go](internal/config/dbreads.go)).
    The SQL is no longer hardcoded in `pg` — `batch.Runner` reads `cfg.DBReads` and passes each
    query into `pg.SearchRoles(…, query, term)` / `pg.RoleDetail(…, detailQuery, parentsQuery, login)`
@@ -230,16 +272,18 @@ templates** run against each cluster — the app does not hardcode DDL. Module:
    before the pgx `Query` so it stays a bind (a legacy raw `$1` still works). Result columns are
    scanned **BY NAME** against a fixed contract
    via `pgx.RowToStructByNameLax` into `db`-tagged structs (`searchRoleRow`/`roleDetailRow`/
-   `roleParentRow`): column **order is irrelevant**, a NULL `comment`/`rolconfig` scans cleanly
+   `roleParentRow`/`roleDependencyRow`): column **order is irrelevant**, a NULL `comment`/`rolconfig` scans cleanly
    (`*string` → `""`, nil `[]string`), an **omitted** contract column leaves its field zero-valued
    (lax), and an **extra** returned column with no matching struct field is **rejected** with a
    clear pgx error. So a deployment can point a read at a privileged wrapper function/view (e.g.
    `SELECT rolname, comment FROM admin.search_roles(${rolename})`) as long as it returns the
    contract's named columns. Contracts: `search_roles` → `rolname, comment`; `role_detail` → the 7
-   `rol*` bools + `comment` + `rolconfig`; `role_parents` → `rolname`. Editable in Settings →
+   `rol*` bools + `comment` + `rolconfig`; `role_parents` → `rolname`; `role_dependencies` →
+   `database, dependency, class, object`. Editable in Settings →
    **Introspection queries** (same `#fn-dialog` in read mode; **Default** button reverts to the
    vanilla built-in). `validateDBReads` only checks non-empty + references `${rolename}` (or legacy
    `$1`); the column contract is enforced at scan time. This was the planned **Step 2**, now done.
+   **`role_dependencies` is a pre-flight, not a display read** — see the remove-role decision below.
 
 ## Bound methods (`app.go` → `window.go.main.App`)
 
@@ -264,8 +308,10 @@ Run/test: `TestConnection` (by saved cluster id), `TestConnectionInput` (ad-hoc
 `ClusterInput`+`Auth`, used by the cluster editor to test on-screen values),
 `PreviewTargets`, `RunRoleBatch(RoleBatchRequest)` (per-cluster transactional batch; the UI's
 create/update/remove path), `RunOperation(RunRequest)` (legacy single-op, kept but unused by the UI).
-Introspection (Alter role): `SearchRoles(RoleSearchRequest)`,
-`LoadRoleDetails(RoleDetailsRequest)`.
+Introspection (Alter role): `SearchRoles(RoleSearchRequest)` (→ `[]ClusterRoleMatches`, one per
+cluster),
+`LoadRoleDetails(RoleDetailsRequest)`, `LoadRoleDependencies(RoleDependenciesRequest)` (the
+pre-flight dependency check run before any `remove_role`).
 
 ## Operations (call templates, `internal/calltemplate/`)
 
@@ -383,7 +429,7 @@ the `#fn-dialog` popup (execution type, call template, clickable placeholder chi
 reference — the old Settings-level *Template syntax help* button was removed, so the help now lives
 in **every** template editor popup. An **Introspection queries** section (`#db-reads-editor`,
 driven by `DB_READS`) sits in a two-column grid (`.settings-two-col`) beside DB command templates;
-it lists the three read queries and opens the **same** `#fn-dialog` in **read mode**
+it lists the four read queries (incl. `role_dependencies`) and opens the **same** `#fn-dialog` in **read mode**
 (`fnDialogMode`/`openReadDialog`): the execution select is hidden (`setFnDialogExecutionRow`),
 the placeholder chips show a single **`${rolename}`** chip (`renderFnPlaceholders(['rolename'])`),
 and the contract sentence + query textarea + **Default** button remain; Done stages into
@@ -411,7 +457,17 @@ Open every `<dialog>` via the **`openModal(dlgOrId)`** helper in
 auto-focus (which otherwise leaves a keyboard focus ring on the first Close/OK button, or
 pops a `?` hint) **unless** the dialog declares intentional initial focus via an `[autofocus]`
 element (e.g. the Find-role search input, and the first field of the add/edit forms — the
-group **Label** and cluster **Alias** inputs). Settings list editors focus the new row's
+group **Label** and cluster **Alias** inputs). Close every `<dialog>` via the mirror-image
+**`closeModal(dlgOrId)`**, never a bare `.close()`: closing restores focus (synchronously) to
+whatever opened the dialog, and the engine then paints the keyboard focus ring there **even for a
+mouse-driven open** — so clicking a control that opens a popup left it ringed once the popup closed
+(reported for the status chip inside the Find-role popup). `closeModal` drops that restored focus
+when the last interaction was a **pointer** (tracked by `lastInputWasPointer`, capture-phase
+`pointerdown`/`keydown` listeners); a keyboard user — including Esc-to-close, which counts as
+keyboard — keeps the ring and their place in the tab order. Note the mechanism deliberately does
+**not** rely on the `close` event (some engines don't fire it for a programmatic `.close()`) nor on
+a focus event (the restore can happen without one). A `<form method="dialog">` submit still closes
+natively, bypassing the helper. Settings list editors focus the new row's
 input after an Add (parent-group `.pr-value`, comment-field `.cf-key`). Focus indicators are
 **keyboard-only** (`:focus-visible`) and **inset** (border-colour + `inset` box-shadow; a
 light ring on primary-filled controls where a primary ring would vanish) so scroll containers
@@ -430,6 +486,21 @@ The header is a `.brand` row (accent dot + smaller title + version chip + round 
   shared form. Search + detail load are **restricted to the selected clusters**
   (`alterTargets`/`alterScopeClusters` captured at search time). Clicking **Create role**
   resets the form to an empty synthetic baseline over the selected clusters.
+  **The search popup has its own status chip** (`#search-status`, bottom-left of its `<menu>`,
+  Close staying right): `SearchRoles` returns one `ClusterRoleMatches` per cluster, which
+  `buildStatusState` turns into `searchState` — a state **independent of `runState`**, because a
+  search only runs `SearchRoles` while the role-detail load happens later (`pickUser` →
+  `reloadDetails`) and owns the footer chip. Clicking it opens the shared `#run-status-dialog`:
+  `openRunStatusDialog(rs)` records `statusDialogState`, and `runStatusSummary(rs)` /
+  `renderRunStatusDialog(rs)` / the row magnifier+copy all read the state they were given, so the
+  two chips never bleed into each other. `searchState` is cleared by `openSearchDialog` (it belongs
+  to the search that produced it); `clearRunStatus` still owns `runState` only.
+  **Failures are a one-liner, never a list** — `searchFailureLine(failed, total)` in
+  `#alter-search-errors` ("2 of 5 clusters could not be searched — click Status for details."), with
+  the per-cluster detail in the status popup. `renderAlterErrors` (the last surviving copy of the
+  deleted `renderDetailErrors`) is gone, and with it the alias-printed-twice duplication;
+  `stripClusterPrefix` drops the `connect to <alias>: ` that `pg.Connect` adds when the message
+  renders in a table that already has a Cluster column.
 - **Privileges** (parent roles) and **Attributes** (superuser/createrole/createdb/
   inherit/login/replication/bypassrls) render one-per-row: name left, **scope labels**
   right. Completeness is judged **per group**: all selected clusters of a group matched
@@ -483,7 +554,10 @@ The header is a `.brand` row (accent dot + smaller title + version chip + round 
   `renderRunStatus`, state in `runState`). The chip is **button-sized, neutral-colored, and
   glyph-free** (spinner only while running; the *word* OK/Error carries the result — no ✓/✕).
   Clicking it opens `#run-status-dialog` (columns Cluster/Category/Status/Duration/Message +
-  actions; **no Host column**), live while running. Each done row's actions cell has a
+  actions; **no Host column**), live while running. Rows are **ordered by configured group then
+  alias** — `statusRowOrder(rs)` sorts at render with the shared `byGroupThenAlias`, so the table is
+  stable regardless of the order clusters were queued in or results arrived in, for **every** use of
+  it (runs, role loads, search). Each done row's actions cell has a
   **magnifier** (`.rst-view`) that opens a separate, larger `#run-queries-dialog` listing that
   cluster's executed SQL (`ClusterResult.Queries`/`ClusterProgress.Queries` — the queries are
   NOT shown inline in the table) and a **copy button** (`.rst-copy`) that copies the cluster's

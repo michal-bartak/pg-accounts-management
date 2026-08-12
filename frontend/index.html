@@ -278,6 +278,10 @@
       <div id="alter-search-errors" class="alter-errors"></div>
       <div id="alter-results" class="alter-results"></div>
       <menu>
+        <button type="button" id="search-status" class="run-status hidden" aria-live="polite" title="Show per-cluster status">
+          <span class="run-status-icon" aria-hidden="true"></span>
+          <span class="run-status-text"></span>
+        </button>
         <button type="button" id="search-dialog-close">Close</button>
       </menu>
     </div>
@@ -341,6 +345,17 @@
       <menu>
         <button type="button" id="run-queries-copy">Copy</button>
         <button type="button" id="run-queries-close" class="primary">Close</button>
+      </menu>
+    </div>
+  </dialog>
+
+  <dialog id="deps-dialog">
+    <div class="deps-dialog-body">
+      <h2>Role dependencies <button type="button" class="q-hint" data-hint="Objects that depend on this role on each cluster (pg_shdepend), read before the role is dropped. A cluster with dependencies is skipped unless you choose Try anyway. pg_shdepend only describes objects of the database the app connects to, plus cluster-wide ones.">?</button><button type="button" id="deps-reload" class="config-path-copy" title="Re-check dependencies" aria-label="Re-check dependencies"></button><button type="button" id="deps-view-sql" class="config-path-copy" title="View the executed query" aria-label="View the executed query"></button></h2>
+      <div id="deps-list" class="deps-list"></div>
+      <menu>
+        <button type="button" id="deps-cancel">Cancel</button>
+        <button type="button" id="deps-ok" class="primary">Remove role</button>
       </menu>
     </div>
   </dialog>

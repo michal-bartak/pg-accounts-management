@@ -70,11 +70,13 @@ func DefaultConfig() model.Config {
 		},
 		// Introspection reads. Defaults are vanilla catalog queries; result columns are
 		// scanned by name against the contract documented on model.DBReads. $1 is the search
-		// pattern (search_roles) or the role name (role_detail / role_parents).
+		// pattern (search_roles) or the role name (role_detail / role_parents /
+		// role_dependencies).
 		DBReads: model.DBReads{
-			SearchRoles: model.DBRead{Query: defaultSearchRolesQuery},
-			RoleDetail:  model.DBRead{Query: defaultRoleDetailQuery},
-			RoleParents: model.DBRead{Query: defaultRoleParentsQuery},
+			SearchRoles:      model.DBRead{Query: defaultSearchRolesQuery},
+			RoleDetail:       model.DBRead{Query: defaultRoleDetailQuery},
+			RoleParents:      model.DBRead{Query: defaultRoleParentsQuery},
+			RoleDependencies: model.DBRead{Query: defaultRoleDependenciesQuery},
 		},
 		Batch:         model.BatchSettings{MaxConcurrency: 5},
 		UI:            model.UISettings{Theme: model.ThemeSystem, CommentDefaultView: model.CommentViewFields, PasswordGen: model.DefaultPasswordGen()},

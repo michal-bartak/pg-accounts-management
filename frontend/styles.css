@@ -534,6 +534,59 @@ tr:last-child td { border-bottom: none; }
   padding: 0;
 }
 
+/* Pre-flight dependency popup (before a role is dropped). Narrow when nothing was found — it is
+   then just a per-cluster "no dependencies" list; as wide as the viewport allows as soon as any
+   cluster reports rows, because the Object column carries full function/table identifiers. */
+#deps-dialog { max-width: min(560px, 92vw); }
+#deps-dialog.wide { max-width: 98vw; }
+.deps-dialog-body { padding: 1.25rem; display: block; min-width: 420px; }
+#deps-dialog.wide .deps-dialog-body { min-width: min(720px, 90vw); }
+/* The titlebar carries the ? hint, Reload, and the one SQL magnifier (every cluster runs the
+   same query). Reload spins its icon while the re-check is in flight, reusing the run-status
+   keyframes rather than defining a second spin. */
+.deps-dialog-body h2 { margin: 0 0 0.75rem; display: flex; align-items: center; gap: 0.4rem; }
+#deps-reload.busy .ic { animation: run-status-spin 0.7s linear infinite; }
+#deps-reload:disabled { opacity: 0.6; cursor: default; }
+.deps-list {
+  max-height: 60vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+/* Three sections — no dependencies / could not be checked / dependencies found — each with a
+   small uppercase subheader (.alter-privs-label, the role form's section label). */
+.deps-group { display: flex; flex-direction: column; gap: 0.5rem; }
+.deps-subhead { display: block; }
+/* Clean clusters are just chips, on the line below their subheader. */
+.deps-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.deps-cluster { display: flex; flex-direction: column; gap: 0.35rem; }
+.deps-cluster + .deps-cluster { margin-top: 0.4rem; }
+.deps-cluster-head { display: flex; align-items: center; gap: 0.5rem; }
+/* The summary takes the slack, so Skip/Try anyway stays right-aligned. */
+.deps-summary { color: var(--muted); font-size: var(--fs-sm); margin-right: auto; }
+/* Cluster / Error / decision. The decision column hugs its buttons; the message wraps. */
+.deps-error-table td { vertical-align: middle; }
+.deps-error-table th:last-child,
+.deps-error-table td:last-child { width: 1%; white-space: nowrap; }
+.deps-error-table td.status-error { white-space: normal; word-break: break-word; }
+/* Every dependency table shares one <colgroup>, so the columns line up across clusters. */
+.deps-table { table-layout: fixed; }
+.deps-table td { vertical-align: top; }
+/* The short columns never wrap, so all remaining width goes to Object. */
+.deps-table th:not(:last-child),
+.deps-table td:not(:last-child) { white-space: nowrap; }
+/* Object identifiers can be very long — the last <col> has no fixed width, so it absorbs the
+   remaining space and wraps rather than stretching the dialog further. */
+.deps-table td:last-child { white-space: normal; word-break: break-word; }
+.deps-dialog-body menu {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
 .ops-sidebar {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1047,12 +1100,12 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .alter-search { display: flex; gap: 0.5rem; align-items: center; }
 .alter-search input[type="search"] { flex: 1; }
 
+/* One counted line about failed clusters; the per-cluster detail lives in the status popup. */
 .alter-errors {
   margin: 0.5rem 0;
   font-size: var(--fs-sm);
   color: var(--danger);
 }
-.alter-error-row { margin-top: 0.2rem; }
 .alter-cluster-host { color: var(--muted); font-size: var(--fs-sm); }
 
 .alter-results { margin-top: 0.75rem; display: grid; gap: 0.4rem; }
@@ -1248,6 +1301,9 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .search-dialog-body h2,
 .comments-dialog-body h2 { margin: 0 0 0.75rem; }
 .search-dialog-body .alter-results { margin-top: 0.75rem; max-height: 50vh; overflow-y: auto; }
+/* Status chip on the left of the popup's button row, Close staying right (the same margin-right
+   trick as #fn-dialog-default / #btn-test-cluster). */
+#search-status { margin-right: auto; }
 .search-dialog-body menu,
 .comments-dialog-body menu,
 .about-dialog-body menu {

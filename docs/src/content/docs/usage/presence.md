@@ -49,7 +49,8 @@ you searched. Tick to add, untick to drop.
   and the comment all target it too. A `CREATE ROLE` is prepended to that cluster's transaction
   on Save. Whether creation is staged automatically is a
   [general setting](/pg-accounts-management/configuration/general/).
-- **Dropping** a cluster records a `DROP ROLE` for that cluster alone.
+- **Dropping** a cluster records a `DROP ROLE` for that cluster alone, pre-flighted by the
+  [dependency check](#dependency-check-before-a-drop) when you Save.
 
 The picker can only offer clusters that are in the role's scope. To bring in a cluster that
 wasn't part of Target selection when you searched, tick it in the sidebar and search again.
@@ -57,18 +58,48 @@ wasn't part of Target selection when you searched, tick it in the sidebar and se
 ## Remove role
 
 The red **Remove role** button drops the role from **every cluster in scope where it exists**.
-It always asks for confirmation first, and groups flagged *require confirmation* add their own.
+It always asks for confirmation first — the dependency check below — and groups flagged
+*require confirmation* add their own.
+
+## Dependency check before a drop
+
+Nothing is dropped blind. Before a `DROP ROLE` goes out — whether from **Remove role** or from
+a cluster you dropped in the presence picker and published with **Save changes** — the app reads
+the objects that depend on the role on every targeted cluster and shows them per cluster.
 
 <figure class="shot">
 <div class="light-only">
 
-![Remove role confirmation, listing the affected clusters](../../../assets/usage/remove-role-confirm-light.png)
+![Dependency check before removing a role](../../../assets/usage/remove-role-confirm-light.png)
 
 </div>
 <div class="dark-only">
 
-![Remove role confirmation, listing the affected clusters](../../../assets/usage/remove-role-confirm-dark.png)
+![Dependency check before removing a role](../../../assets/usage/remove-role-confirm-dark.png)
 
 </div>
-<figcaption>Remove role confirmation, listing the affected clusters</figcaption>
+<figcaption>Dependency check — per cluster, what depends on the role and whether to drop it there</figcaption>
 </figure>
+
+Clusters are grouped into three sections, in this order — and inside each by group, then alias:
+
+1. **No dependencies** — just the list of clusters. They are dropped without further asking.
+2. **Could not be checked** — the cluster and why (unreachable, or the connect user lacks
+   permission on the catalogs).
+3. **Dependencies found** — per cluster, the objects that depend on the role.
+
+Everything in the last two sections is set to **Skip** and left out of the run entirely. That is
+the default. Switch a cluster to **Try anyway** to drop it regardless: PostgreSQL then decides, and
+the outcome shows in the [command log](/pg-accounts-management/usage/command-log/) like any other
+run.
+
+If you go and clear the dependencies while the popup is open — reassigning ownership or dropping
+the objects in psql — the **reload** button next to the title re-runs the check on the same
+clusters without closing the dialog. Any *Try anyway* you already picked is kept where it still
+applies.
+
+Every cluster runs the same query, so the magnifier next to the popup's title shows it once. The
+check itself is the configurable `role_dependencies`
+[read query](/pg-accounts-management/configuration/call-templates/); its default reads
+`pg_shdepend`, which describes the objects of the database the app connects to plus cluster-wide
+ones — anything owned in another database on the same cluster is listed but not named.

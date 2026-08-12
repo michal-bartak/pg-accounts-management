@@ -79,8 +79,8 @@ type DBRead struct {
 	Query string `yaml:"query" json:"query"`
 }
 
-// DBReads holds the three introspection queries used by the Alter-role flow. $1 is the search
-// pattern (search_roles) or the role name (role_detail / role_parents).
+// DBReads holds the introspection queries used by the Alter-role flow. $1 is the search
+// pattern (search_roles) or the role name (role_detail / role_parents / role_dependencies).
 type DBReads struct {
 	// SearchRoles must return columns: rolname (text), comment (text, nullable).
 	SearchRoles DBRead `yaml:"search_roles" json:"searchRoles"`
@@ -90,6 +90,10 @@ type DBReads struct {
 	RoleDetail DBRead `yaml:"role_detail" json:"roleDetail"`
 	// RoleParents must return one row per direct parent: rolname (text).
 	RoleParents DBRead `yaml:"role_parents" json:"roleParents"`
+	// RoleDependencies is the pre-flight check run before a role is dropped: one row per
+	// object that depends on the role. Must return columns: database, dependency, class,
+	// object (all text, nullable).
+	RoleDependencies DBRead `yaml:"role_dependencies" json:"roleDependencies"`
 }
 
 type BatchSettings struct {
@@ -439,7 +443,39 @@ type RoleDetailsRequest struct {
 	Auth        AuthContext `json:"auth"`
 }
 
-// RoleMatch is one role found on one cluster during a search.
+// RoleDependenciesRequest runs the pre-flight dependency check for one login across the
+// selected clusters/categories, before the role is dropped there.
+type RoleDependenciesRequest struct {
+	LoginName   string      `json:"loginName"`
+	CategoryIDs []string    `json:"categoryIds"`
+	ClusterIDs  []string    `json:"clusterIds"`
+	Auth        AuthContext `json:"auth"`
+}
+
+// RoleDependency is one object that depends on a role (one row of the role_dependencies read).
+type RoleDependency struct {
+	Database   string `json:"database"`
+	Dependency string `json:"dependency"`
+	Class      string `json:"class"`
+	Object     string `json:"object"`
+}
+
+// ClusterRoleDependencies is one role's dependencies on one cluster. It mirrors
+// ClusterRoleDetail (same identity fields + DurationMs/Queries) so the popup can show the
+// executed SQL the same way the run-status popup does.
+type ClusterRoleDependencies struct {
+	ClusterID    string           `json:"clusterId"`
+	Alias        string           `json:"alias"`
+	Host         string           `json:"host"`
+	Category     string           `json:"category"`
+	Dependencies []RoleDependency `json:"dependencies"`
+	Error        string           `json:"error,omitempty"` // per-cluster connect/query error, if any
+	DurationMs   int64            `json:"durationMs"`
+	Queries      []string         `json:"queries,omitempty"`
+}
+
+// RoleMatch is one role found on one cluster during a search. Per-cluster failures live on the
+// enclosing ClusterRoleMatches, not here.
 type RoleMatch struct {
 	ClusterID string `json:"clusterId"`
 	Alias     string `json:"alias"`
@@ -448,7 +484,21 @@ type RoleMatch struct {
 	LoginName string `json:"loginName"`
 	Comment   string `json:"comment"`
 	FullName  string `json:"fullName"`
-	Error     string `json:"error,omitempty"` // per-cluster connect/query error, if any
+}
+
+// ClusterRoleMatches is one cluster's search outcome — its matches, or why it could not be
+// scanned. It mirrors ClusterRoleDetail (same identity fields + DurationMs/Queries) so a search
+// reports through the same status chip, and unlike a flat match list it also represents a cluster
+// that was scanned successfully but matched nothing.
+type ClusterRoleMatches struct {
+	ClusterID  string      `json:"clusterId"`
+	Alias      string      `json:"alias"`
+	Host       string      `json:"host"`
+	Category   string      `json:"category"`
+	Matches    []RoleMatch `json:"matches"`
+	Error      string      `json:"error,omitempty"` // per-cluster connect/query error, if any
+	DurationMs int64       `json:"durationMs"`
+	Queries    []string    `json:"queries,omitempty"`
 }
 
 // ClusterRoleDetail is one login's state on one cluster (parents = direct memberships).
