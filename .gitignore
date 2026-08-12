@@ -1,5 +1,12 @@
 build/bin/
-build/windows/
+# Wails regenerates most of build/windows/ on every build; keep only the hand-written
+# installer sources (WiX) and the app icon used by the exe resource and the MSI.
+build/windows/*
+!build/windows/icon.ico
+!build/windows/installer/
+build/windows/installer/*
+!build/windows/installer/product.wxs
+!build/windows/installer/License.rtf
 dist/
 *.tar.gz
 *.exe

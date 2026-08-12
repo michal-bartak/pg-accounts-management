@@ -50,13 +50,22 @@ GitLab (`origin`) pushes are independent; the release workflow runs only on GitH
 
 ### Release artifacts
 
-| Platform | File |
-|----------|------|
-| Linux amd64 | `DbAccounts-v{VERSION}-linux-amd64.tar.gz` |
-| Windows amd64 | `DbAccounts-v{VERSION}-windows-amd64.zip` (contains `.exe`) |
-| macOS arm64 | `DbAccounts-v{VERSION}-darwin-arm64.tar.gz` (contains `.app`) |
+Every platform ships a **native installer** — there are no archives to unpack.
 
-Linux tarball users need runtime libraries installed (`libgtk-3-0`, `libwebkit2gtk-4.1-0` on Debian/Ubuntu).
+| Platform | File | Built by |
+|----------|------|----------|
+| macOS universal | `DbAccounts-v{VERSION}-macos-universal.dmg` | [`build/scripts/make-dmg.sh`](build/scripts/make-dmg.sh) (`hdiutil`) |
+| Windows amd64 | `DbAccounts-v{VERSION}-windows-amd64.msi` | [`build/scripts/make-msi.ps1`](build/scripts/make-msi.ps1) (WiX v3, [`product.wxs`](build/windows/installer/product.wxs)) |
+| Linux amd64 (deb) | `DbAccounts-v{VERSION}-linux-amd64.deb` | [`build/scripts/make-linux-packages.sh`](build/scripts/make-linux-packages.sh) (fpm) |
+| Linux amd64 (rpm) | `DbAccounts-v{VERSION}-linux-amd64.rpm` | same script |
+
+The workflow runs those scripts through `make package-ci`, so a local `make package` produces the same installer as a release.
+
+Packaging notes:
+
+- **DMG** — the app icon is rebuilt as a full multi-size `.icns` and the bundle ad-hoc re-signed, then staged with an `/Applications` drop target and a background image. Finder automation sets the window layout; if it is unavailable the DMG still builds, just without the layout.
+- **MSI** — per-machine install into `C:\Program Files\DbAccounts`, Start-menu shortcut, in-place upgrades (`MajorUpgrade`), install path remembered under `HKLM\Software\MichalBartak\DbAccounts`. The `UpgradeCode` GUID in `product.wxs` must never change. Banner and dialog bitmaps are generated from `build/appicon.png` at build time.
+- **deb/rpm** — `/usr/bin/DbAccounts`, a `.desktop` entry from [`build/linux/dbaccounts.desktop`](build/linux/dbaccounts.desktop) and an icon; package name `dbaccounts`. Runtime dependencies name the WebKit the binary is linked against (`libwebkit2gtk-4.1-0` / `webkit2gtk4.1`) — update them together with the build tag if that ever changes. Set `MAINTAINER="Name <email>"` to override the maintainer field.
 
 On Ubuntu 24.04+ (WebKit 4.1 only), `make build` auto-detects `webkit2gtk-4.1` and passes `-tags webkit2_41` to Wails. Install dev packages: `libgtk-3-dev libwebkit2gtk-4.1-dev`.
 
@@ -64,18 +73,18 @@ On Ubuntu 24.04+ (WebKit 4.1 only), `make build` auto-detects `webkit2gtk-4.1` a
 
 GitHub Actions produces **ad-hoc / unsigned** binaries. There is no Apple Developer ID notarization or Windows Authenticode signing unless you add that separately (requires paid certificates and CI secrets).
 
-Copy-paste instructions for testers (also worth pasting into the GitHub Release description):
+The release workflow already puts these instructions in the release description:
 
 **macOS**
 
-1. Extract `DbAccounts.app` from the release `.tar.gz`.
-2. Right-click the app → **Open** → confirm **Open** (do not double-click the first time).
-3. Or: **System Settings → Privacy & Security → Open Anyway** after a blocked launch.
-4. Or in Terminal: `xattr -dr com.apple.quarantine /path/to/DbAccounts.app`
+1. Open the `.dmg` and drag **DbAccounts** to Applications.
+2. Clear the quarantine flag once: `xattr -dr com.apple.quarantine /Applications/DbAccounts.app`
+3. Or right-click the app → **Open** → confirm **Open**, or **System Settings → Privacy & Security → Open Anyway** after a blocked launch.
+4. Downloading with `curl -LJO <url>` instead of a browser sets no quarantine flag at all.
 
 **Windows**
 
-- If SmartScreen appears: **More info** → **Run anyway**.
+- If SmartScreen appears on the `.msi`: **More info** → **Run anyway**.
 
 To remove Gatekeeper warnings entirely, you would need Apple Developer Program membership (~$99/year), a Developer ID certificate, and notarization in the macOS CI job. See [Wails macOS signing discussion](https://github.com/wailsapp/wails/issues/3868) if you pursue that later.
 
@@ -83,8 +92,16 @@ To remove Gatekeeper warnings entirely, you would need Apple Developer Program m
 
 ```bash
 make test          # optional but recommended
-make package       # sync version, wails build, dist/ artifact
+make package       # sync version, wails build, native installer under dist/
 ```
+
+`make package` builds the installer for the host OS. Extra tooling per host: WiX Toolset v3 on
+Windows (`choco install wixtoolset`), `fpm` + `rpm` on Linux
+(`sudo apt install rpm ruby-dev && sudo gem install fpm`); macOS needs only the system tools
+(plus Pillow if you want the DMG background image).
+
+Build a universal macOS bundle with `make package PLATFORM=darwin/universal` — `PLATFORM` is
+passed straight to `wails build` and its last element names the artifact.
 
 For CI-style build without re-running tests: `make package-ci`.
 
@@ -101,14 +118,14 @@ Development (`wails dev`) uses defaults in [`internal/version/version.go`](inter
 - [ ] `VERSION` updated
 - [ ] `make sync-wails-version`
 - [ ] `make test` passes
-- [ ] `make package` produces expected artifact under `dist/` (local smoke test)
+- [ ] `make package` produces the expected installer under `dist/` (local smoke test)
 - [ ] Tag `v$(cat VERSION)` created and pushed to GitHub
-- [ ] Release workflow run manually; assets appear on GitHub Releases
+- [ ] Release workflow run manually; all four installers appear on GitHub Releases
 
 ## Artifact naming (local builds)
 
 | OS | Example |
 |----|---------|
-| macOS | `dist/DbAccounts-v0.1.0-darwin-arm64.tar.gz` |
-| Linux | `dist/DbAccounts-v0.1.0-linux-amd64.tar.gz` |
-| Windows | `dist/DbAccounts-v0.1.0-windows-amd64.exe` |
+| macOS | `dist/DbAccounts-v0.1.0-macos-arm64.dmg` (`macos-universal` with `PLATFORM=darwin/universal`) |
+| Linux | `dist/DbAccounts-v0.1.0-linux-amd64.deb`, `dist/DbAccounts-v0.1.0-linux-amd64.rpm` |
+| Windows | `dist/DbAccounts-v0.1.0-windows-amd64.msi` |
