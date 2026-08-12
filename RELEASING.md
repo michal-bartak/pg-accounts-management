@@ -2,19 +2,31 @@
 
 ## Version source of truth
 
+`VERSION` is the **only** file where a version is maintained by hand.
+
 | File | Purpose |
 |------|---------|
-| [`VERSION`](VERSION) | Application semver (e.g. `0.1.0`) — used for git tags, builds, UI |
-| [`wails.json`](wails.json) `info.productVersion` | macOS/Windows bundle metadata — synced via `make sync-wails-version` |
+| [`VERSION`](VERSION) | Application semver (e.g. `0.1.0`) — git tags, installer names, bundle metadata, UI |
+| [`wails.json`](wails.json) `info.productVersion` | **Generated mirror** of `VERSION` — `make sync-wails-version` owns it, never hand-edit |
 | [`config.yaml`](config.example.yaml) `version:` | **Config schema** version (not app version) |
+
+Everything else derives from `VERSION` at build time: the app embeds it (`//go:embed VERSION` in
+[`main.go`](main.go)), the installer scripts read it for artifact names and the MSI `ProductVersion`,
+and `build`/`build-ci` depend on `sync-wails-version`, so `make package` and the release workflow
+always package a bundle whose metadata matches. The `wails.json` copy exists only because Wails v2
+hardcodes its config path and has no flag or env var for the version — deleting the key would make
+Wails fall back to a hardcoded `1.0.0`.
 
 ## Bump version
 
 1. Edit `VERSION` (semver: `MAJOR.MINOR.PATCH`).
-2. Run `make sync-wails-version`.
-3. Commit: `git commit -am "chore: release v0.1.0"` (example).
+2. Run `make sync-wails-version` — prints `productVersion <old> -> <new> (updated - commit this)`.
+3. Commit both files: `git commit -am "chore: release v0.1.0"` (example).
 4. Tag: `git tag -a v0.1.0 -m "DbAccounts 0.1.0"`.
 5. Push branch and tags to GitLab and/or GitHub remotes.
+
+Step 2 is a convenience — any `make build`/`make package` runs it too, and it rewrites `wails.json`
+only when the value actually differs, so builds never churn the file.
 
 Tag names must match `VERSION` with a `v` prefix: `v` + contents of `VERSION`.
 
@@ -105,18 +117,21 @@ passed straight to `wails build` and its last element names the artifact.
 
 For CI-style build without re-running tests: `make package-ci`.
 
-Build injects into the binary:
+The version needs no ldflags — `main.go` embeds the `VERSION` file and assigns
+`version.Version` at startup, so `go run`, `wails dev` and every build report the same number.
+`-ldflags` inject only the build metadata:
 
-- `version.Version` — from `VERSION`
 - `version.Commit` — `git rev-parse --short HEAD`
 - `version.BuildDate` — UTC timestamp
+- `version.Repo` — the `origin` remote URL
 
-Development (`wails dev`) uses defaults in [`internal/version/version.go`](internal/version/version.go) unless you pass the same `-ldflags`.
+Running without them (`wails dev`, `go run .`) shows the real version with `Commit` as `dev` and the
+default repo URL from [`internal/version/version.go`](internal/version/version.go).
 
 ## Git tag checklist
 
 - [ ] `VERSION` updated
-- [ ] `make sync-wails-version`
+- [ ] `make sync-wails-version` run and the `wails.json` change committed
 - [ ] `make test` passes
 - [ ] `make package` produces the expected installer under `dist/` (local smoke test)
 - [ ] Tag `v$(cat VERSION)` created and pushed to GitHub

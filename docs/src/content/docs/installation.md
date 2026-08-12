@@ -16,6 +16,8 @@ ships a native installer per platform:
 | Debian, Ubuntu (x64) | `DbAccounts-v{VERSION}-linux-amd64.deb` |
 | Fedora, RHEL, openSUSE (x64) | `DbAccounts-v{VERSION}-linux-amd64.rpm` |
 
+`{VERSION}` here and in the commands below stands for the release you downloaded, e.g. `1.0.0`.
+
 Builds are **not** signed with an Apple or Microsoft developer certificate, so the first
 launch may show a security warning.
 
@@ -47,7 +49,7 @@ SmartScreen may warn about the unsigned installer: click **More info → Run any
 Silent install (per machine, needs an elevated prompt):
 
 ```bat
-msiexec /i DbAccounts-v0.3.0-windows-amd64.msi /qn
+msiexec /i DbAccounts-v{VERSION}-windows-amd64.msi /qn
 ```
 
 ### Linux
@@ -57,10 +59,10 @@ GTK and WebKit runtime libraries.
 
 ```bash
 # Debian / Ubuntu
-sudo apt install ./DbAccounts-v0.3.0-linux-amd64.deb
+sudo apt install ./DbAccounts-v{VERSION}-linux-amd64.deb
 
 # Fedora / RHEL
-sudo dnf install ./DbAccounts-v0.3.0-linux-amd64.rpm
+sudo dnf install ./DbAccounts-v{VERSION}-linux-amd64.rpm
 ```
 
 To remove: `sudo apt remove dbaccounts` or `sudo dnf remove dbaccounts`.

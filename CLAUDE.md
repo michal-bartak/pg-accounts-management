@@ -12,7 +12,8 @@ Cross-platform desktop app (**Wails v2** + embedded WebView, vanilla HTML/CSS/JS
 frontend, **pgx/v5** backend) for maintaining **PostgreSQL roles across many
 clusters**. Real DDL/privilege changes are performed by **user-defined SQL call
 templates** run against each cluster — the app does not hardcode DDL. Module:
-`github.com/michalbartak/dbaccounts`. Current version: see [VERSION](VERSION) (`0.3.0`).
+`github.com/michalbartak/dbaccounts`. Current version: read [VERSION](VERSION) — don't copy it
+into prose, it goes stale.
 
 ## Product decisions (don't regress)
 
@@ -631,8 +632,21 @@ make package         # build/bin/DbAccounts.app + the host OS installer in dist/
 runtime version: `main.go` embeds it (`//go:embed VERSION`) and sets `version.Version` at startup,
 so `go run` / `wails dev` / `make` all reflect it without ldflags (the `internal/version.Version`
 literal is only an empty-embed fallback). `-ldflags` inject only `Commit`/`BuildDate`/`Repo`.
-`make sync-wails-version` aligns `wails.json` `productVersion` (packaging metadata);
 `GetAppVersion()` surfaces the version. Config YAML `version:` is the **schema** version only.
+
+**`wails.json` `info.productVersion` is a generated mirror of VERSION — never hand-edit it**, and
+don't restate a version number in prose or docs either (use a `{VERSION}` placeholder, as
+[docs installation](docs/src/content/docs/installation.md) does). `make sync-wails-version` owns
+that field and `build`/`build-ci` depend on it, so `make package` and the release workflow always
+package matching bundle metadata (macOS `CFBundleVersion`/`CFBundleShortVersionString`, the Windows
+exe version resource — installer names and the MSI `ProductVersion` read VERSION directly). The copy
+exists only because Wails v2 hardcodes its config path to `<cwd>/wails.json` and offers **no** CLI
+flag or env var for the version; dropping the key makes Wails default to a hardcoded `1.0.0`, and a
+`preBuildHook` can't help (the project config is parsed before hooks run). The sync **writes only on
+a real change** (printing `… (updated - commit this)`), so builds don't churn the tracked file —
+which is how a stale `productVersion` once rode along in an unrelated commit. A build that bypasses
+`make` (bare `wails dev`/`wails build`) uses whatever is committed; that only affects dev bundle
+metadata, never a release.
 
 ## Packaging (installers, not archives)
 

@@ -62,10 +62,31 @@ endef
 version:
 	@echo $(VERSION)
 
-# Align wails.json productVersion with VERSION (run before release build).
+# wails.json info.productVersion is a GENERATED mirror of VERSION — never hand-edit it. It exists
+# only because Wails v2 hardcodes its config path and offers no flag/env to supply the version (and
+# dropping the key makes Wails default to a hardcoded 1.0.0). It feeds the macOS Info.plist
+# CFBundleVersion/CFBundleShortVersionString and the Windows exe version resource; installer names
+# and the MSI ProductVersion read the VERSION file directly. build/build-ci depend on this target,
+# so every release package is in sync. Writes only on a real change, so builds don't churn a tracked
+# file — when it does write, commit the one-line change.
+define SYNC_WAILS_VERSION_PY
+import json, pathlib
+want = pathlib.Path('VERSION').read_text().strip()
+path = pathlib.Path('wails.json')
+cfg = json.loads(path.read_text())
+have = cfg.get('info', {}).get('productVersion')
+if have == want:
+    print('wails.json productVersion already ' + want)
+else:
+    cfg.setdefault('info', {})['productVersion'] = want
+    # write_bytes: text mode would rewrite every line as CRLF on Windows (no .gitattributes here).
+    path.write_bytes((json.dumps(cfg, indent=2, ensure_ascii=False) + '\n').encode())
+    print('wails.json productVersion %s -> %s (updated - commit this)' % (have, want))
+endef
+export SYNC_WAILS_VERSION_PY
+
 sync-wails-version:
-	@python3 -c "import json, pathlib; v=pathlib.Path('VERSION').read_text().strip(); p=pathlib.Path('wails.json'); w=json.loads(p.read_text()); w.setdefault('info', {})['productVersion']=v; p.write_text(json.dumps(w, indent=2)+'\n')"
-	@echo "wails.json productVersion -> $(VERSION)"
+	@python3 -c "$$SYNC_WAILS_VERSION_PY"
 
 ensure-wails:
 	@if [ ! -f "$(WAILS)" ]; then go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0; fi

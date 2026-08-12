@@ -1,4 +1,6 @@
-// Package version holds application release metadata (overridden at link time via -ldflags).
+// Package version holds application release metadata. Version comes from the VERSION file (main.go
+// embeds it and assigns it at startup); Commit/BuildDate/Repo are overridden at link time via
+// -ldflags.
 package version
 
 import "strings"
