@@ -316,7 +316,7 @@ func quoteSQLKeywordList(value string) (string, error) {
 		return "", fmt.Errorf("at least one keyword is required")
 	}
 	for _, kw := range kws {
-		if !roleLiteralRE.MatchString(kw) {
+		if !identRE.MatchString(kw) {
 			return "", fmt.Errorf("invalid keyword %q: use letters, digits, underscore", kw)
 		}
 	}
@@ -328,7 +328,7 @@ func quoteSQLKeywordList(value string) (string, error) {
 // double-quoted; validation is the injection guard.
 func validConfigName(name string) (string, error) {
 	name = strings.TrimSpace(name)
-	if !gucNameRE.MatchString(name) {
+	if !IsGUCName(name) {
 		return "", fmt.Errorf("invalid setting name: %q", name)
 	}
 	return name, nil

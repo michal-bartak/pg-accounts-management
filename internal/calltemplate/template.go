@@ -9,15 +9,24 @@ import (
 	"strings"
 )
 
+// TokenPattern is the placeholder grammar as a regexp source string. Exported because the
+// frontend must carry its own copy (a different runtime renders the search-column templates),
+// and a copy that cannot be deleted should at least be pinned: a test compares this against the
+// literal in frontend/app.js so the two can't drift silently.
+const TokenPattern = `\$\{\{([^{}]*)\}\}|\$\{([^{}]*)\}`
+
 var (
 	// tokenRE matches the two placeholder namespaces in one left-to-right pass: ${{name}} is
 	// always a configured comment field, ${name} is always a built-in. Both name classes exclude
 	// braces, so the bare branch CANNOT swallow a ${{…}} token — the precedence is structural,
 	// not merely the order of the alternatives. Anything else containing "${" is malformed and is
 	// caught by leftoverPlaceholder.
-	tokenRE           = regexp.MustCompile(`\$\{\{([^{}]*)\}\}|\$\{([^{}]*)\}`)
-	placeholderNameRE = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
-	roleLiteralRE     = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+	tokenRE = regexp.MustCompile(TokenPattern)
+	// identRE is THE definition of a bare SQL identifier for the whole app — letters, digits and
+	// underscore, not starting with a digit. Placeholder names, role-name literals, preconfigured
+	// parent groups and comment-field keys are all the same shape, and used to be four separate
+	// copies of this pattern across three packages. Reachable elsewhere via IsIdentifier.
+	identRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 	// ARRAY['gr_a', 'gr_b'] || ${parent_roles}
 	arrayOrNullRE = regexp.MustCompile(`ARRAY\s*\[((?:\s*'[a-zA-Z_][a-zA-Z0-9_]*'\s*,?\s*)+)\]\s*\|\|\s*\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}`)
 	// ARRAY[${parent_roles}, 'gr_a', 'gr_b'] → ARRAY['gr_a', 'gr_b'] || ${parent_roles}
@@ -89,6 +98,64 @@ func leftoverPlaceholder(call string) bool {
 	return strings.Contains(tokenRE.ReplaceAllString(call, ""), "${")
 }
 
+// --- Public token API -------------------------------------------------------------------
+// The two-namespace placeholder syntax (${name} / ${{key}}) is also used by the Find-role
+// search-column templates, which `config` validates. That package had its own copy of the
+// token regex and its own "unfinished placeholder" scan; both now come from here, so the syntax
+// is defined once even though the two consumers do different things with the result.
+
+// TokenNS is which namespace a placeholder was written in.
+type TokenNS int
+
+const (
+	// TokenBuiltin is ${name} — a closed, per-context set.
+	TokenBuiltin TokenNS = iota
+	// TokenCommentField is ${{name}} — always a comment key.
+	TokenCommentField
+)
+
+// Token is one well-formed placeholder occurrence. Name is the trimmed inner text (which may be
+// empty — callers decide whether that is an error in their context).
+type Token struct {
+	NS   TokenNS
+	Name string
+}
+
+// ScanTemplate returns every well-formed placeholder in s, in order. Both inner-name classes
+// exclude braces, so a bare ${…} can never swallow a ${{…}}: the precedence is structural.
+func ScanTemplate(s string) []Token {
+	raw := scanTokens(s)
+	out := make([]Token, 0, len(raw))
+	for _, t := range raw {
+		ns := TokenBuiltin
+		if t.ns == nsCommentField {
+			ns = TokenCommentField
+		}
+		out = append(out, Token{NS: ns, Name: strings.TrimSpace(t.inner)})
+	}
+	return out
+}
+
+// HasMalformedPlaceholder reports a "${" that is not part of a well-formed token — ${x, ${{x}
+// or ${a{b}. Checked against the template text, never against substituted values.
+func HasMalformedPlaceholder(s string) bool {
+	return leftoverPlaceholder(s)
+}
+
+// IsIdentifier reports whether s is a bare SQL identifier: letters, digits and underscore, not
+// starting with a digit. This is the shared rule behind preconfigured parent groups, comment-field
+// keys, placeholder names and role-name literals — one definition rather than a copy per package.
+func IsIdentifier(s string) bool {
+	return identRE.MatchString(s)
+}
+
+// IsGUCName reports whether s is a valid role-GUC name: a bare identifier, optionally namespaced
+// (auto_explain.log_min_duration). GUC names are case-insensitive, so they are embedded unquoted
+// and this check IS the injection guard — which is exactly why it must not be duplicated.
+func IsGUCName(s string) bool {
+	return gucNameRE.MatchString(strings.TrimSpace(s))
+}
+
 // opSupportsCommentFields reports whether an operation offers ${{comment_key}} placeholders.
 func opSupportsCommentFields(operation string) bool {
 	return operation == "create_role" || operation == "set_comment"
@@ -141,7 +208,7 @@ func commentFieldSet(operation string, commentFields []string) map[string]bool {
 	m := make(map[string]bool, len(commentFields))
 	for _, f := range commentFields {
 		f = strings.TrimSpace(f)
-		if f != "" && placeholderNameRE.MatchString(f) {
+		if f != "" && identRE.MatchString(f) {
 			m[f] = true
 		}
 	}
@@ -161,7 +228,7 @@ func parsePlaceholderToken(tok rawToken, operation string) (parsedPlaceholder, e
 	}
 
 	if tok.ns == nsCommentField {
-		if !placeholderNameRE.MatchString(inner) {
+		if !identRE.MatchString(inner) {
 			return parsedPlaceholder{}, fmt.Errorf(
 				"invalid comment-field placeholder ${{%s}}: use letters, digits, underscore", inner)
 		}
@@ -184,7 +251,7 @@ func parsePlaceholderToken(tok rawToken, operation string) (parsedPlaceholder, e
 		}
 		literals := items[1:]
 		for _, lit := range literals {
-			if !roleLiteralRE.MatchString(lit) {
+			if !identRE.MatchString(lit) {
 				return parsedPlaceholder{}, fmt.Errorf("invalid role name %q", lit)
 			}
 		}
@@ -196,7 +263,7 @@ func parsePlaceholderToken(tok rawToken, operation string) (parsedPlaceholder, e
 		}, nil
 	}
 
-	if !placeholderNameRE.MatchString(inner) {
+	if !identRE.MatchString(inner) {
 		return parsedPlaceholder{}, fmt.Errorf(
 			"invalid placeholder ${%s}: use ${loginname} or ARRAY['fixed_role', ...] || ${parent_roles}",
 			inner,

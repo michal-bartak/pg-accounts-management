@@ -2,9 +2,9 @@ package commands
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
+	"github.com/michalbartak/dbaccounts/internal/calltemplate"
 	"github.com/michalbartak/dbaccounts/internal/model"
 )
 
@@ -20,12 +20,11 @@ const (
 	OpResetConfig    = "reset_config"
 )
 
-// configNameRE validates a GUC name (optionally namespaced, e.g. auto_explain.log_min_duration).
-var configNameRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$`)
-
-// ValidConfigName reports whether name is an acceptable role GUC name.
+// ValidConfigName reports whether name is an acceptable role GUC name. Delegates to
+// calltemplate, which embeds the name unquoted and so owns the rule — validating it here against
+// a second copy of the pattern is how the two could have drifted apart.
 func ValidConfigName(name string) bool {
-	return configNameRE.MatchString(strings.TrimSpace(name))
+	return calltemplate.IsGUCName(name)
 }
 
 // allowedAttributeKeywords are the ALTER ROLE attribute keywords the app may emit.

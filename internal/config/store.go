@@ -5,18 +5,19 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/michalbartak/dbaccounts/internal/calltemplate"
 	"github.com/michalbartak/dbaccounts/internal/model"
 	"gopkg.in/yaml.v3"
 )
 
-// parentRoleRE bounds a preconfigured parent group to a bare SQL identifier, matching
-// what the grant path accepts (unquoted role names).
-var parentRoleRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+// A preconfigured parent group and a comment-field key are both bounded to a bare SQL identifier,
+// matching what the grant path accepts (unquoted role names). The rule lives in calltemplate —
+// the package that actually embeds these values in SQL — rather than in a copy of the pattern here.
+var isIdentifier = calltemplate.IsIdentifier
 
 var ErrNotFound = errors.New("config not found")
 
@@ -675,7 +676,7 @@ func validateParentRoles(roles []string) ([]string, error) {
 		if r == "" {
 			continue
 		}
-		if !parentRoleRE.MatchString(r) {
+		if !isIdentifier(r) {
 			return nil, fmt.Errorf("invalid parent group %q: use letters, digits, underscore", r)
 		}
 		if seen[r] {
@@ -714,7 +715,7 @@ func validateCommentFields(fields []model.CommentField) ([]model.CommentField, e
 		if key == "" {
 			continue
 		}
-		if !parentRoleRE.MatchString(key) {
+		if !isIdentifier(key) {
 			return nil, fmt.Errorf("invalid comment field key %q: use letters, digits, underscore", key)
 		}
 		if seen[key] {
@@ -737,7 +738,7 @@ func sanitizeCommentFields(fields []model.CommentField) []model.CommentField {
 	var out []model.CommentField
 	for _, f := range fields {
 		key := strings.TrimSpace(f.Key)
-		if key == "" || seen[key] || !parentRoleRE.MatchString(key) {
+		if key == "" || seen[key] || !isIdentifier(key) {
 			continue
 		}
 		seen[key] = true
@@ -754,9 +755,9 @@ func sanitizeCommentFields(fields []model.CommentField) []model.CommentField {
 // written ${{key}} instead, so a key named "comment" stays reachable.
 var searchBuiltins = map[string]bool{"comment": true}
 
-// searchTokenRE mirrors calltemplate's token regex: ${{key}} is a comment key, ${name} a built-in.
-// Both name classes exclude braces, so the bare branch cannot swallow a ${{…}} token.
-var searchTokenRE = regexp.MustCompile(`\$\{\{([^{}]*)\}\}|\$\{([^{}]*)\}`)
+// The token syntax itself comes from calltemplate (ScanTemplate / HasMalformedPlaceholder) — a
+// search column is a different NAMESPACE over the same grammar, not a different grammar, so there
+// is no second regex here to drift out of step with the call templates'.
 
 // validateSearchColumns trims label+template and drops rows with a blank template (a column
 // with nothing to show). A blank label is kept — the header cell is then simply empty. A malformed
@@ -801,12 +802,12 @@ func sanitizeSearchColumns(cols []model.SearchColumn) []model.SearchColumn {
 // unconstrained beyond that: they are arbitrary JSON keys (which may contain '-' or '.'), and the
 // template is display text the frontend HTML-escapes, never SQL.
 func checkSearchTemplateSyntax(tmpl string) error {
-	if strings.Contains(searchTokenRE.ReplaceAllString(tmpl, ""), "${") {
+	if calltemplate.HasMalformedPlaceholder(tmpl) {
 		return fmt.Errorf(
 			"invalid search column template %q: unfinished placeholder — write ${comment} or ${{comment_key}} with both braces closed", tmpl)
 	}
-	for _, m := range searchTokenRE.FindAllStringSubmatch(tmpl, -1) {
-		if strings.TrimSpace(m[1]+m[2]) == "" {
+	for _, tok := range calltemplate.ScanTemplate(tmpl) {
+		if tok.Name == "" {
 			return fmt.Errorf("invalid search column template %q: empty placeholder — put a name between the braces", tmpl)
 		}
 	}
@@ -822,15 +823,14 @@ func checkSearchTemplate(tmpl string) error {
 	if err := checkSearchTemplateSyntax(tmpl); err != nil {
 		return err
 	}
-	for _, m := range searchTokenRE.FindAllStringSubmatch(tmpl, -1) {
-		if m[1] != "" { // a ${{key}} token — any comment key is allowed
-			continue
+	for _, tok := range calltemplate.ScanTemplate(tmpl) {
+		if tok.NS == calltemplate.TokenCommentField {
+			continue // any comment key is allowed
 		}
-		name := strings.TrimSpace(m[2])
-		if !searchBuiltins[name] {
+		if !searchBuiltins[tok.Name] {
 			return fmt.Errorf(
 				"invalid search column template %q: ${%s} is not supported — use ${{%s}} for a comment key, or ${comment} for the whole comment",
-				tmpl, name, name)
+				tmpl, tok.Name, tok.Name)
 		}
 	}
 	return nil
