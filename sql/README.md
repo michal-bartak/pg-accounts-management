@@ -66,7 +66,7 @@ grant_parents:
 | Identifier | Role/login names | `testuser`, `Gr_devs_all_ro` |
 | Identifier list | `${parent_roles}` on `grant_parents` | `gr_a, gr_b` (comma-separated in form) |
 | Literal (quoted) | Passwords, `${comment}` on `set_comment` | `'secret'`, `'{"full_name":"O''Hara"}'` |
-| Comment field (typed) | `${<comment field key>}` on `create_role` / `set_comment` | `'John Doe'` (string), `42` (number), `TRUE` (bool), `NULL` (empty/absent), `'["a","b"]'` (array/object as JSON) |
+| Comment field (typed) | `${{<comment field key>}}` on `create_role` / `set_comment` | `'John Doe'` (string), `42` (number), `TRUE` (bool), `NULL` (empty/absent), `'["a","b"]'` (array/object as JSON) |
 
 Function mode always uses `$n` binds instead of embedding.
 
@@ -107,7 +107,7 @@ values.
 |--------|----------|
 | `${loginname}`, `${new_password}`, … | Value from the Operations form, bound as `$n`. |
 | `${parent_roles}` | Expands **inline** to `ARRAY['gr_a', 'gr_b']` (a text[] literal, values verbatim), **not** a bind; empty → `NULL`. |
-| `${<comment field>}` | Bound as its typed value (text/number/bool, or `NULL`). |
+| `${{<comment field>}}` | Bound as its typed value (text/number/bool, or `NULL`). |
 | `NULL`, `'literal'` | Copied into SQL unchanged (from trusted config). |
 | `ARRAY['gr_a', 'gr_b'] \|\| ${parent_roles}` | Fixed roles in template; empty → `\|\| NULL`; set → `\|\| $n::text[]` (this concat form binds as `$n::text[]`, unlike a standalone `${parent_roles}`). |
 | `ARRAY[${parent_roles}, 'gr_a', 'gr_b']` | Normalized to `ARRAY['gr_a', 'gr_b'] \|\| ${parent_roles}`. |
@@ -119,14 +119,14 @@ values.
 ## Create role
 
 ```text
-admin_access.create_role(${loginname}, NULL, ${full_name}, ${e_mail}, ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_roles})
+admin_access.create_role(${loginname}, NULL, ${{full_name}}, ${{e_mail}}, ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_roles})
 ```
 
 ```yaml
 db_functions:
   create_role:
     execution: function
-    call: "admin_access.create_role(${loginname}, NULL, ${full_name}, ${e_mail}, ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_roles})"
+    call: "admin_access.create_role(${loginname}, NULL, ${{full_name}}, ${{e_mail}}, ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_roles})"
 ```
 
 ---
@@ -219,7 +219,7 @@ set_comment:
   call: "COMMENT ON ROLE ${loginname} IS ${comment}"
 ```
 
-`${loginname}` is a validated identifier; `${comment}` is embedded as an **escaped string literal** (single quotes doubled), so JSON comments like `{"full_name":"O'Hara"}` are safe. Each configured comment field is also available as `${<key>}` (typed; empty/absent → `NULL`) — useful for splitting the comment into columns of a wrapper function, e.g. `admin.set_role_meta(${loginname}, ${full_name}, ${e_mail})`.
+`${loginname}` is a validated identifier; `${comment}` is embedded as an **escaped string literal** (single quotes doubled), so JSON comments like `{"full_name":"O'Hara"}` are safe. Each configured comment field is also available as `${{<key>}}` (typed; empty/absent → `NULL`) — useful for splitting the comment into columns of a wrapper function, e.g. `admin.set_role_meta(${loginname}, ${{full_name}}, ${{e_mail}})`. Note the double braces: `${comment}` is the whole comment, `${{comment}}` a JSON key named `comment`.
 
 ---
 
@@ -285,14 +285,25 @@ editor's **Default** button reverts a read to its vanilla built-in.
 
 ## Allowed placeholders
 
+Two namespaces, and they never overlap:
+
+- **`${name}`** — a built-in, from the closed set the operation offers (below). Any other name is
+  rejected when you save.
+- **`${{key}}`** — a configured comment field (Settings → Comment fields), on `create_role` and
+  `set_comment` only.
+
+That separation is what keeps a comment key named like a built-in usable: `${comment}` is the whole
+comment, `${{comment}}` is a JSON key called `comment`. A comment field cannot be used inside the
+`ARRAY[...] || ${...}` concat form.
+
 | Operation | `${...}` names | Statement/block embedding |
 |-----------|----------------|---------------------------|
-| `create_role` | `loginname`, `parent_roles`, `${<comment field>}` | `loginname` identifier; `parent_roles` = statement → quoted identifier list, function → inline `ARRAY['a','b']`; comment fields typed (empty/absent → `NULL`) |
+| `create_role` | `loginname`, `parent_roles`, `${{<comment field>}}` | `loginname` identifier; `parent_roles` = statement → quoted identifier list, function → inline `ARRAY['a','b']`; comment fields typed (empty/absent → `NULL`) |
 | `remove_role` | `loginname`, `rolename` | Identifiers |
 | `grant_parents` | `loginname`, `parent_roles` | Identifiers; `parent_roles` = comma-separated identifier list |
 | `revoke_parents` | `loginname`, `parent_roles` | Same as grant_parents |
 | `change_password` | `loginname`, `new_password` | Identifier + literal (password) |
-| `set_comment` | `loginname`, `comment`, `${<comment field>}` | Identifier + literal (comment); comment fields typed (empty/absent → `NULL`) |
+| `set_comment` | `loginname`, `comment`, `${{<comment field>}}` | Identifier + literal (comment); comment fields typed (empty/absent → `NULL`) |
 | `set_attribute` | `loginname`, `attributes` (alias `attribute`) | Identifier + space-separated whitelisted keywords (e.g. `NOLOGIN`) |
 | `set_config` | `loginname`, `config_name`, `config_value` | Identifier + bare GUC name (unquoted) + literal |
 | `reset_config` | `loginname`, `config_name` | Identifier + bare GUC name (unquoted) |
@@ -310,6 +321,7 @@ editor's **Default** button reverts a read to its vanilla built-in.
 | `SELECT` in function template | Rejected on save |
 | Omitting `DO … BEGIN … END` in a block template | Block mode runs your text verbatim — write the complete anonymous block yourself |
 | Full call pasted into legacy `name` field | Migrated or reset on load |
+| `${full_name}` for a comment field | Rejected on save: comment keys use `${{full_name}}` — single braces are built-ins only |
 
 ---
 

@@ -47,10 +47,12 @@ db_functions:
     execution: statement
     call: "CREATE ROLE ${loginname}"
   # create_role:
-  #   # ${parent_roles}, ${<comment field>} (one per comment_fields entry, e.g. ${full_name},
-  #   # ${e_mail}) available; empty/absent comment fields pass as SQL NULL; ARRAY['grp'] || ${parent_roles}
+  #   # Built-ins are single-brace (${loginname}, ${parent_roles}); a comment field is
+  #   # DOUBLE-brace, one per comment_fields entry (e.g. ${{full_name}}, ${{e_mail}}) —
+  #   # empty/absent comment fields pass as SQL NULL. A comment field cannot appear inside the
+  #   # ARRAY['grp'] || ${parent_roles} concat form.
   #   execution: function
-  #   call: "admin_access.create_role(${loginname}, NULL, ${full_name}, ${e_mail}, ARRAY['gr_personal_users'] || ${parent_roles})"
+  #   call: "admin_access.create_role(${loginname}, NULL, ${{full_name}}, ${{e_mail}}, ARRAY['gr_personal_users'] || ${parent_roles})"
   remove_role:
     execution: statement
     call: "DROP ROLE ${loginname}"
@@ -208,3 +210,19 @@ comment_fields:
     label: Full name
   - key: e_mail
     label: Email
+
+# search_columns: extra columns shown next to the role name in the Find-role results (the role
+# name itself is always the first column and is not configurable). Ordered. Each template is
+# display text supporting exactly two placeholders: ${{<key>}} resolves to that key in the role's
+# JSON comment (any key, not just the comment_fields ones), and ${comment} to the whole comment
+# verbatim — which is how a comment whose JSON has its own "comment" key stays addressable, and the
+# way to show a plain-text comment. Anything else is rejected when saving, including the
+# call-template names ${loginname} / ${parent_roles}, which a display column has no use for.
+# An unknown key, a JSON null and a non-JSON comment all resolve to empty,
+# and the result is whitespace-collapsed, so "${{first_name}} ${{last_name}}" yields "John" when
+# there is no last name. Non-string values render typed (42, true, ["a"]).
+# Omit the key to get the default single "Full name" column; an explicit empty list
+# (search_columns: []) shows the role name only.
+search_columns:
+  - label: Full name
+    template: ${{full_name}}

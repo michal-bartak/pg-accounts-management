@@ -156,7 +156,6 @@ func (r *Runner) SearchRoles(term string, categoryIDs, clusterIDs []string, auth
 					Category:  cl.Category,
 					LoginName: row.Name,
 					Comment:   row.Comment,
-					FullName:  pg.ParseFullName(row.Comment),
 				})
 			}
 			mu.Lock()
@@ -217,7 +216,6 @@ func (r *Runner) LoadRoleDetails(loginName string, categoryIDs, clusterIDs []str
 				Category:   cl.Category,
 				Exists:     exists,
 				Comment:    comment,
-				FullName:   pg.ParseFullName(comment),
 				Parents:    parents,
 				Attributes: attrs,
 				Settings:   settings,

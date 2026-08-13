@@ -112,8 +112,7 @@ into prose, it goes stale.
   Fields↔Raw. The **Fields** toggle is disabled whenever the raw text is non-empty and not a
   JSON object (`commentFieldsBlocked`) — Fields can't represent plain text, so switching would
   drop it; edit such comments in Raw. A non-JSON comment saves as plain text with an inline note. The backend
-  `set_comment` op stays an opaque quoted literal; `pg.ParseFullName` (`full_name`) is kept
-  only for search-result display. The comment UI **mode follows the staged state**
+  `set_comment` op stays an opaque quoted literal. The comment UI **mode follows the staged state**
   (`commentEditor.varies`), not the DB baseline: while comments vary the inline editor is hidden and
   reconciliation moves to the **Comments dialog**, whose per-version boxes reuse the
   same Fields/Raw editor (`commentVersionEditors`). Each version box (when there is >1) also has a
@@ -127,6 +126,55 @@ into prose, it goes stale.
   sent from the dialog — staged comments publish with the rest of the edits on **Save changes**
   (`buildAlterClusterOps` prefers a cluster's override, else the inline editor's comment).
   `commentOverrides` is cleared by `resetEditMaps` (pick / save / mode switch).
+- **Search-result columns are configured, never hardcoded.** What shows next to the rolename in
+  the Find-role popup is **`Config.SearchColumns`** (YAML `search_columns`, ordered
+  `{label,template}`), a Settings-managed list (**Role Details** group, `#search-columns-editor`,
+  `searchColumnsDraft`) saved via `SaveSearchColumns` (`Store.UpdateSearchColumns` →
+  `validateSearchColumns`: trims, drops blank-template rows, keeps a blank label, and applies
+  `checkSearchTemplate`). The rolename column is fixed and not configurable. A **template is display
+  text, never SQL**, rendered **frontend-side** by `renderSearchTemplate(tmpl, comment)` from the
+  comment `RoleMatch` already carries — so no read query, column contract, or `pg` change is
+  involved, and a Settings change takes effect without re-searching. It uses **the same two
+  namespaces as the call templates** (see the placeholder-namespace decision below):
+  `${{<key>}}` = any key of the JSON comment (not just `comment_fields`); the bare namespace is a
+  **closed** set whose only member is `${comment}` = the raw comment (the only way to show a
+  plain-text one). Unknown key / JSON `null` / non-JSON comment → `''`; non-strings typed
+  via `commentValueString` (`42`/`true`/`["a"]`); the result is whitespace-collapsed so
+  `${{first}} ${{last}}` with no last name is `John`, not `John ` (literal separators are kept).
+  An unknown **bare** name renders **as itself** (not `''`), so the mistake is visible in the row,
+  and `checkSearchTemplate` refuses to save it with a message naming the `${{…}}` form;
+  `searchTemplateError` in the frontend mirrors that check to flag the row live and block Save with
+  a **row-numbered** message the backend error cannot carry. Load-time `sanitizeSearchColumns` uses
+  the weaker `checkSearchTemplateSyntax` on purpose: a stale bare name is **kept and shown broken**
+  rather than silently deleted from the user's config. Comment KEYS stay unvalidated beyond that —
+  they are arbitrary JSON keys (`e-mail`) and the output is HTML-escaped.
+  `search_columns` carries **no `omitempty`**: an
+  absent key (older config) gets the default `Full name = ${{full_name}}`, while an explicit
+  `search_columns: []` means "rolename only" and must survive a restart — hence `Load` keys the
+  default off `== nil` and `sanitizeSearchColumns` preserves nil-ness. The frontend `searchColumns()`
+  therefore has **no default fallback** (unlike `commentFields()`), or an explicit empty list would
+  resurrect the default. `searchCellValues` picks each value from the first cluster in
+  `byGroupThenAlias` order (results arrive in completion order), flagging `≠` when clusters disagree.
+  **Layout**: rows stay single-line clickable `<button>`s, and `renderAlterResults` puts ONE
+  `grid-template-columns` on `#alter-results` as `--search-cols`, which the header
+  (`.alter-result-head`) and every row use as their own grid — equal-width grids with an identical
+  template line up without CSS subgrid. Three traps this cost, don't undo them: (1) `ch`/`%` resolve
+  **per element**, so `.alter-result-head` must pin `font-size: var(--fs-base)` to match the
+  `<button>` row (a 16px header over a 14.4px row shifted every column ~11%) and the rolename's bold
+  must sit on the `.alter-login` **child**, never the row; (2) the popup is **content-sized**, so a
+  percentage track is circular and silently stops columns from reaching their own content width —
+  every track is absolute or `fr`; (3) `ch` is the width of "0" and under-measures proportional text
+  (a 20-char email needs ~20% more than 20ch), so `searchMeasureTracks` measures the real text with
+  canvas `measureText` using fonts read from throwaway probes (`searchCellFonts`), with
+  `searchColNatural`'s `ch` estimate only as the can't-measure fallback. A column past
+  `SEARCH_COL_MAX_CH` becomes `1fr` (takes the free space) rather than just clipping; the rolename
+  track is definite so it yields last; the chips get their own trailing
+  `minmax(<measured>, auto)` track — `searchBadgeTrack` pins its base from `badgeRowWidth` so the
+  chip-less header reserves the same width (otherwise the surplus went to the `fr` columns and
+  un-aligned them), while the `auto` max still stretches to keep the chips flush right. Every cell
+  carries a `title`, since any column is squeezed below its content in a narrow enough window, and
+  `.alter-results` is `overflow:auto` as the last resort. `pg.ParseFullName` / `RoleMatch.FullName` /
+  `ClusterRoleDetail.FullName` were **removed** with this — don't reintroduce a hardcoded key.
 - **One shared role form for Create and Alter.** Both modes render through
   `renderAlterDetail` over `alterDetails` and the same edit maps (`alterAdd`/`alterRevoke`,
   `alterAttrAdd`/`alterAttrRemove`, `alterConfigSet`/`alterConfigReset`, password). Mode =
@@ -256,8 +304,9 @@ into prose, it goes stale.
    [internal/pg/introspect.go](internal/pg/introspect.go): `SearchRoles` (matches
    `rolname` or `COMMENT ON ROLE` via `pg_shdescription`), `RoleDetail` (existence,
    comment, attribute flags, parent memberships from `pg_auth_members`, and role GUCs
-   from `pg_roles.rolconfig` → `Settings` map), `ParseFullName` (JSON comment
-   `full_name`), `likePattern` (escaped ILIKE). `batch.Runner.SearchRoles` /
+   from `pg_roles.rolconfig` → `Settings` map), `likePattern` (escaped ILIKE). The package parses
+   **no** comment keys — a search result's extra columns are rendered frontend-side from
+   `RoleMatch.Comment` (see the search-columns decision). `batch.Runner.SearchRoles` /
    `LoadRoleDetails` / `LoadRoleDependencies` fan out over the **resolved selected clusters** (not
    all) and collect per-cluster errors instead of failing. All three return **one entry per
    cluster** — `ClusterRoleMatches` / `ClusterRoleDetail` / `ClusterRoleDependencies`, each with
@@ -291,7 +340,8 @@ into prose, it goes stale.
 Config/clusters/groups: `GetConfig`, `GetConfigPath`, `ReloadConfig`, `AddCluster`,
 `UpdateCluster`, `DeleteCluster`, `AddCategory`, `UpdateCategory`, `DeleteCategory`,
 `SaveDBFunctions`, `SaveDBReads` (introspection queries), `SaveBatchSettings`, `SaveUISettings`,
-`SaveParentRoles`, `SaveCommentFields`, `SaveTargetSelection`, `SaveClusters`
+`SaveParentRoles`, `SaveCommentFields`, `SaveSearchColumns` (Find-role result columns),
+`SaveTargetSelection`, `SaveClusters`
 (staged Clusters editor — replaces the whole clusters+categories set at once via
 `Store.SaveClustersAndCategories`; the per-item `Add/Update/Delete Cluster/Category` are kept
 but no longer used by the UI), `GetAppVersion`, `CheckForUpdate` (GitHub-Releases version check →
@@ -320,16 +370,37 @@ pre-flight dependency check run before any `remove_role`).
 Defaults in [internal/config/store.go](internal/config/store.go); example in
 [config.example.yaml](config.example.yaml); DSL in [sql/README.md](sql/README.md).
 
+**Two placeholder namespaces, and they never overlap** (`internal/calltemplate`): **`${name}`** is a
+built-in from the **closed** per-op set (`AllowedPlaceholders`), **`${{name}}`** is always a
+configured comment field. One `tokenRE` matches both in a single pass; both inner name classes
+exclude braces, so the bare branch **cannot** swallow a `${{…}}` token — the precedence is
+structural, not the order of the alternatives. `scanTokens` yields `rawToken{ns,start,end}`,
+`parsedPlaceholder.ns` carries it, and **`placeholderKindFor` is the single source of truth**: both
+the emitted SQL shape and the bound value derive from the kind it returns. That is not cosmetic —
+`buildFunctionQuery` used to take the shape from a built-ins-first lookup and the value from
+comment-field-set membership, which disagreed on exactly the colliding names, so `${comment}` on
+`set_comment` bound the whole comment through the comment-field JSON decoder (keys reordered,
+`""`→NULL, `42`→float64). Because the args map is keyed by bare name, a comment field's value is
+namespaced with **`model.CommentArgKey` (`cf:`)** inside `commands.BuildArgs`, so `${comment}` and
+`${{comment}}` can both resolve for one call; the **Wails wire format is unchanged** (the
+`CommentFields` maps stay keyed by the bare key). Malformed forms (`${x`, `${{x}`, `${a{b}`) are
+rejected by `leftoverPlaceholder` **on the template before substitution** — which replaced a
+post-substitution `strings.Contains(out, "${")` guard that also tripped on a *value* containing
+`${`. `fieldBind` and its statement-mode guard were deleted as unreachable. This **breaks** any
+template that referenced a comment key in single braces, and there is deliberately **no migration**
+for it (the app is pre-release, so a rewrite-on-load would be permanent clutter) — a stale template
+is simply rejected on save with a message naming the `${{…}}` form.
+
 All defaults are **statement** mode, vanilla PostgreSQL DDL:
 
 | op | placeholders | default template |
 |----|--------------|------------------|
-| `create_role` | loginname, parent_roles, **`${<comment field>}`** (one per `Config.CommentFields`) | `CREATE ROLE ${loginname}` (parent_roles + comment fields unused by the vanilla default; a `function`-mode override can consume them, e.g. `admin.create(${loginname}, ${parent_roles})`) |
+| `create_role` | loginname, parent_roles, **`${{<comment field>}}`** (one per `Config.CommentFields`) | `CREATE ROLE ${loginname}` (parent_roles + comment fields unused by the vanilla default; a `function`-mode override can consume them, e.g. `admin.create(${loginname}, ${parent_roles})`) |
 | `remove_role` | loginname (rolename alias) | `DROP ROLE ${loginname}` |
 | `grant_parents` | loginname, parent_roles | `GRANT ${parent_roles} TO ${loginname}` |
 | `revoke_parents` | loginname, parent_roles | `REVOKE ${parent_roles} FROM ${loginname}` |
 | `change_password` | loginname, new_password | `ALTER ROLE ${loginname} PASSWORD ${new_password}` |
-| `set_comment` | loginname, **comment**, **`${<comment field>}`** (one per `Config.CommentFields`) | `COMMENT ON ROLE ${loginname} IS ${comment}` |
+| `set_comment` | loginname, **comment**, **`${{<comment field>}}`** (one per `Config.CommentFields`) | `COMMENT ON ROLE ${loginname} IS ${comment}` |
 | `set_attribute` | loginname, **attributes** (space-separated keyword list; `attribute` singular kept as an alias) | `ALTER ROLE ${loginname} WITH ${attributes}` |
 | `set_config` | loginname, **config_name**, config_value | `ALTER ROLE ${loginname} SET ${config_name} = ${config_value}` |
 | `reset_config` | loginname, **config_name** | `ALTER ROLE ${loginname} RESET ${config_name}` |
@@ -365,7 +436,7 @@ whitelisted (`SUPERUSER`/`NOSUPERUSER`, `CREATEROLE`/…, `LOGIN`, `REPLICATION`
 `commands.ValidateOperation`.
 
 ### Adding a new operation
-Extend all of: `calltemplate.AllowedPlaceholders` + `placeholderKindForField` (+ a new
+Extend all of: `calltemplate.AllowedPlaceholders` + `placeholderKindFor` (+ a new
 `fieldKind` and `buildEmbedded` case if the value needs non-standard embedding, e.g.
 `fieldConfigName` for unquoted GUC names); `commands` op const + `BuildArgs` +
 `ValidateOperation`; `model.DBFunctions` + `*Params` + `OperationSpec`;
@@ -419,11 +490,14 @@ toolbar hosts the right-aligned **Cluster groups** button (`btn-manage-groups` �
 Save button, so it lives here rather than Settings). Settings is organised into
 divider-separated **`.settings-group`** sections (small uppercase `.settings-group-label`,
 same look as the role form): **General** (Appearance theme + Max concurrency), **Preconfigured
-parent groups**, **Comments** (Comment fields + Preferred comment view), and **DB command
-templates**. Parent groups and Comment fields are drag-orderable add/remove **list editors**
+parent groups**, **Comments** (Comment fields + Preferred comment view), **Role Details** (search
+result columns), and **DB command
+templates**. Parent groups, Comment fields and Find-role columns are drag-orderable add/remove
+**list editors**
 built from the shared `listRowHtml`/`wireListEditor` helpers (drag handle + remove ×, `Add…`
-button), staged in `parentRolesDraft` / `commentFieldsDraft` (`#parent-roles-editor` /
-`#comment-fields-editor`). DB templates are a compact list of command names; clicking one opens
+button), staged in `parentRolesDraft` / `commentFieldsDraft` / `searchColumnsDraft`
+(`#parent-roles-editor` / `#comment-fields-editor` / `#search-columns-editor`). DB templates are a
+compact list of command names; clicking one opens
 the `#fn-dialog` popup (execution type, call template, clickable placeholder chips — staged in
 `dbFnDraft`). The popup's titlebar (`.fn-titlebar`) has a square **help icon button** (`#fn-help`,
 `.icon-btn`, top-right, top-aligned with the title) that opens the `#template-help-dialog` syntax
@@ -432,7 +506,8 @@ in **every** template editor popup. An **Introspection queries** section (`#db-r
 driven by `DB_READS`) sits in a two-column grid (`.settings-two-col`) beside DB command templates;
 it lists the four read queries (incl. `role_dependencies`) and opens the **same** `#fn-dialog` in **read mode**
 (`fnDialogMode`/`openReadDialog`): the execution select is hidden (`setFnDialogExecutionRow`),
-the placeholder chips show a single **`${rolename}`** chip (`renderFnPlaceholders(['rolename'])`),
+the placeholder chips show a single **`${rolename}`** chip
+(`renderFnPlaceholders([{token:'${rolename}',kind:'builtin'}])`),
 and the contract sentence + query textarea + **Default** button remain; Done stages into
 `dbReadsDraft` (saved via `SaveDBReads`/`readDBReadsFromEditor`, dirty-tracked by `savedDBReads`).
 The **Preferred comment view** toggle is `#comment-view-pref`

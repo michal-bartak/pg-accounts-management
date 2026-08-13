@@ -85,12 +85,12 @@ Config: `db_functions.<operation>.call` + optional `.execution` (`function` \| `
 
 | `operation` | Allowed `${...}` | Notes |
 |-------------|------------------|-------|
-| `create_role` | loginname, parent_roles, `${<comment field>}` (per `Config.CommentFields`) | `parent_roles`: statement → `"a", "b"`, function → inline `ARRAY['a','b']`; comment fields typed (string→literal, num/bool→bare, empty/absent→`NULL`); `ARRAY \|\|` requires `execution: function` |
+| `create_role` | loginname, parent_roles, `${{<comment field>}}` (per `Config.CommentFields`) | `parent_roles`: statement → `"a", "b"`, function → inline `ARRAY['a','b']`; comment fields typed (string→literal, num/bool→bare, empty/absent→`NULL`); `ARRAY \|\|` requires `execution: function` |
 | `remove_role` | loginname, rolename (alias) | `statement`: e.g. `DROP ROLE ${loginname}`; `block`: a complete anonymous block (`DO $tag$ … $tag$;`), run verbatim |
 | `grant_parents` | loginname, parent_roles | `statement`: `GRANT ${parent_roles} TO ${loginname}` — identifiers, not quoted |
 | `revoke_parents` | loginname, parent_roles | Default `statement`: `REVOKE ${parent_roles} FROM ${loginname}` |
 | `change_password` | loginname, new_password | |
-| `set_comment` | loginname, comment, `${<comment field>}` (per `Config.CommentFields`) | Default `statement`: `COMMENT ON ROLE ${loginname} IS ${comment}` — comment as escaped literal; comment fields typed (empty/absent→`NULL`) |
+| `set_comment` | loginname, comment, `${{<comment field>}}` (per `Config.CommentFields`) | Default `statement`: `COMMENT ON ROLE ${loginname} IS ${comment}` — comment as escaped literal; comment fields typed (empty/absent→`NULL`) |
 | `set_attribute` | loginname, attributes (alias: attribute) | Default `statement`: `ALTER ROLE ${loginname} WITH ${attributes}` — space-separated whitelisted keywords (SUPERUSER/NOSUPERUSER/…), embedded unquoted |
 | `set_config` | loginname, config_name, config_value | Default `statement`: `ALTER ROLE ${loginname} SET ${config_name} = ${config_value}` — `config_name` is a bare unquoted GUC name (`fieldConfigName`, `gucNameRE`-validated), value a literal. Role GUCs read from `pg_roles.rolconfig`. |
 | `reset_config` | loginname, config_name | Default `statement`: `ALTER ROLE ${loginname} RESET ${config_name}` |
@@ -103,14 +103,15 @@ Config: `db_functions.<operation>.call` + optional `.execution` (`function` \| `
 
 (parent_roles and the configured comment-field placeholders are unused by the vanilla default; a
 `function`-mode override can consume them, e.g.
-`admin_access.create_role(${loginname}, NULL, ${full_name}, ${e_mail}, ARRAY['grp'] || ${parent_roles})`).
+`admin_access.create_role(${loginname}, NULL, ${{full_name}}, ${{e_mail}}, ARRAY['grp'] || ${parent_roles})`).
 Loading an existing config never force-overwrites user templates; the `#fn-dialog` **Default**
 button reverts one template to the vanilla built-in.
 
 **Template processing:**
 
 - **Function mode:** `${field}` → `$n` text bind from form (`internal/commands` arg map).
-- **Statement/block:** `loginname`, `parent_roles`, `rolename` → double-quoted identifiers; `parent_roles` split on commas → `"a", "b"` (create_role/grant/revoke); `new_password`, `comment`, `config_value` → SQL string literals; **comment fields** (create_role/set_comment) → JSON-value-typed (string→literal, number/bool→bare, array/object→JSON literal, empty/`null`/absent→bare `NULL`), threaded in as variadic `commentFields ...string` from `Config.CommentFieldKeys()`.
+- **Two namespaces, never overlapping:** `${name}` = a built-in from the CLOSED per-op set; `${{name}}` = a configured comment field, always. One `tokenRE` matches both (inner classes exclude braces, so the bare branch can't swallow a double form); `parsedPlaceholder.ns` carries it and `placeholderKindFor` is the single source of truth for BOTH the SQL shape and the bound value — `buildFunctionQuery` previously took them from two disagreeing lookups, which corrupted `${comment}` on `set_comment` when a field was keyed `comment`. Comment-field values are namespaced in the args map via `model.CommentArgKey` (`cf:`) inside `commands.BuildArgs`; the Wails wire format is unchanged. Malformed `${…}` is rejected before substitution (`leftoverPlaceholder`). There is deliberately NO migration for the old single-brace form — the app is pre-release, so a stale template is simply rejected with a message naming the `${{…}}` form.
+- **Statement/block:** `loginname`, `parent_roles`, `rolename` → double-quoted identifiers; `parent_roles` split on commas → `"a", "b"` (create_role/grant/revoke); `new_password`, `comment`, `config_value` → SQL string literals; **comment fields** (`${{key}}`, create_role/set_comment) → JSON-value-typed (string→literal, number/bool→bare, array/object→JSON literal, empty/`null`/absent→bare `NULL`), threaded in as variadic `commentFields ...string` from `Config.CommentFieldKeys()`.
 - **Function mode `${parent_roles}`:** embedded inline as `ARRAY['a','b']` (verbatim single-quoted values via `renderRoleArrayVerbatim`; `'`-bearing values rejected; empty → `NULL`), NOT a `$n` bind — so wrapper functions receive a real `text[]`. The legacy `ARRAY[fixed] || ${parent_roles}` concat form still binds `$n::text[]` via `preprocessArrayOrNull`.
 - `ARRAY['a','b'] || ${field}` → fixed array literal + `|| NULL` if field empty, else `|| $n::text[]` with `[]string{value}` (processed before other placeholders).
 - `ARRAY[${field}, 'a', 'b']` → normalized to `ARRAY['a','b'] || ${field}` via `normalizeTemplate`.
@@ -190,7 +191,22 @@ arbitrary JSON, no forced keys): Fields↔Raw toggle, Fields edits string values
 come from Settings-managed `Config.CommentFields` (`comment_fields`, default full_name/e_mail,
 `SaveCommentFields`); empty comments default to `ui.comment_default_view` (`preferredCommentView`);
 `editorFromComment`/`assembleComment(From)`/`switchEditorMode`/`parseCommentObject` are the core
-helpers. Run: both modes build per-cluster ordered op lists and send ONE
+helpers. **Find-role result columns are configured too**, never a hardcoded comment key:
+`Config.SearchColumns` (`search_columns`, ordered `{label,template}`, `SaveSearchColumns`, Settings
+→ **Role Details** list editor / `searchColumnsDraft`) is rendered frontend-side by
+`renderSearchTemplate` over `RoleMatch.Comment` — same two namespaces as the call templates:
+`${{<key>}}` = any JSON comment key, and the closed bare set's only member `${comment}` =
+the raw comment, unresolved → `''`, result whitespace-collapsed; `searchCellValues` flags `≠` when
+clusters disagree. Layout: ONE `grid-template-columns` (`--search-cols`) shared by the header and
+every row — widths measured with canvas `measureText` (`searchMeasureTracks`, since `ch`
+under-measures proportional text), all tracks absolute or `fr` (the popup is content-sized, so `%`
+is circular), the header pinned to the row's `font-size` (`ch` resolves per element), an over-cap
+column becomes `1fr`, and the chips' trailing track base is pinned from the widest row
+(`searchBadgeTrack`) so the chip-less header reserves the same space. `search_columns` has
+no `omitempty` so an explicit `[]` ("rolename only") survives a restart while an absent key gets the
+default; `searchColumns()` therefore has no frontend default fallback. `pg.ParseFullName` and the
+`FullName` fields are gone — don't reintroduce them. Run: both modes build per-cluster ordered op
+lists and send ONE
 `App.RunRoleBatch(RoleBatchRequest)` (`executeRoleBatch`); the backend (`batch.runClusterTx`) runs
 each cluster's ops in a **single transaction** (commit/rollback, one result per cluster, bounded
 concurrency), emitting a `role-batch-progress` Wails event (`model.ClusterProgress`) per cluster

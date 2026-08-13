@@ -74,6 +74,8 @@ sandbox.document = documentStub;
 sandbox.navigator = { clipboard: { writeText: async () => {} } };
 sandbox.CSS = { escape: (s) => String(s) };
 sandbox.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+// Nothing is laid out here, so every resolved value is empty — callers must cope with that.
+sandbox.getComputedStyle = () => ({ columnGap: '', gap: '', fontSize: '', width: '' });
 sandbox.addEventListener = () => {}; // window.addEventListener('DOMContentLoaded', …) at load
 sandbox.removeEventListener = () => {};
 sandbox.console = console;
@@ -489,18 +491,22 @@ test('commentFieldArgs: a plain-text (non-object) comment yields no field args',
   assert.deepEqual(r, {});
 });
 
-test('fnPlaceholderNames: create_role / set_comment inject configured fields; other ops unchanged', () => {
+test('fnPlaceholderChips: built-ins bare, comment fields doubled, no shadow de-dup', () => {
   const r = evalJSON(`(() => {
-    ${SETUP_STATE}
+    // A field keyed like a built-in is the case that used to be silently de-duplicated away.
+    state = { commentFields: [{key:'full_name',label:'Full name'},{key:'comment',label:'Note'}] };
     return {
-      create: fnPlaceholderNames('create_role', ['loginname','parent_roles']),
-      comment: fnPlaceholderNames('set_comment', ['loginname','comment']),
-      other: fnPlaceholderNames('change_password', ['loginname','new_password']),
+      create: fnPlaceholderChips('create_role', ['loginname','parent_roles']),
+      comment: fnPlaceholderChips('set_comment', ['loginname','comment']),
+      other: fnPlaceholderChips('change_password', ['loginname','new_password']),
     };
   })()`);
-  assert.deepEqual(r.create, ['loginname', 'full_name', 'e_mail', 'parent_roles']);
-  assert.deepEqual(r.comment, ['loginname', 'full_name', 'e_mail', 'comment']);
-  assert.deepEqual(r.other, ['loginname', 'new_password']);
+  assert.deepEqual(r.create.map((c) => c.token), ['\${loginname}', '\${parent_roles}', '\${{full_name}}', '\${{comment}}']);
+  assert.deepEqual(r.create.map((c) => c.kind), ['builtin', 'builtin', 'field', 'field']);
+  // ${comment} (built-in) and ${{comment}} (the field) both get a chip — the namespaces are disjoint.
+  assert.deepEqual(r.comment.map((c) => c.token), ['\${loginname}', '\${comment}', '\${{full_name}}', '\${{comment}}']);
+  // An op without comment fields gets built-ins only.
+  assert.deepEqual(r.other.map((c) => c.token), ['\${loginname}', '\${new_password}']);
 });
 
 // --- Run-status phases: create+load log concatenation and phase-aware chip summary -------------
@@ -947,20 +953,239 @@ test('groupMatches: works on the flattened per-cluster matches (no error rows to
   const r = evalJSON(`(() => {
     const scanned = [
       { clusterId:'c1', alias:'prod-1', category:'prod', matches:[
-        { clusterId:'c1', loginName:'bob', fullName:'', comment:'' },
-        { clusterId:'c1', loginName:'alice', fullName:'Alice A', comment:'' }] },
+        { clusterId:'c1', loginName:'bob', comment:'' },
+        { clusterId:'c1', loginName:'alice', comment:'{"full_name":"Alice A"}' }] },
       { clusterId:'c2', alias:'uat-1', category:'uat', matches:[] },           // scanned, no match
       { clusterId:'c3', alias:'uat-2', category:'uat', matches:[], error:'refused' }, // never scanned
       { clusterId:'c4', alias:'uat-3', category:'uat', matches:[
-        { clusterId:'c4', loginName:'bob', fullName:'Bob B', comment:'' }] },
+        { clusterId:'c4', loginName:'bob', comment:'{"full_name":"Bob B"}' }] },
     ];
     const groups = groupMatches(scanned.flatMap((c) => c.matches || []));
-    return groups.map((g) => ({ login: g.loginName, full: g.fullName, clusters: g.clusters.map((m) => m.clusterId) }));
+    return groups.map((g) => ({ login: g.loginName, clusters: g.clusters.map((m) => m.clusterId) }));
   })()`);
   assert.deepEqual(r, [
-    { login: 'alice', full: 'Alice A', clusters: ['c1'] },
-    { login: 'bob', full: 'Bob B', clusters: ['c1', 'c4'] }, // fullName = first non-empty in group
+    { login: 'alice', clusters: ['c1'] },
+    { login: 'bob', clusters: ['c1', 'c4'] },
   ]);
+});
+
+// ---------------------------------------------------------------------------------------------
+test('renderSearchTemplate: combines comment keys, collapses gaps, types non-strings', () => {
+  const r = evalJSON(`(() => {
+    const c = '{"first_name":"John","last_name":"O\\'Hara","age":42,"active":true,"tags":["a"],"note":null}';
+    return {
+      combined: renderSearchTemplate('\${{first_name}} \${{last_name}}', c),
+      missingTail: renderSearchTemplate('\${{first_name}} \${{nope}}', c),   // no trailing space
+      missingHead: renderSearchTemplate('\${{nope}} \${{first_name}}', c),   // no leading space
+      separator: renderSearchTemplate('\${{last_name}}, \${{nope}}', c),     // literals kept verbatim
+      number: renderSearchTemplate('\${{age}}', c),
+      bool: renderSearchTemplate('\${{active}}', c),
+      array: renderSearchTemplate('\${{tags}}', c),
+      nullValue: renderSearchTemplate('\${{note}}', c),
+      literal: renderSearchTemplate('id \${{first_name}}!', c),
+      spacedName: renderSearchTemplate('\${{ first_name }}', c),
+      missingKey: renderSearchTemplate('\${{nope}}', c),
+      unknownBare: renderSearchTemplate('\${nope}', c),
+    };
+  })()`);
+  assert.equal(r.combined, "John O'Hara");
+  assert.equal(r.missingTail, 'John');
+  assert.equal(r.missingHead, 'John');
+  assert.equal(r.separator, "O'Hara,"); // a literal comma survives an empty placeholder
+  assert.equal(r.number, '42');
+  assert.equal(r.bool, 'true');
+  assert.equal(r.array, '["a"]');
+  assert.equal(r.nullValue, ''); // JSON null reads as empty, like the comment editor
+  assert.equal(r.literal, 'id John!');
+  assert.equal(r.spacedName, 'John');
+  assert.equal(r.missingKey, ''); // an absent comment key is empty
+  // A bare name is a BUILT-IN reference, and there is no built-in called `nope`, so it renders as
+  // itself — the mistake is visible in the row, and saving it is refused with a guiding message.
+  assert.equal(r.unknownBare, '\${nope}');
+});
+
+test('renderSearchTemplate: ${comment} is the raw comment, JSON keys need a JSON comment', () => {
+  const r = evalJSON(`(() => ({
+    rawFromJson: renderSearchTemplate('\${comment}', '{"full_name":"Ann"}'),
+    rawFromText: renderSearchTemplate('\${comment}', 'just a person'),
+    keyFromText: renderSearchTemplate('\${{full_name}}', 'just a person'),
+    keyFromBadJson: renderSearchTemplate('\${{full_name}}', '{"full_name":'),
+    emptyComment: renderSearchTemplate('\${comment}', ''),
+  }))()`);
+  assert.equal(r.rawFromJson, '{"full_name":"Ann"}');
+  assert.equal(r.rawFromText, 'just a person'); // the only way to show a plain-text comment
+  assert.equal(r.keyFromText, '');
+  assert.equal(r.keyFromBadJson, '');
+  assert.equal(r.emptyComment, '');
+});
+
+// This is the case the namespace split exists for: a JSON comment carrying its own `comment` key.
+test('renderSearchTemplate: ${comment} and ${{comment}} are different things', () => {
+  const c = '{"comment":"inner note","loginname":"shadow","full_name":"Ann"}';
+  const r = evalJSON(`(() => {
+    const c = '${c}';
+    return {
+      whole: renderSearchTemplate('\${comment}', c),
+      key: renderSearchTemplate('\${{comment}}', c),
+      shadowedKey: renderSearchTemplate('\${{loginname}}', c),
+      bareLoginname: renderSearchTemplate('\${loginname}', c),
+      mixed: renderSearchTemplate('\${{comment}} / \${{full_name}}', c),
+    };
+  })()`);
+  assert.equal(r.whole, c); // the built-in: the comment verbatim
+  assert.equal(r.key, 'inner note'); // the JSON key of the same name — previously unreachable
+  assert.equal(r.shadowedKey, 'shadow');
+  assert.equal(r.bareLoginname, '${loginname}'); // not a search built-in
+  assert.equal(r.mixed, 'inner note / Ann');
+});
+
+test('renderSearchTemplate: only the two exact forms are placeholders', () => {
+  const r = evalJSON(`(() => {
+    const c = '{"x":"v"}';
+    return {
+      halfClosed: renderSearchTemplate('\${{x}', c),
+      innerBrace: renderSearchTemplate('\${a{b}', c),
+      emptyDouble: renderSearchTemplate('\${{}}', c),
+      emptyBare: renderSearchTemplate('\${}', c),
+    };
+  })()`);
+  // Each is left verbatim because the name classes exclude braces — nothing is half-substituted.
+  assert.equal(r.halfClosed, '${{x}');
+  assert.equal(r.innerBrace, '${a{b}');
+  assert.equal(r.emptyDouble, ''); // a well-formed token with an empty key → empty value
+  assert.equal(r.emptyBare, '${}');
+});
+
+test('searchTemplateError: guides ${full_name} to ${{full_name}}', () => {
+  const r = evalJSON(`[
+    searchTemplateError('\${{first_name}} \${{e-mail}}'),
+    searchTemplateError('pre \${comment} post'),
+    searchTemplateError('no placeholders at all'),
+    searchTemplateError('\${full_name}'),
+    searchTemplateError('\${oops'),
+    searchTemplateError('\${{oops}'),
+    searchTemplateError('\${}'),
+    searchTemplateError('\${{}}'),
+  ]`);
+  assert.equal(r[0], ''); // any comment key is fine in the double form
+  assert.equal(r[1], ''); // ${comment} is the one built-in
+  assert.equal(r[2], '');
+  assert.match(r[3], /\$\{\{full_name\}\}/); // names the fix
+  assert.match(r[4], /Unfinished/);
+  assert.match(r[5], /Unfinished/);
+  assert.match(r[6], /Empty/);
+  assert.match(r[7], /Empty/);
+});
+
+test('searchCellValues: stable pick in configured order, flagged when clusters disagree', () => {
+  const r = evalJSON(`(() => {
+    state = { categories: [{ id:'prod', label:'Production' }, { id:'uat', label:'UAT' }] };
+    const cols = [{ label:'Name', template:'\${{full_name}}' }, { label:'Mail', template:'\${{e_mail}}' }];
+    // Deliberately out of configured order, as results arrive in completion order.
+    const group = { loginName:'bob', clusters: [
+      { clusterId:'u1', alias:'uat-1',  category:'uat',  comment:'{"full_name":"Bobby"}' },
+      { clusterId:'p1', alias:'prod-1', category:'prod', comment:'{"full_name":"Bob B"}' },
+    ]};
+    const consistent = { loginName:'ann', clusters: [
+      { clusterId:'p1', alias:'prod-1', category:'prod', comment:'{"full_name":"Ann"}' },
+      { clusterId:'u1', alias:'uat-1',  category:'uat',  comment:'{"full_name":"Ann"}' },
+    ]};
+    return { varying: searchCellValues(group, cols), same: searchCellValues(consistent, cols) };
+  })()`);
+  // prod-1 sorts first (configured group order), so its value is the one shown.
+  assert.deepEqual(r.varying[0], { text: 'Bob B', varies: true });
+  assert.deepEqual(r.varying[1], { text: '', varies: false }); // no e_mail anywhere
+  assert.deepEqual(r.same[0], { text: 'Ann', varies: false }); // equal values are not "varying"
+});
+
+test('searchColumns: an empty list means role name only (no default fallback)', () => {
+  const r = evalJSON(`(() => {
+    const out = {};
+    state = { searchColumns: [] };
+    out.explicitEmpty = searchColumns().length;
+    state = { searchColumns: [{ label:'A', template:'\${a}' }, { label:'B', template:'' }] };
+    out.dropsBlankTemplate = searchColumns().map((c) => c.label);
+    state = {};
+    out.missing = searchColumns().length;
+    return out;
+  })()`);
+  assert.equal(r.explicitEmpty, 0); // the backend already resolved the default at load
+  assert.deepEqual(r.dropsBlankTemplate, ['A']);
+  assert.equal(r.missing, 0);
+});
+
+test('searchGridTemplate: one template for header and rows; wide columns turn flexible', () => {
+  const r = evalJSON(`(() => {
+    const cols = [{ label:'Name', template:'\${n}' }];
+    const wide = [{ label:'Name', template:'\${n}' }, { label:'Raw', template:'\${comment}' }];
+    return {
+      sized: searchGridTemplate(['bob'], cols, [[{ text:'a', varies:false }], [{ text:'a much longer value', varies:false }]]),
+      flexible: searchGridTemplate(['bob'], cols, [[{ text:'y'.repeat(200), varies:false }]]),
+      mixed: searchGridTemplate(['bob'], wide, [[{ text:'Ann', varies:false }, { text:'z'.repeat(120), varies:false }]]),
+      minimum: searchGridTemplate(['x'], [{ label:'', template:'\${n}' }], [[{ text:'', varies:false }]]),
+      longLogin: searchGridTemplate(['r'.repeat(63)], [], [[]]), // capped at SEARCH_LOGIN_MAX_CH
+      noColumns: searchGridTemplate(['bob'], [], [[]]),
+      pinnedBadges: searchGridTemplate(['bob'], cols, [[{ text:'a', varies:false }]], { badgeTrack: 'min(140px, 30ch)' }),
+      // The measured path: exact pixel widths, and the cap applied in pixels too.
+      measured: searchGridTemplate(['bob'], wide, [[{ text:'Ann', varies:false }, { text:'long', varies:false }]], {
+        measured: { zero: 8, cap: 240, login: 40, extra: [55.2, 900] },
+      }),
+    };
+  })()`);
+  // Rolename track is definite — it gives up space last — and the chips always close the row with a
+  // reserved minimum. No percentage tracks: the popup is content-sized, so they would be circular.
+  assert.equal(r.sized.template, '6ch minmax(6ch, 19ch) minmax(8ch, auto)');
+  // Past the 30ch cap a column becomes 1fr rather than just being cut off.
+  assert.equal(r.flexible.template, '6ch minmax(6ch, 1fr) minmax(8ch, auto)');
+  // A narrow column keeps its own width while the wide one takes the free space.
+  assert.equal(r.mixed.template, '6ch minmax(6ch, 6ch) minmax(6ch, 1fr) minmax(8ch, auto)');
+  assert.equal(r.minimum.template, '6ch minmax(6ch, 6ch) minmax(8ch, auto)');
+  assert.equal(r.noColumns.template, '6ch minmax(8ch, auto)'); // rolename + chips only
+  assert.equal(r.longLogin.template, '40ch minmax(8ch, auto)'); // SEARCH_LOGIN_MAX_CH caps it
+  // The measured chips width becomes the track base, shared by the header (which has no chips).
+  assert.equal(r.pinnedBadges.template, '6ch minmax(6ch, 6ch) minmax(min(140px, 30ch), auto)');
+  // Measured: px widths, the 900px column past the 240px cap flexes, and the narrow one is floored
+  // at SEARCH_COL_MIN_CH * zero = 48px.
+  assert.equal(r.measured.template, '40px minmax(6ch, 56px) minmax(6ch, 1fr) minmax(8ch, auto)');
+});
+
+test('searchBadgeTrack: bounded by a share of the row, and inert when unmeasurable', () => {
+  const r = evalJSON(`(() => {
+    const el = (kids) => ({ children: kids, getBoundingClientRect: () => ({ width: 0 }) });
+    // No rows at all, and rows whose chips have no laid-out width, both leave the ch minimum.
+    const empty = searchBadgeTrack({ querySelectorAll: () => [], getBoundingClientRect: () => ({ width: 800 }) });
+    const unmeasured = searchBadgeTrack({
+      querySelectorAll: () => [el([{ getBoundingClientRect: () => ({ width: 0 }) }])],
+      getBoundingClientRect: () => ({ width: 800 }),
+    });
+    return { empty, unmeasured };
+  })()`);
+  assert.equal(r.empty, '');
+  assert.equal(r.unmeasured, '');
+});
+
+test('search-columns dirty check matches what the backend stores', () => {
+  const r = evalJSON(`(() => {
+    state = { searchColumns: [{ label:'Full name', template:'\${full_name}' }] };
+    const dirty = () => JSON.stringify(readSearchColumnsFromEditor()) !== JSON.stringify(savedSearchColumns());
+    const out = {};
+    searchColumnsDraft = [{ label:'Full name', template:'\${full_name}' }];
+    out.clean = dirty();
+    searchColumnsDraft = [{ label:' Full name ', template:' \${full_name} ' }];
+    out.whitespaceOnly = dirty(); // trimmed the same way validateSearchColumns does
+    searchColumnsDraft = [{ label:'Full name', template:'\${first_name} \${last_name}' }];
+    out.edited = dirty();
+    searchColumnsDraft = [];
+    out.cleared = dirty();
+    searchColumnsDraft = [{ label:'Full name', template:'\${full_name}' }, { label:'x', template:'  ' }];
+    out.blankRow = dirty(); // a row with no template is dropped, so it is not a change
+    return out;
+  })()`);
+  assert.equal(r.clean, false);
+  assert.equal(r.whitespaceOnly, false);
+  assert.equal(r.edited, true);
+  assert.equal(r.cleared, true); // removing every column is a real change
+  assert.equal(r.blankRow, false);
 });
 
 test('stripClusterPrefix: the alias is not repeated in a table that has a Cluster column', () => {

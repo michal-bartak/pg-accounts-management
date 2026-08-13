@@ -2,7 +2,6 @@ package pg
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -199,23 +198,6 @@ func parseRoleConfig(rolconfig []string) map[string]string {
 		}
 	}
 	return out
-}
-
-// ParseFullName extracts full_name from a JSON comment, or "" if the comment is not
-// JSON, has no full_name key, or the value is not a non-empty string.
-func ParseFullName(comment string) string {
-	comment = strings.TrimSpace(comment)
-	if comment == "" || comment[0] != '{' {
-		return ""
-	}
-	var m map[string]any
-	if err := json.Unmarshal([]byte(comment), &m); err != nil {
-		return ""
-	}
-	if v, ok := m["full_name"].(string); ok {
-		return strings.TrimSpace(v)
-	}
-	return ""
 }
 
 // likePattern wraps a search term as a case-insensitive substring ILIKE pattern,

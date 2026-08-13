@@ -175,7 +175,9 @@ func TestBuildArgs_allOperations(t *testing.T) {
 				},
 			},
 			want: map[string]string{
-				"loginname": "u1", "parent_roles": "gr_p", "full_name": `"Name"`, "e_mail": `"e@x.com"`,
+				// Comment-field values are namespaced (model.CommentArgKey), so a field keyed
+				// like a built-in cannot overwrite it.
+				"loginname": "u1", "parent_roles": "gr_p", "cf:full_name": `"Name"`, "cf:e_mail": `"e@x.com"`,
 			},
 		},
 		{

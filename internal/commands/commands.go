@@ -40,12 +40,13 @@ var allowedAttributeKeywords = map[string]bool{
 }
 
 // commentFieldArgs copies the per-cluster comment-field values (JSON-encoded; see
-// model.CreateRoleParams.CommentFields) into a fresh args map that reserved placeholders are then
-// layered onto. A nil/empty input yields an empty (non-nil) map.
+// model.CreateRoleParams.CommentFields) into a fresh args map, under prefixed keys so a field keyed
+// like a built-in placeholder keeps its own entry. Built-in values are then layered on under their
+// bare names, in any order. A nil/empty input yields an empty (non-nil) map.
 func commentFieldArgs(fields map[string]string) map[string]string {
 	args := make(map[string]string, len(fields)+2)
 	for k, v := range fields {
-		args[k] = v
+		args[model.CommentArgKey(k)] = v
 	}
 	return args
 }
@@ -57,7 +58,6 @@ func BuildArgs(cfg model.Config, op model.OperationSpec) (model.DBFunction, map[
 			return model.DBFunction{}, nil, fmt.Errorf("create role parameters missing")
 		}
 		p := op.CreateRole
-		// Comment fields first, so a reserved placeholder always wins on a key collision.
 		args := commentFieldArgs(p.CommentFields)
 		args["loginname"] = p.LoginName
 		args["parent_roles"] = p.ParentRoles

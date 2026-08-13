@@ -10,6 +10,22 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Configurable search columns** — choose what shows next to the role name when searching, each column built from comment keys (`${{first_name}} ${{last_name}}`) or the raw comment.
+
+### Changed
+
+- **Breaking: comment keys in templates now use double braces** — `${{full_name}}`. Single braces are reserved for built-ins (`${loginname}`, `${comment}`, `${parent_roles}`, …), so a comment key named `comment` or `loginname` is finally reachable. Update any custom `create_role` / `set_comment` template that referenced a comment key in single braces.
+- Find-role results line up as a table, and no longer assume the comment has a `full_name` key.
+- An unknown `${name}` in a template is now reported instead of silently rendering empty.
+
+### Fixed
+
+- A comment field named like a built-in no longer corrupts what `set_comment` writes in function mode (the comment could be re-serialized, or an empty one stored as NULL).
+- Adding a comment field and using it in a call template in the same Settings save now works.
+- A comment containing `${` no longer fails the operation.
+
 ## [0.9.0] - 2026-08-12
 
 ### Added
