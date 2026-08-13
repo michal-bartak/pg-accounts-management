@@ -58,10 +58,6 @@ export function ReloadConfig() {
   return window['go']['main']['App']['ReloadConfig']();
 }
 
-export function RunOperation(arg1) {
-  return window['go']['main']['App']['RunOperation'](arg1);
-}
-
 export function RunRoleBatch(arg1) {
   return window['go']['main']['App']['RunRoleBatch'](arg1);
 }
