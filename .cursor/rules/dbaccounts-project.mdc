@@ -205,12 +205,14 @@ helpers. **Find-role result columns are configured too**, never a hardcoded comm
 `renderSearchTemplate` over `RoleMatch.Comment` — same two namespaces as the call templates:
 `${{<key>}}` = any JSON comment key, and the closed bare set's only member `${comment}` =
 the raw comment, unresolved → `''`, result whitespace-collapsed; `searchCellValues` flags `≠` when
-clusters disagree. Layout: ONE `grid-template-columns` (`--search-cols`) shared by the header and
-every row — widths measured with canvas `measureText` (`searchMeasureTracks`, since `ch`
-under-measures proportional text), all tracks absolute or `fr` (the popup is content-sized, so `%`
-is circular), the header pinned to the row's `font-size` (`ch` resolves per element), an over-cap
-column becomes `1fr`, and the chips' trailing track base is pinned from the widest row
-(`searchBadgeTrack`) so the chip-less header reserves the same space. `search_columns` has
+clusters disagree. Layout: **CSS subgrid**. The container `#alter-results` owns the tracks
+(`--search-cols` from `searchGridTemplate(colCount)`: `fit-content(40ch)` rolename, one
+`fit-content(30ch)` per column, `minmax(8ch, auto)` chips); the header and every row are
+`grid-column: 1 / -1` + `grid-template-columns: subgrid`, so the browser does the sizing. A subgrid
+child's border+padding insets its tracks, so `.alter-result-head` must keep
+`padding: 0 calc(0.7rem + 1px)` to match the row; the column gap lives on the container and is
+inherited. This needs **WebKit 16 / macOS 12+ / WebKitGTK 2.38+** — see the installation docs.
+`search_columns` has
 no `omitempty` so an explicit `[]` ("rolename only") survives a restart while an absent key gets the
 default; `searchColumns()` therefore has no frontend default fallback. `pg.ParseFullName` and the
 `FullName` fields are gone — don't reintroduce them. Run: both modes build per-cluster ordered op

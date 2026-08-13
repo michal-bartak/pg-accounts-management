@@ -2540,147 +2540,31 @@ function searchCellValues(group, cols) {
   });
 }
 
-const SEARCH_COL_MIN_CH = 6; // floor, so a squeezed column never collapses to nothing
-const SEARCH_COL_MAX_CH = 30; // past this a column stops growing and turns flexible instead
+// Column widths are pure CSS: the results container owns the tracks and every row/header subgrids
+// into them (see .alter-results in styles.css), so the browser sizes each column to its widest cell
+// across all rows. This replaced ~165 lines that measured text with canvas measureText against
+// fonts read from throwaway DOM probes, plus a two-pass render to reserve the chip column.
+const SEARCH_COL_MAX_CH = 30; // a column stops growing here; past it the cell ellipsizes
 const SEARCH_LOGIN_MAX_CH = 40; // rolenames go to 63 chars; longer ones ellipsize with a title
 const SEARCH_BADGE_MIN_CH = 8; // reserved for the cluster chips, so a wide column can't starve them
-// Past this the chips wrap instead of widening, so a role on many clusters cannot squeeze the
-// configured columns. Every track stays absolute or `fr` on purpose: the popup is content-sized, so
-// a percentage track would resolve against a width that depends on the tracks themselves — which
-// silently stopped columns from ever reaching their own content width.
-const SEARCH_BADGE_MAX_CH = 30;
 
-/** A configured column's natural width in characters: its widest value (or its header, when that
- *  is wider). The `≠` marker costs two. Only the fallback — `searchMeasureTracks` is exact. */
-function searchColNatural(col, cells, i) {
-  const len = (cell) => (cell?.text || '').length + (cell?.varies ? 2 : 0);
-  return cells.reduce((m, row) => Math.max(m, len(row[i])), (col.label || '').length);
-}
-
-/** Resolved fonts of the result cells, read from throwaway probes. Returns null when there is
- *  nothing to measure against (no layout — e.g. the test harness). */
-function searchCellFonts(box) {
-  if (typeof getComputedStyle !== 'function' || typeof document.createElement !== 'function') return null;
-  const host = document.createElement('div');
-  host.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;width:0;height:0';
-  host.innerHTML =
-    '<div class="alter-result-row"><span class="alter-login">x</span><span class="alter-cell">x</span></div>' +
-    '<div class="alter-result-head"><span class="alter-cell">x</span></div>';
-  box.appendChild(host);
-  const font = (sel) => {
-    const el = host.querySelector(sel);
-    const s = el && getComputedStyle(el);
-    return s ? `${s.fontWeight} ${s.fontSize} ${s.fontFamily}` : '';
-  };
-  const out = {
-    login: font('.alter-result-row .alter-login'),
-    cell: font('.alter-result-row .alter-cell'),
-    head: font('.alter-result-head .alter-cell'),
-  };
-  host.remove();
-  return out.cell.includes('px') ? out : null;
-}
-
-let searchMeasureCtx = null;
-
-/** Exact pixel width each column needs, measured with the cells' real fonts.
+/** The `grid-template-columns` for the results container: the rolename, one track per configured
+ *  column, then the cluster chips.
  *
- *  Character counts scaled by `ch` are not good enough here: `ch` is the width of "0", and
- *  proportional text runs wider (`john.doe@example.com` needs ~20% more than 20ch), so a column
- *  sized from its character count clipped its own widest value. Returns null when it cannot
- *  measure, and the caller falls back to the `ch` estimate. */
-function searchMeasureTracks(box, loginNames, cols, cells) {
-  const fonts = searchCellFonts(box);
-  if (!fonts) return null;
-  try {
-    searchMeasureCtx = searchMeasureCtx || document.createElement('canvas').getContext('2d');
-  } catch {
-    return null;
-  }
-  const ctx = searchMeasureCtx;
-  if (!ctx) return null;
-  const at = (text, font) => {
-    ctx.font = font;
-    return ctx.measureText(String(text || '')).width;
-  };
-  const zero = at('0', fonts.cell);
-  if (!zero) return null;
-  const variesPx = at(' ≠', fonts.cell);
-  return {
-    zero,
-    cap: SEARCH_COL_MAX_CH * zero,
-    login: Math.min(
-      SEARCH_LOGIN_MAX_CH * zero,
-      loginNames.reduce((m, n) => Math.max(m, at(n, fonts.login)), at('Role', fonts.head))
-    ),
-    extra: cols.map((col, i) =>
-      cells.reduce(
-        (m, row) => Math.max(m, at(row[i]?.text, fonts.cell) + (row[i]?.varies ? variesPx : 0)),
-        at(col.label, fonts.head)
-      )
-    ),
-  };
-}
-
-/** The `grid-template-columns` shared by the header and every result row.
+ *  `fit-content(<cap>)` is the whole trick — "as wide as the content needs, up to <cap>". That is
+ *  what the measuring code was hand-computing, except the browser does it against the real laid-out
+ *  text instead of a canvas approximation (`ch` is the width of "0", which under-measures
+ *  proportional text by ~20%). The cap stops a long ${comment} column from pushing the chips off
+ *  screen; `.alter-cell` ellipsizes whatever exceeds it.
  *
- *  Columns line up because each row is its own grid with the SAME template at the same width: `ch`
- *  resolves against the row element (whose font is uniform — the rolename's bold sits on a child)
- *  and `fr` against the same free space. No CSS subgrid, so the rows stay plain <button>s, and the
- *  header can style its own text without shifting a single column — which per-element `ch`
- *  flex-bases could not do.
- *
- *  A column whose content exceeds the cap becomes `1fr` instead of merely being cut off, so a wide
- *  one (`${comment}`) takes the space that is actually free. Every column keeps a min so it can
- *  shrink without vanishing, the rolename never shrinks, and the chips hold a column of their own:
- *  its `auto` max both stretches to soak up leftover space when nothing is flexible (keeping the
- *  chips flush right) and stops an `fr` column from starving them.
- *
- *  `measured` (from searchMeasureTracks) gives exact pixel widths; without it the widths are
- *  estimated from character counts in `ch`, which is looser but never zero-width. */
-function searchGridTemplate(loginNames, cols, cells, opts = {}) {
-  const { badgeTrack = `${SEARCH_BADGE_MIN_CH}ch`, measured = null } = opts;
-  const min = `${SEARCH_COL_MIN_CH}ch`;
-  const clamp = (n, hi) => Math.max(SEARCH_COL_MIN_CH, Math.min(hi, n));
-  const loginCh = clamp(loginNames.reduce((m, n) => Math.max(m, n.length), 'Role'.length), SEARCH_LOGIN_MAX_CH);
-  // Definite, so the identifier gives up space last rather than first. Already capped at
-  // SEARCH_LOGIN_MAX_CH, beyond which a rolename ellipsizes (every rolename carries a tooltip).
-  const tracks = [measured ? `${Math.ceil(measured.login)}px` : `${loginCh}ch`];
-  for (let i = 0; i < cols.length; i++) {
-    const need = measured ? measured.extra[i] : searchColNatural(cols[i], cells, i);
-    const capped = measured ? need > measured.cap : need > SEARCH_COL_MAX_CH;
-    const size = measured
-      ? `${Math.ceil(Math.max(SEARCH_COL_MIN_CH * measured.zero, need))}px`
-      : `${clamp(need, SEARCH_COL_MAX_CH)}ch`;
-    tracks.push(capped ? `minmax(${min}, 1fr)` : `minmax(${min}, ${size})`);
-  }
-  tracks.push(`minmax(${badgeTrack}, auto)`);
-  return { template: tracks.join(' ') };
-}
-
-/** Width one row's chips need on a single line — measured from the children, so an already-wrapped
- *  container doesn't under-report. */
-function badgeRowWidth(el) {
-  const kids = [...(el?.children || [])];
-  if (!kids.length) return 0;
-  const gap = parseFloat(getComputedStyle(el).columnGap) || 0;
-  return kids.reduce((sum, k) => sum + k.getBoundingClientRect().width, 0) + gap * (kids.length - 1);
-}
-
-/** Pin the chips track to the widest row's chips.
- *
- *  That track is content-sized, and the header has no chips — so it would reserve only the minimum
- *  there and hand the surplus to the flexible columns, putting them out of line with the rows.
- *  Giving header and rows the same track *base* keeps the free space (and therefore every `fr`
- *  column) identical, while the `auto` max still lets the track stretch when no column is flexible,
- *  so the chips stay flush right. Capped at SEARCH_BADGE_MAX_CH so a role on many clusters wraps its
- *  chips instead of squeezing the columns. Returns '' when nothing is measurable (e.g. rendered while
- *  hidden), which leaves the `ch` minimum in place. */
-function searchBadgeTrack(box) {
-  const rows = [...box.querySelectorAll('.alter-result-row .alter-cluster-badges')];
-  const widest = rows.reduce((m, el) => Math.max(m, badgeRowWidth(el)), 0);
-  if (!widest) return '';
-  return `min(${Math.ceil(widest)}px, ${SEARCH_BADGE_MAX_CH}ch)`;
+ *  The trailing `auto` maximum absorbs leftover width, so the chips stay flush right without the
+ *  second measure pass that used to pin that track. */
+function searchGridTemplate(colCount) {
+  return [
+    `fit-content(${SEARCH_LOGIN_MAX_CH}ch)`,
+    ...Array.from({ length: colCount }, () => `fit-content(${SEARCH_COL_MAX_CH}ch)`),
+    `minmax(${SEARCH_BADGE_MIN_CH}ch, auto)`,
+  ].join(' ');
 }
 
 function renderAlterResults() {
@@ -2691,12 +2575,8 @@ function renderAlterResults() {
   }
   const cols = searchColumns();
   const cells = alterGroups.map((g) => searchCellValues(g, cols));
-  const logins = alterGroups.map((g) => g.loginName);
-  // Measure before building the markup, so the tooltips agree with which columns actually flex.
-  const measured = searchMeasureTracks(box, logins, cols, cells);
-  const w = searchGridTemplate(logins, cols, cells, { measured });
-  // One template on the container, inherited by the header and every row (see searchGridTemplate).
-  box.style.setProperty('--search-cols', w.template);
+  // One template on the container; the header and every row subgrid into it.
+  box.style.setProperty('--search-cols', searchGridTemplate(cols.length));
   const head = cols.length
     ? `<div class="alter-result-head">
         <span class="alter-cell">Role</span>
@@ -2729,15 +2609,6 @@ function renderAlterResults() {
       </button>`;
       })
       .join('');
-  // Second pass: now that the chips are laid out, reserve their real width for header and rows
-  // alike (see searchBadgeTrack).
-  const badgeTrack = searchBadgeTrack(box);
-  if (badgeTrack) {
-    box.style.setProperty(
-      '--search-cols',
-      searchGridTemplate(logins, cols, cells, { measured, badgeTrack }).template
-    );
-  }
 }
 
 async function pickUser(login) {

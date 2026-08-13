@@ -18,6 +18,20 @@ ships a native installer per platform:
 
 `{VERSION}` here and in the commands below stands for the release you downloaded, e.g. `1.0.0`.
 
+## System requirements
+
+DbAccounts draws its interface with the operating system's own web engine, so the engine
+version — not just the OS version — matters.
+
+| Platform | Requirement |
+|----------|-------------|
+| macOS | **12 Monterey or later**, kept up to date. The interface needs WebKit 16 (shipped with Safari 16, September 2022); a Mac that has had no system update since then renders the role-search results without column alignment. |
+| Windows | **10 or 11** with the **WebView2 runtime**, which Windows installs and updates automatically. The MSI adds it if missing. |
+| Linux | **WebKitGTK 2.38 or later** (`libwebkit2gtk-4.1-0`), which the `.deb`/`.rpm` pull in. Ships with Ubuntu 22.04+, Debian 12+ and Fedora 37+. |
+
+Older systems may still launch, but the Find-role results table is the part that degrades:
+its columns are laid out with CSS subgrid, which those engines do not support.
+
 Each release description opens with what is new in that version; the
 [changelog](https://github.com/michal-bartak/pg-accounts-management/blob/main/CHANGELOG.md)
 covers every version in one page.

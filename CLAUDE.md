@@ -155,26 +155,29 @@ into prose, it goes stale.
   therefore has **no default fallback** (unlike `commentFields()`), or an explicit empty list would
   resurrect the default. `searchCellValues` picks each value from the first cluster in
   `byGroupThenAlias` order (results arrive in completion order), flagging `≠` when clusters disagree.
-  **Layout**: rows stay single-line clickable `<button>`s, and `renderAlterResults` puts ONE
-  `grid-template-columns` on `#alter-results` as `--search-cols`, which the header
-  (`.alter-result-head`) and every row use as their own grid — equal-width grids with an identical
-  template line up without CSS subgrid. Three traps this cost, don't undo them: (1) `ch`/`%` resolve
-  **per element**, so `.alter-result-head` must pin `font-size: var(--fs-base)` to match the
-  `<button>` row (a 16px header over a 14.4px row shifted every column ~11%) and the rolename's bold
-  must sit on the `.alter-login` **child**, never the row; (2) the popup is **content-sized**, so a
-  percentage track is circular and silently stops columns from reaching their own content width —
-  every track is absolute or `fr`; (3) `ch` is the width of "0" and under-measures proportional text
-  (a 20-char email needs ~20% more than 20ch), so `searchMeasureTracks` measures the real text with
-  canvas `measureText` using fonts read from throwaway probes (`searchCellFonts`), with
-  `searchColNatural`'s `ch` estimate only as the can't-measure fallback. A column past
-  `SEARCH_COL_MAX_CH` becomes `1fr` (takes the free space) rather than just clipping; the rolename
-  track is definite so it yields last; the chips get their own trailing
-  `minmax(<measured>, auto)` track — `searchBadgeTrack` pins its base from `badgeRowWidth` so the
-  chip-less header reserves the same width (otherwise the surplus went to the `fr` columns and
-  un-aligned them), while the `auto` max still stretches to keep the chips flush right. Every cell
-  carries a `title`, since any column is squeezed below its content in a narrow enough window, and
-  `.alter-results` is `overflow:auto` as the last resort. `pg.ParseFullName` / `RoleMatch.FullName` /
-  `ClusterRoleDetail.FullName` were **removed** with this — don't reintroduce a hardcoded key.
+  **Layout — CSS subgrid, no measuring.** Rows stay single-line clickable `<button>`s. The
+  CONTAINER `#alter-results` owns the column tracks (`--search-cols`, set by
+  `searchGridTemplate(colCount)`); the header (`.alter-result-head`) and every row set
+  `grid-column: 1 / -1` + `grid-template-columns: subgrid`, so the browser sizes each column to its
+  widest cell across all rows and they align for free. Tracks are
+  `fit-content(40ch)` (rolename), one `fit-content(30ch)` per configured column, then
+  `minmax(8ch, auto)` for the chips — `fit-content(<cap>)` means "as wide as the content needs, up
+  to the cap", and the trailing `auto` max soaks up leftover width so the chips stay flush right.
+  Two constraints, don't undo them: (1) a subgrid child's own border+padding **insets its tracks**,
+  so `.alter-result-head`'s horizontal padding must stay `calc(0.7rem + 1px)` = the row's
+  padding + border, or header and rows fall out of alignment; (2) the column gap lives on the
+  CONTAINER (`gap: 0.4rem 0.6rem`) and subgridded children inherit it — a child must not set its own.
+  Cells keep `min-width: 0` so a track can shrink below its content instead of overflowing, every
+  cell carries a `title` (any column is squeezed in a narrow enough window), and `.alter-results` is
+  `overflow:auto` as the last resort.
+  This **replaced ~165 lines** that measured text with canvas `measureText` against fonts read from
+  throwaway DOM probes, plus a second render pass to pin the chip track. It is why the app requires
+  **WebKit 16 / macOS 12+ / WebKitGTK 2.38+** (WebView2 is evergreen) — see the platform note in
+  [docs installation](docs/src/content/docs/installation.md). One deliberate behaviour change: a
+  column past its cap now ellipsizes rather than turning into `1fr` and absorbing free space; the
+  chips track takes the slack instead. `pg.ParseFullName` / `RoleMatch.FullName` /
+  `ClusterRoleDetail.FullName` were **removed** earlier with this feature — don't reintroduce a
+  hardcoded key.
 - **One shared role form for Create and Alter.** Both modes render through
   `renderAlterDetail` over `alterDetails` and the same edit maps (`alterAdd`/`alterRevoke`,
   `alterAttrAdd`/`alterAttrRemove`, `alterConfigSet`/`alterConfigReset`, password). Mode =

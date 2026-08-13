@@ -1114,54 +1114,24 @@ test('searchColumns: an empty list means role name only (no default fallback)', 
   assert.equal(r.missing, 0);
 });
 
-test('searchGridTemplate: one template for header and rows; wide columns turn flexible', () => {
-  const r = evalJSON(`(() => {
-    const cols = [{ label:'Name', template:'\${n}' }];
-    const wide = [{ label:'Name', template:'\${n}' }, { label:'Raw', template:'\${comment}' }];
-    return {
-      sized: searchGridTemplate(['bob'], cols, [[{ text:'a', varies:false }], [{ text:'a much longer value', varies:false }]]),
-      flexible: searchGridTemplate(['bob'], cols, [[{ text:'y'.repeat(200), varies:false }]]),
-      mixed: searchGridTemplate(['bob'], wide, [[{ text:'Ann', varies:false }, { text:'z'.repeat(120), varies:false }]]),
-      minimum: searchGridTemplate(['x'], [{ label:'', template:'\${n}' }], [[{ text:'', varies:false }]]),
-      longLogin: searchGridTemplate(['r'.repeat(63)], [], [[]]), // capped at SEARCH_LOGIN_MAX_CH
-      noColumns: searchGridTemplate(['bob'], [], [[]]),
-      pinnedBadges: searchGridTemplate(['bob'], cols, [[{ text:'a', varies:false }]], { badgeTrack: 'min(140px, 30ch)' }),
-      // The measured path: exact pixel widths, and the cap applied in pixels too.
-      measured: searchGridTemplate(['bob'], wide, [[{ text:'Ann', varies:false }, { text:'long', varies:false }]], {
-        measured: { zero: 8, cap: 240, login: 40, extra: [55.2, 900] },
-      }),
-    };
-  })()`);
-  // Rolename track is definite — it gives up space last — and the chips always close the row with a
-  // reserved minimum. No percentage tracks: the popup is content-sized, so they would be circular.
-  assert.equal(r.sized.template, '6ch minmax(6ch, 19ch) minmax(8ch, auto)');
-  // Past the 30ch cap a column becomes 1fr rather than just being cut off.
-  assert.equal(r.flexible.template, '6ch minmax(6ch, 1fr) minmax(8ch, auto)');
-  // A narrow column keeps its own width while the wide one takes the free space.
-  assert.equal(r.mixed.template, '6ch minmax(6ch, 6ch) minmax(6ch, 1fr) minmax(8ch, auto)');
-  assert.equal(r.minimum.template, '6ch minmax(6ch, 6ch) minmax(8ch, auto)');
-  assert.equal(r.noColumns.template, '6ch minmax(8ch, auto)'); // rolename + chips only
-  assert.equal(r.longLogin.template, '40ch minmax(8ch, auto)'); // SEARCH_LOGIN_MAX_CH caps it
-  // The measured chips width becomes the track base, shared by the header (which has no chips).
-  assert.equal(r.pinnedBadges.template, '6ch minmax(6ch, 6ch) minmax(min(140px, 30ch), auto)');
-  // Measured: px widths, the 900px column past the 240px cap flexes, and the narrow one is floored
-  // at SEARCH_COL_MIN_CH * zero = 48px.
-  assert.equal(r.measured.template, '40px minmax(6ch, 56px) minmax(6ch, 1fr) minmax(8ch, auto)');
-});
-
-test('searchBadgeTrack: bounded by a share of the row, and inert when unmeasurable', () => {
-  const r = evalJSON(`(() => {
-    const el = (kids) => ({ children: kids, getBoundingClientRect: () => ({ width: 0 }) });
-    // No rows at all, and rows whose chips have no laid-out width, both leave the ch minimum.
-    const empty = searchBadgeTrack({ querySelectorAll: () => [], getBoundingClientRect: () => ({ width: 800 }) });
-    const unmeasured = searchBadgeTrack({
-      querySelectorAll: () => [el([{ getBoundingClientRect: () => ({ width: 0 }) }])],
-      getBoundingClientRect: () => ({ width: 800 }),
-    });
-    return { empty, unmeasured };
-  })()`);
-  assert.equal(r.empty, '');
-  assert.equal(r.unmeasured, '');
+// Column widths are CSS's job now (the container's tracks + subgrid on rows/header), so what is
+// left to test is the track LIST: one per configured column, capped, between a rolename track and
+// the chips track. The sizing itself is the browser's and is verified in a real engine instead.
+test('searchGridTemplate: rolename + one capped track per column + the chips track', () => {
+  const r = evalJSON(`({
+    none: searchGridTemplate(0),
+    one: searchGridTemplate(1),
+    three: searchGridTemplate(3),
+  })`);
+  // No configured columns: rolename + chips only.
+  assert.equal(r.none, 'fit-content(40ch) minmax(8ch, auto)');
+  // fit-content(<cap>) = "as wide as the content needs, up to the cap" — the browser measures the
+  // real text, which is what replaced the canvas approximation.
+  assert.equal(r.one, 'fit-content(40ch) fit-content(30ch) minmax(8ch, auto)');
+  assert.equal(r.three, 'fit-content(40ch) fit-content(30ch) fit-content(30ch) fit-content(30ch) minmax(8ch, auto)');
+  // The chips close the row with a reserved minimum, and their `auto` max absorbs leftover width so
+  // they stay flush right without a second measure pass.
+  for (const t of [r.none, r.one, r.three]) assert.match(t, /minmax\(8ch, auto\)$/);
 });
 
 test('search-columns dirty check matches what the backend stores', () => {

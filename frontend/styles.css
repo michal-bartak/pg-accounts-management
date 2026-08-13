@@ -1091,17 +1091,30 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   color: var(--danger);
 }
 
-.alter-results { margin-top: 0.75rem; display: grid; gap: 0.4rem; }
-/* A result row is its own grid using the ONE template `renderAlterResults` puts on the container
-   (--search-cols), which is what makes the columns line up across rows and with the header — see
-   searchGridTemplate. `ch` in the template resolves against THIS element, so its font must stay
-   uniform: the rolename's bold lives on the .alter-login child, never here. The fallback covers
-   the pre-render state and the no-configured-columns case. */
-.alter-result-row {
+/* The CONTAINER owns the column tracks; the header and every row subgrid into them, so the browser
+   sizes each column to its widest cell across all rows and they line up for free. The row gap is
+   0.4rem, the column gap 0.6rem — subgridded children inherit the column gap, so they must not set
+   their own. --search-cols comes from searchGridTemplate (track *functions* only, no measurement). */
+.alter-results {
+  margin-top: 0.75rem;
   display: grid;
-  grid-template-columns: var(--search-cols, auto minmax(8ch, auto));
+  grid-template-columns: var(--search-cols, fit-content(40ch) minmax(8ch, auto));
+  gap: 0.4rem 0.6rem;
+}
+/* The empty-state / "searching…" note is a plain child, so span it across every column. */
+.alter-results > p { grid-column: 1 / -1; }
+
+/* A subgrid child's own border+padding insets its tracks, so the header's horizontal padding MUST
+   equal the row's border+padding (1px + 0.7rem) or the two fall out of alignment. That is the same
+   constraint the old hand-measured version had; it is just now the only thing holding them together. */
+.alter-result-head,
+.alter-result-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
   align-items: center;
-  gap: 0.6rem;
+}
+.alter-result-row {
   width: 100%;
   text-align: left;
   padding: 0.55rem 0.7rem;
@@ -1124,19 +1137,13 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   white-space: nowrap;
 }
 .alter-cell-varies { color: var(--warn, #e8a838); font-weight: 600; }
-/* Header labelling the configured columns: the same grid template as a row, with padding matching
-   the row's 0.7rem + 1px border so the header cells sit exactly above the row cells. Styled like a
-   `th` (muted, normal case) rather than a small-uppercase section label — these are column headers,
-   and the weight/case now only affect the text, not the column positions. */
+/* Styled like a `th` (muted, normal case) rather than a small-uppercase section label — these are
+   column headers. Padding matches the row's border+padding; see the shared rule above for why. */
 .alter-result-head {
-  display: grid;
-  grid-template-columns: var(--search-cols, auto minmax(8ch, auto));
-  align-items: center;
-  gap: 0.6rem;
   padding: 0 calc(0.7rem + 1px);
-  /* Must match the row's font-size, not the inherited body one: `ch` in the shared template
-     resolves per element, so a 16px header over a 14.4px <button> row would size every track ~11%
-     wider and shift every column. */
+  /* The `ch` units in --search-cols resolve against the CONTAINER now, not per row, so the header's
+     font no longer shifts the columns. Kept aligned with the row anyway, since the header text
+     should read at the same size as the cells beneath it. */
   font-size: var(--fs-base);
 }
 .alter-result-head .alter-cell { font-weight: 500; color: var(--muted); }
