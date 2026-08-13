@@ -25,12 +25,19 @@ version — not just the OS version — matters.
 
 | Platform | Requirement |
 |----------|-------------|
-| macOS | **12 Monterey or later**, kept up to date. The interface needs WebKit 16 (shipped with Safari 16, September 2022); a Mac that has had no system update since then renders the role-search results without column alignment. |
-| Windows | **10 or 11** with the **WebView2 runtime**, which Windows installs and updates automatically. The MSI adds it if missing. |
+| macOS | **12 Monterey or later**, kept up to date. |
+| Windows | **10 or 11** with the **WebView2 runtime**, which Windows installs and updates automatically. |
 | Linux | **WebKitGTK 2.38 or later** (`libwebkit2gtk-4.1-0`), which the `.deb`/`.rpm` pull in. Ships with Ubuntu 22.04+, Debian 12+ and Fedora 37+. |
 
-Older systems may still launch, but the Find-role results table is the part that degrades:
-its columns are laid out with CSS subgrid, which those engines do not support.
+**Windows 7, 8 and 8.1 are not supported and cannot run DbAccounts at all.** This is not a
+matter of the app degrading: the Go toolchain has produced Windows 10+ binaries only since
+Go 1.21, so the executable will not start on those versions. Microsoft also ended WebView2
+support for them in 2023. There is no build of DbAccounts that runs on Windows 7 — the
+project has always been built with a toolchain that excludes it.
+
+On macOS and Linux the failure mode is gentler: a system old enough to carry a pre-2022 web
+engine may still launch the app, but the Find-role results table lays its columns out with
+CSS subgrid, so on those engines the columns stop lining up. Updating the OS fixes it.
 
 Each release description opens with what is new in that version; the
 [changelog](https://github.com/michal-bartak/pg-accounts-management/blob/main/CHANGELOG.md)

@@ -16,7 +16,7 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **System requirements are now stated explicitly**: macOS 12+, Windows 10/11 with WebView2, or Linux with WebKitGTK 2.38+. The Find-role results table lays its columns out with CSS subgrid; on older engines the columns no longer line up. The macOS installer previously claimed to support 10.13, which the app has never actually run on.
+- **System requirements are now stated explicitly**: macOS 12+, Windows 10/11 with WebView2, or Linux with WebKitGTK 2.38+. Windows 7/8/8.1 cannot run the app at all (they have not been able to since before the first release — the Go toolchain builds Windows 10+ binaries only). On an older macOS or Linux the Find-role columns stop lining up, as they now use CSS subgrid. The macOS installer previously claimed to support 10.13, which the app has never actually run on.
 - **Breaking: comment keys in templates now use double braces** — `${{full_name}}`. Single braces are reserved for built-ins (`${loginname}`, `${comment}`, `${parent_roles}`, …), so a comment key named `comment` or `loginname` is finally reachable. Update any custom `create_role` / `set_comment` template that referenced a comment key in single braces.
 - Find-role results line up as a table, and no longer assume the comment has a `full_name` key.
 - An unknown `${name}` in a template is now reported instead of silently rendering empty.
