@@ -195,7 +195,7 @@
           <span class="settings-group-label">Comments</span>
           <div class="settings-row settings-row-top">
             <div class="settings-field">
-              <span class="settings-field-label">Comment fields <button type="button" class="q-hint" data-hint="JSON keys shown as labeled inputs when a role comment holds JSON (Create / Alter role). Drag the handle to reorder; keys not listed here are still shown. Plain-text comments use the Raw view.">?</button></span>
+              <span class="settings-field-label">Comment fields <button type="button" class="q-hint" data-hint="JSON keys shown as labeled inputs when a role comment holds JSON (Create / Alter role). Drag the handle to reorder; keys not listed here are still shown. Plain-text comments use the Raw view. Each key is also available as a ${{key}} placeholder in the create_role and set_comment call templates.">?</button></span>
               <div id="comment-fields-editor" class="list-editor"></div>
               <button type="button" class="list-add" id="btn-add-comment-field">Add field…</button>
             </div>
@@ -207,6 +207,12 @@
               </div>
             </div>
           </div>
+        </div>
+
+        <div class="settings-group">
+          <span class="settings-group-label">Role Details <button type="button" class="q-hint" data-hint="Extra columns shown next to the role name when you search for a role. Two placeholders are supported: ${{key}} for one key of the role&#39;s JSON comment (e.g. ${{first_name}} ${{last_name}}), and ${comment} for the whole comment. Nothing else — a missing key renders empty. Drag the handle to reorder; remove every row to show the role name only.">?</button></span>
+          <div id="search-columns-editor" class="list-editor"></div>
+          <button type="button" class="list-add" id="btn-add-search-column">Add column…</button>
         </div>
 
         <div class="settings-group">
@@ -258,7 +264,12 @@
       </ul>
 
       <h3>Placeholders</h3>
-      <p>Use <code>${field}</code> in templates. Common fields: <code>${loginname}</code>, <code>${fullname}</code>, <code>${email}</code>, <code>${parent_role}</code>, <code>${parent_roles}</code>, <code>${new_password}</code>, <code>${rolename}</code> (remove_role alias).</p>
+      <p>Two forms, and they are separate namespaces:</p>
+      <ul>
+        <li><code>${name}</code> — a <strong>built-in</strong>, from the closed set an operation offers: <code>${loginname}</code>, <code>${parent_roles}</code>, <code>${comment}</code>, <code>${new_password}</code>, <code>${attributes}</code>, <code>${config_name}</code>, <code>${config_value}</code>, and <code>${rolename}</code> (remove_role alias). Any other name is rejected.</li>
+        <li><code>${{key}}</code> — a <strong>configured comment field</strong> (Settings → Comment fields), in <code>create_role</code> and <code>set_comment</code> only. Typed from the role's JSON comment; empty or absent becomes <code>NULL</code>.</li>
+      </ul>
+      <p>So <code>${comment}</code> is the whole comment, while <code>${{comment}}</code> is a JSON key named <code>comment</code>. A comment field cannot be used inside the <code>ARRAY[...] || ${...}</code> concat form.</p>
       <p>Function mode: do not use raw <code>$1</code> or <code>SELECT</code> in the template. Statement/block mode: role names are identifiers, not bind parameters.</p>
 
       <menu>

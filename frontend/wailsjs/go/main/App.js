@@ -86,6 +86,10 @@ export function SaveParentRoles(arg1) {
   return window['go']['main']['App']['SaveParentRoles'](arg1);
 }
 
+export function SaveSearchColumns(arg1) {
+  return window['go']['main']['App']['SaveSearchColumns'](arg1);
+}
+
 export function SaveTargetSelection(arg1) {
   return window['go']['main']['App']['SaveTargetSelection'](arg1);
 }

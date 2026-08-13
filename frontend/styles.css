@@ -786,9 +786,11 @@ tr:last-child td { border-bottom: none; }
 
 .settings-row label,
 .settings-field {
+  /* Named so descendants can cancel it out of their own spacing — see .list-add below. */
+  --settings-field-gap: 0.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: var(--settings-field-gap);
   font-size: var(--fs-label);
 }
 
@@ -886,6 +888,13 @@ tr:last-child td { border-bottom: none; }
 #fn-execution { width: auto; min-width: 12rem; }
 #fn-call { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-sm); resize: vertical; }
 .fn-placeholders { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+/* The chips live in a <span> inside .fn-placeholders, so that flex gap never reached them and they
+   rendered flush; make the list its own flex row and the group label gets room too. */
+#fn-placeholder-list { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+/* Comment-field chips are the ${{key}} namespace — outlined rather than filled, so the two kinds
+   are distinguishable at a glance. */
+.ph-chip-field { background: transparent; border-style: dashed; }
+.ph-group-label { font-size: var(--fs-xs); color: var(--muted); margin-left: 0.15rem; }
 .ph-chip {
   min-height: 0;
   padding: 0.15rem 0.5rem;
@@ -1109,8 +1118,14 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .alter-cluster-host { color: var(--muted); font-size: var(--fs-sm); }
 
 .alter-results { margin-top: 0.75rem; display: grid; gap: 0.4rem; }
+/* A result row is its own grid using the ONE template `renderAlterResults` puts on the container
+   (--search-cols), which is what makes the columns line up across rows and with the header — see
+   searchGridTemplate. `ch` in the template resolves against THIS element, so its font must stay
+   uniform: the rolename's bold lives on the .alter-login child, never here. The fallback covers
+   the pre-render state and the no-configured-columns case. */
 .alter-result-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--search-cols, auto minmax(8ch, auto));
   align-items: center;
   gap: 0.6rem;
   width: 100%;
@@ -1123,9 +1138,44 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   cursor: pointer;
 }
 .alter-result-row:hover { border-color: var(--primary); }
-.alter-login { font-weight: 600; }
-.alter-fullname { color: var(--muted); font-size: var(--fs-sm); }
-.alter-cluster-badges { margin-left: auto; display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.alter-login { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* One configured search column (Settings → Find role). Overlong values ellipsize rather than
+   wrapping the row; the column's own width comes from the shared grid template. */
+.alter-cell {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.alter-cell-varies { color: var(--warn, #e8a838); font-weight: 600; }
+/* Header labelling the configured columns: the same grid template as a row, with padding matching
+   the row's 0.7rem + 1px border so the header cells sit exactly above the row cells. Styled like a
+   `th` (muted, normal case) rather than a small-uppercase section label — these are column headers,
+   and the weight/case now only affect the text, not the column positions. */
+.alter-result-head {
+  display: grid;
+  grid-template-columns: var(--search-cols, auto minmax(8ch, auto));
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 calc(0.7rem + 1px);
+  /* Must match the row's font-size, not the inherited body one: `ch` in the shared template
+     resolves per element, so a 16px header over a 14.4px <button> row would size every track ~11%
+     wider and shift every column. */
+  font-size: var(--fs-base);
+}
+.alter-result-head .alter-cell { font-weight: 500; color: var(--muted); }
+/* Last grid track. Its `auto` max stretches to absorb leftover space when no column is flexible,
+   so justify-self keeps the chips flush right; `margin-left:auto` covers the flex contexts that
+   reuse this class (e.g. the Present-on block, which overrides it). */
+.alter-cluster-badges {
+  margin-left: auto;
+  justify-self: end;
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
 
 .alter-detail { margin-top: 1rem; }
 .alter-detail-head {
@@ -1296,11 +1346,18 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .alter-password label.inline { display: flex; align-items: center; gap: 0.35rem; }
 
 
+/* Wide enough for the configured search columns (Settings → Find role) without the popup
+   resizing itself as results come and go. */
+#search-dialog { max-width: min(1040px, 96vw); }
+.search-dialog-body { min-width: min(560px, 90vw); }
 .search-dialog-body,
 .comments-dialog-body { padding: 1.25rem; display: block; }
 .search-dialog-body h2,
 .comments-dialog-body h2 { margin: 0 0 0.75rem; }
-.search-dialog-body .alter-results { margin-top: 0.75rem; max-height: 50vh; overflow-y: auto; }
+/* Scrolls as one box, so the header keeps sitting over its own columns while scrolling. The
+   horizontal axis is the safety valve for a window too narrow for the configured columns' minimums
+   — the alternative is chips clipped at the edge with no way to reach them. */
+.search-dialog-body .alter-results { margin-top: 0.75rem; max-height: 50vh; overflow: auto; }
 /* Status chip on the left of the popup's button row, Close staying right (the same margin-right
    trick as #fn-dialog-default / #btn-test-cluster). */
 #search-status { margin-right: auto; }
@@ -1339,7 +1396,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .scope-cluster .hint { margin: 0; }
 #scope-form menu { margin: 0.5rem 0 0; padding: 0; display: flex; justify-content: flex-end; gap: 0.5rem; }
 
-/* Shared draggable list editor (comment fields, parent groups). */
+/* Shared draggable list editor (comment fields, parent groups, search columns). */
 .list-editor {
   display: flex;
   flex-direction: column;
@@ -1357,9 +1414,25 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .le-row .cf-key,
 .le-row .pr-value { flex: 0 0 13rem; }
 .le-row .cf-label { flex: 1 1 0; }
+/* A search column is label + template; the label matches the fixed primary-field width above so
+   the Comments and Role Details editors line up, and the template takes the remaining space. The
+   template keeps the standard UI font — monospace reads as out of place at this size, next to the
+   plain-text inputs of the other list editors. */
+.le-row .sc-label { flex: 0 0 13rem; }
+.le-row .sc-template { flex: 1 1 0; }
+/* A template whose placeholders won't save (searchTemplateError); the reason is on the title.
+   The `.list-editor` qualifier is load-bearing, not decoration: the baseline
+   `input:not([type=checkbox]):not([type=radio]):not([type=color])` rule scores (0,3,1), so a
+   shorter `.le-row input.invalid` (0,2,1) loses to it and the border stays grey. This ties at
+   (0,3,1) and wins on order. */
+.list-editor .le-row input.invalid { border-color: var(--danger); }
 /* A parent-group row is just grip + one primary field + delete, so shrink-wrap the editor to
    that width instead of stretching the field across the full 32rem. */
 #parent-roles-editor.list-editor { width: fit-content; max-width: 100%; }
+/* Templates run long (several ${{key}} tokens plus separators), so this editor spans its settings
+   group instead of the shared 32rem cap; the fixed label column keeps its width and .sc-template
+   absorbs everything left over. */
+#search-columns-editor.list-editor { width: 100%; }
 .le-grip {
   flex: 0 0 auto;
   cursor: grab;
@@ -1385,8 +1458,14 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 }
 /* Add… buttons (Settings list editors + Operations privilege/setting) — full control height. */
 .list-add { align-self: flex-start; }
-#btn-add-comment-field,
-#btn-add-parent-role { margin-top: 0.5rem; }
+/* Gap between a list editor and its own Add… button. Keyed on the structure rather than a list of
+   button ids, so a new Settings list editor is spaced correctly without touching this rule. The
+   Operations privilege/setting buttons sit inside .alter-add-priv, so they are unaffected. */
+.list-editor + .list-add { margin-top: 0.5rem; }
+/* Inside a .settings-field (a gapped flex column, e.g. Comment fields) the parent's own gap already
+   sits between the two, so subtract it — otherwise that editor's button clears more than the ones
+   placed directly in a .settings-group. */
+.settings-field .list-editor + .list-add { margin-top: calc(0.5rem - var(--settings-field-gap)); }
 
 /* Settings row whose fields differ in height (e.g. list editor + toggle): top-align labels. */
 .settings-row-top { align-items: flex-start; }

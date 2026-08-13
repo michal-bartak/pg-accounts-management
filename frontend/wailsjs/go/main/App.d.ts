@@ -44,6 +44,8 @@ export function SaveDBReads(arg1:model.DBReads):Promise<void>;
 
 export function SaveParentRoles(arg1:Array<string>):Promise<void>;
 
+export function SaveSearchColumns(arg1:Array<model.SearchColumn>):Promise<void>;
+
 export function SaveTargetSelection(arg1:model.TargetSelection):Promise<void>;
 
 export function SaveUISettings(arg1:model.UISettings):Promise<void>;

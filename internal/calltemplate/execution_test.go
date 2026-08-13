@@ -448,14 +448,14 @@ func TestBuild_parentRoles_createRole_bothModes(t *testing.T) {
 // TestBuild_commentFields_statementTyping covers the JSON-typed embedding: string → quoted
 // literal, empty/null/absent → bare NULL, number/bool → typed literal, array/object → JSON text.
 func TestBuild_commentFields_statementTyping(t *testing.T) {
-	call := "CREATE ROLE ${loginname} /* ${full_name} ${e_mail} ${age} ${active} ${tags} */"
+	call := "CREATE ROLE ${loginname} /* ${{full_name}} ${{e_mail}} ${{age}} ${{active}} ${{tags}} */"
 	args := map[string]string{
-		"loginname": "jdoe",
-		"full_name": `"John O'Hara"`,
-		"e_mail":    `""`, // empty string → NULL
-		"age":       `42`,
-		"active":    `true`,
-		"tags":      `["a","b"]`,
+		"loginname":    "jdoe",
+		"cf:full_name": `"John O'Hara"`,
+		"cf:e_mail":    `""`, // empty string → NULL
+		"cf:age":       `42`,
+		"cf:active":    `true`,
+		"cf:tags":      `["a","b"]`,
 		// "missing" intentionally absent → NULL
 	}
 	sql, _, useQuery, err := Build(call, args, "create_role", model.ExecutionStatement,
@@ -475,7 +475,7 @@ func TestBuild_commentFields_statementTyping(t *testing.T) {
 // TestBuild_commentFields_absentIsNull ensures an unconfigured-in-args field resolves to NULL
 // rather than erroring "missing value".
 func TestBuild_commentFields_absentIsNull(t *testing.T) {
-	sql, _, _, err := Build("COMMENT ON ROLE ${loginname} IS ${comment} -- ${dept}",
+	sql, _, _, err := Build("COMMENT ON ROLE ${loginname} IS ${comment} -- ${{dept}}",
 		map[string]string{"loginname": "jdoe", "comment": "'{}'"}, "set_comment", model.ExecutionStatement, "dept")
 	if err != nil {
 		t.Fatal(err)
@@ -488,8 +488,8 @@ func TestBuild_commentFields_absentIsNull(t *testing.T) {
 // TestBuild_commentFields_functionBinds ensures function mode binds typed values (nil / string /
 // number / bool) rather than raw JSON text.
 func TestBuild_commentFields_functionBinds(t *testing.T) {
-	_, vals, useQuery, err := Build("admin.create(${loginname}, ${full_name}, ${age}, ${missing})",
-		map[string]string{"loginname": "jdoe", "full_name": `"Jane"`, "age": `7`},
+	_, vals, useQuery, err := Build("admin.create(${loginname}, ${{full_name}}, ${{age}}, ${{missing}})",
+		map[string]string{"loginname": "jdoe", "cf:full_name": `"Jane"`, "cf:age": `7`},
 		"create_role", model.ExecutionFunction, "full_name", "age", "missing")
 	if err != nil {
 		t.Fatal(err)
@@ -514,11 +514,11 @@ func TestBuild_commentFields_functionBinds(t *testing.T) {
 
 // TestBuild_commentFields_emptyStringIsNull pins the requirement that an empty-string comment
 // field (JSON-encoded as `""` — present in the args, not absent) is stored as SQL NULL in BOTH
-// execution modes, exactly like a JSON null or a missing key — never as an empty literal ''.
+// execution modes, exactly like a JSON null or a missing key — never as an empty literal ”.
 func TestBuild_commentFields_emptyStringIsNull(t *testing.T) {
 	// Statement mode: embedded as a bare, unquoted NULL (not '').
-	sql, _, _, err := Build("CREATE ROLE ${loginname} -- ${full_name}",
-		map[string]string{"loginname": "jdoe", "full_name": `""`}, "create_role", model.ExecutionStatement, "full_name")
+	sql, _, _, err := Build("CREATE ROLE ${loginname} -- ${{full_name}}",
+		map[string]string{"loginname": "jdoe", "cf:full_name": `""`}, "create_role", model.ExecutionStatement, "full_name")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -527,8 +527,8 @@ func TestBuild_commentFields_emptyStringIsNull(t *testing.T) {
 	}
 
 	// Function mode: bound as a real nil (→ SQL NULL), not the empty string "".
-	_, vals, useQuery, err := Build("admin.create(${loginname}, ${full_name})",
-		map[string]string{"loginname": "jdoe", "full_name": `""`}, "create_role", model.ExecutionFunction, "full_name")
+	_, vals, useQuery, err := Build("admin.create(${loginname}, ${{full_name}})",
+		map[string]string{"loginname": "jdoe", "cf:full_name": `""`}, "create_role", model.ExecutionFunction, "full_name")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -549,11 +549,16 @@ func TestValidate_createRole_rejectsRemovedFullnameEmail(t *testing.T) {
 	if err := ValidateCallTemplateWithExecution("CREATE ROLE ${loginname} -- ${email}", "create_role", model.ExecutionStatement); err == nil {
 		t.Fatal("expected ${email} to be rejected for create_role")
 	}
-	// A comment field is only allowed when configured.
-	if err := ValidateCallTemplateWithExecution("CREATE ROLE ${loginname} -- ${full_name}", "create_role", model.ExecutionStatement); err == nil {
-		t.Fatal("expected ${full_name} rejected when not configured")
+	// A comment field lives in the ${{...}} namespace only, and only when configured.
+	if err := ValidateCallTemplateWithExecution("CREATE ROLE ${loginname} -- ${{full_name}}", "create_role", model.ExecutionStatement); err == nil {
+		t.Fatal("expected ${{full_name}} rejected when not configured")
 	}
-	if err := ValidateCallTemplateWithExecution("CREATE ROLE ${loginname} -- ${full_name}", "create_role", model.ExecutionStatement, "full_name"); err != nil {
-		t.Fatalf("configured ${full_name} should be allowed: %v", err)
+	if err := ValidateCallTemplateWithExecution("CREATE ROLE ${loginname} -- ${{full_name}}", "create_role", model.ExecutionStatement, "full_name"); err != nil {
+		t.Fatalf("configured ${{full_name}} should be allowed: %v", err)
+	}
+	// The bare form is a built-in name only — even for a configured field. This is the inversion
+	// that separates the namespaces — there is no migration, a stale template is simply rejected.
+	if err := ValidateCallTemplateWithExecution("CREATE ROLE ${loginname} -- ${full_name}", "create_role", model.ExecutionStatement, "full_name"); err == nil {
+		t.Fatal("expected bare ${full_name} rejected even when configured")
 	}
 }

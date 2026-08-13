@@ -109,6 +109,12 @@ func (a *App) SaveCommentFields(fields []model.CommentField) error {
 	return a.store.UpdateCommentFields(fields)
 }
 
+// SaveSearchColumns persists the extra columns shown next to the role name in the Find-role
+// results. An empty list is valid and means "role name only".
+func (a *App) SaveSearchColumns(cols []model.SearchColumn) error {
+	return a.store.UpdateSearchColumns(cols)
+}
+
 // SaveTargetSelection persists the Operations-page target selection so it survives
 // re-renders (e.g. after saving Settings) and app restarts.
 func (a *App) SaveTargetSelection(t model.TargetSelection) error {

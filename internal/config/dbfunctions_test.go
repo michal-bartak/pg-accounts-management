@@ -92,3 +92,20 @@ func TestNeedsCreateRoleTemplateFix(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateDBFunctions_namespaces(t *testing.T) {
+	fns := DefaultConfig().DBFunctions
+	fns.CreateRole = model.DBFunction{Execution: model.ExecutionFunction, Call: "admin.create(${loginname}, ${{full_name}})"}
+	if err := validateDBFunctions(fns, "full_name"); err != nil {
+		t.Fatalf("${{full_name}} should be accepted when configured: %v", err)
+	}
+	// The bare form is built-ins only, even for a configured field.
+	fns.CreateRole = model.DBFunction{Execution: model.ExecutionFunction, Call: "admin.create(${loginname}, ${full_name})"}
+	err := validateDBFunctions(fns, "full_name")
+	if err == nil {
+		t.Fatal("bare ${full_name} should be rejected")
+	}
+	if !strings.Contains(err.Error(), "${{full_name}}") {
+		t.Fatalf("the error should point at the ${{...}} form, got: %v", err)
+	}
+}

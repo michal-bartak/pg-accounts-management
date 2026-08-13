@@ -215,6 +215,12 @@ type Config struct {
 	// comment holds JSON (Create role / Alter role). Ordered; keys not listed here are
 	// still shown generically. Defaults to full_name/e_mail.
 	CommentFields []CommentField `yaml:"comment_fields,omitempty" json:"commentFields"`
+	// SearchColumns are the extra columns shown next to the role name in the Find-role
+	// results, each built from a display template over the role's comment. Ordered. No
+	// omitempty: an explicitly empty list means "role name only" and must round-trip as
+	// `search_columns: []`, while an absent key (older config) still gets the default
+	// "Full name" column.
+	SearchColumns []SearchColumn `yaml:"search_columns" json:"searchColumns"`
 	// Targets is the last target selection on the Operations page (cluster groups and/or
 	// specific clusters), remembered across re-renders and restarts. Empty = "all groups".
 	Targets TargetSelection `yaml:"targets,omitempty" json:"targets"`
@@ -241,8 +247,27 @@ type CommentField struct {
 	Label string `yaml:"label" json:"label"`
 }
 
+// SearchColumn is one extra column in the Find-role results. Template is display-only text
+// (rendered by the frontend, never SQL): ${<key>} resolves to that key's value in the role's
+// JSON comment, and the reserved ${comment} to the raw comment. An unresolved key renders
+// empty. Label is the column header; blank is allowed.
+type SearchColumn struct {
+	Label    string `yaml:"label" json:"label"`
+	Template string `yaml:"template" json:"template"`
+}
+
+// CommentArgPrefix namespaces a comment field's value in an operation's args map. Without it a
+// field keyed like a built-in placeholder (comment, loginname, …) would share one map entry with
+// that built-in, so ${comment} and ${{comment}} could not both be resolved for the same call.
+// It is applied inside commands.BuildArgs — the Wails wire format (CreateRoleParams.CommentFields /
+// SetCommentParams.CommentFields) stays keyed by the bare key.
+const CommentArgPrefix = "cf:"
+
+// CommentArgKey is the args-map key holding the ${{key}} placeholder's value.
+func CommentArgKey(key string) string { return CommentArgPrefix + key }
+
 // CommentFieldKeys returns the configured comment-field keys in order. These are the placeholder
-// names (${<key>}) additionally offered to the create_role / set_comment call templates.
+// names (${{<key>}}) additionally offered to the create_role / set_comment call templates.
 func (c Config) CommentFieldKeys() []string {
 	keys := make([]string, 0, len(c.CommentFields))
 	for _, f := range c.CommentFields {
@@ -483,7 +508,6 @@ type RoleMatch struct {
 	Category  string `json:"category"`
 	LoginName string `json:"loginName"`
 	Comment   string `json:"comment"`
-	FullName  string `json:"fullName"`
 }
 
 // ClusterRoleMatches is one cluster's search outcome — its matches, or why it could not be
@@ -509,7 +533,6 @@ type ClusterRoleDetail struct {
 	Category   string            `json:"category"`
 	Exists     bool              `json:"exists"`
 	Comment    string            `json:"comment"`
-	FullName   string            `json:"fullName"`
 	Parents    []string          `json:"parents"`
 	Attributes map[string]bool   `json:"attributes"`
 	Settings   map[string]string `json:"settings"`
