@@ -87,11 +87,6 @@ func sqlLiteral(v any) string {
 	}
 }
 
-// CallFunction is an alias for ExecuteOperation (Wails-era name).
-func CallFunction(ctx context.Context, conn *pgx.Conn, fn model.DBFunction, operation string, args map[string]string, commentFields ...string) (sql string, msg string, err error) {
-	return ExecuteOperation(ctx, conn, fn, operation, args, commentFields...)
-}
-
 func runQuery(ctx context.Context, q Querier, query string, values ...any) (string, error) {
 	rows, err := q.Query(ctx, query, values...)
 	if err != nil {

@@ -198,17 +198,6 @@ func ValidateOperation(cfg model.Config, op model.OperationSpec) error {
 	return nil
 }
 
-// ValidateRequest validates a single-operation, cluster-targeted request.
-func ValidateRequest(cfg model.Config, req model.RunRequest) error {
-	if req.Operation == "" {
-		return fmt.Errorf("operation is required")
-	}
-	if len(req.CategoryIDs) == 0 && len(req.ClusterIDs) == 0 {
-		return fmt.Errorf("select at least one category or cluster")
-	}
-	return ValidateOperation(cfg, req.OperationSpec)
-}
-
 // ValidateRoleBatch validates a per-cluster batch request: at least one cluster, each with at
 // least one operation, and every operation well-formed.
 func ValidateRoleBatch(cfg model.Config, req model.RoleBatchRequest) error {

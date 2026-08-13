@@ -13,91 +13,51 @@ func testConfig() model.Config {
 	return config.DefaultConfig()
 }
 
-func baseRunRequest(op string) model.RunRequest {
-	return model.RunRequest{
-		OperationSpec: model.OperationSpec{Operation: op},
-		CategoryIDs:   []string{"uat"},
-		Auth:          model.AuthContext{User: "admin"},
+// ValidateOperation is what the live batch path runs (via ValidateRoleBatch); these cases were
+// previously written against the removed single-op ValidateRequest wrapper.
+func TestValidateOperation_acceptsWellFormedParams(t *testing.T) {
+	cfg := testConfig()
+	for _, tc := range []struct {
+		name string
+		op   model.OperationSpec
+	}{
+		{"createRole", model.OperationSpec{Operation: OpCreateRole, CreateRole: &model.CreateRoleParams{LoginName: "jdoe"}}},
+		{"removeRole", model.OperationSpec{Operation: OpRemoveRole, RemoveRole: &model.RemoveRoleParams{LoginName: "jdoe"}}},
+		{"grantParents", model.OperationSpec{Operation: OpGrantParents, GrantParents: &model.GrantParentsParams{LoginName: "jdoe", ParentRoles: "gr_a,gr_b"}}},
+		{"revokeParents", model.OperationSpec{Operation: OpRevokeParents, RevokeParents: &model.RevokeParentsParams{LoginName: "jdoe", ParentRoles: "gr_a"}}},
+		{"changePassword", model.OperationSpec{Operation: OpChangePassword, ChangePassword: &model.ChangePasswordParams{LoginName: "jdoe", NewPassword: "secret"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := ValidateOperation(cfg, tc.op); err != nil {
+				t.Fatalf("unexpected: %v", err)
+			}
+		})
 	}
 }
 
-func TestValidateRequest_createRole(t *testing.T) {
+// A blank login and a missing params struct must both be refused, for every operation.
+func TestValidateOperation_requiresLogin(t *testing.T) {
 	cfg := testConfig()
-	req := baseRunRequest(OpCreateRole)
-	req.CreateRole = &model.CreateRoleParams{LoginName: "jdoe"}
-
-	if err := ValidateRequest(cfg, req); err != nil {
-		t.Fatalf("unexpected: %v", err)
-	}
-
-	req.CreateRole.LoginName = "  "
-	if err := ValidateRequest(cfg, req); err == nil {
-		t.Fatal("expected error for empty login")
+	for _, tc := range []struct {
+		name string
+		op   model.OperationSpec
+	}{
+		{"blank login", model.OperationSpec{Operation: OpCreateRole, CreateRole: &model.CreateRoleParams{LoginName: "  "}}},
+		{"nil params", model.OperationSpec{Operation: OpRemoveRole}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateOperation(cfg, tc.op)
+			if err == nil || !strings.Contains(err.Error(), "login") {
+				t.Fatalf("got: %v", err)
+			}
+		})
 	}
 }
 
-func TestValidateRequest_removeRole(t *testing.T) {
-	cfg := testConfig()
-	req := baseRunRequest(OpRemoveRole)
-	req.RemoveRole = &model.RemoveRoleParams{LoginName: "jdoe"}
-
-	if err := ValidateRequest(cfg, req); err != nil {
-		t.Fatalf("unexpected: %v", err)
-	}
-
-	req.RemoveRole = nil
-	if err := ValidateRequest(cfg, req); err == nil || !strings.Contains(err.Error(), "login") {
+func TestValidateOperation_rejectsUnknownOperation(t *testing.T) {
+	err := ValidateOperation(testConfig(), model.OperationSpec{Operation: "nope"})
+	if err == nil || !strings.Contains(err.Error(), "unknown operation") {
 		t.Fatalf("got: %v", err)
-	}
-}
-
-func TestValidateRequest_grantParents(t *testing.T) {
-	cfg := testConfig()
-	req := baseRunRequest(OpGrantParents)
-	req.GrantParents = &model.GrantParentsParams{
-		LoginName:   "jdoe",
-		ParentRoles: "gr_a,gr_b",
-	}
-
-	if err := ValidateRequest(cfg, req); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestValidateRequest_revokeParents(t *testing.T) {
-	cfg := testConfig()
-	req := baseRunRequest(OpRevokeParents)
-	req.RevokeParents = &model.RevokeParentsParams{
-		LoginName:   "jdoe",
-		ParentRoles: "gr_a",
-	}
-
-	if err := ValidateRequest(cfg, req); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestValidateRequest_changePassword(t *testing.T) {
-	cfg := testConfig()
-	req := baseRunRequest(OpChangePassword)
-	req.ChangePassword = &model.ChangePasswordParams{
-		LoginName:   "jdoe",
-		NewPassword: "secret",
-	}
-
-	if err := ValidateRequest(cfg, req); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestValidateRequest_requiresTargets(t *testing.T) {
-	cfg := testConfig()
-	req := baseRunRequest(OpRemoveRole)
-	req.CategoryIDs = nil
-	req.RemoveRole = &model.RemoveRoleParams{LoginName: "x"}
-
-	if err := ValidateRequest(cfg, req); err == nil {
-		t.Fatal("expected error")
 	}
 }
 
@@ -398,33 +358,27 @@ func TestBuildQuery_removeRole_customTemplate(t *testing.T) {
 	}
 }
 
-func TestValidateRequest_setConfig(t *testing.T) {
+func TestValidateOperation_setConfig(t *testing.T) {
 	cfg := testConfig()
-	ok := model.RunRequest{
-		OperationSpec: model.OperationSpec{
-			Operation: OpSetConfig,
-			SetConfig: &model.SetConfigParams{LoginName: "t", ConfigName: "log_statement", ConfigValue: "all"},
-		},
-		ClusterIDs: []string{"c"},
+	ok := model.OperationSpec{
+		Operation: OpSetConfig,
+		SetConfig: &model.SetConfigParams{LoginName: "t", ConfigName: "log_statement", ConfigValue: "all"},
 	}
-	if err := ValidateRequest(cfg, ok); err != nil {
+	if err := ValidateOperation(cfg, ok); err != nil {
 		t.Fatalf("valid set_config rejected: %v", err)
 	}
-	bad := model.RunRequest{
-		OperationSpec: model.OperationSpec{
-			Operation: OpSetConfig,
-			SetConfig: &model.SetConfigParams{LoginName: "t", ConfigName: "bad name;", ConfigValue: "x"},
-		},
-		ClusterIDs: []string{"c"},
+	bad := model.OperationSpec{
+		Operation: OpSetConfig,
+		SetConfig: &model.SetConfigParams{LoginName: "t", ConfigName: "bad name;", ConfigValue: "x"},
 	}
-	if err := ValidateRequest(cfg, bad); err == nil {
+	if err := ValidateOperation(cfg, bad); err == nil {
 		t.Fatal("expected invalid setting name to be rejected")
 	}
 	if !ValidConfigName("auto_explain.log_min_duration") || ValidConfigName("a b") {
 		t.Fatal("ValidConfigName wrong")
 	}
 	// set_config/reset_config now build through the call-template like every other op.
-	fn, args, err := BuildArgs(cfg, ok.OperationSpec)
+	fn, args, err := BuildArgs(cfg, ok)
 	if err != nil || fn.Call == "" || args["config_name"] != "log_statement" || args["config_value"] != "all" {
 		t.Fatalf("BuildArgs set_config: fn=%q args=%v err=%v", fn.Call, args, err)
 	}
