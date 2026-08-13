@@ -359,6 +359,8 @@ tr:last-child td { border-bottom: none; }
 #groups-table td:last-child { width: 1%; white-space: nowrap; }
 #clusters-table td:last-child { padding-top: 0.25rem; padding-bottom: 0.25rem; }
 
+/* Group badge = outlined (transparent + border), matching the group scope chips. Per-group
+   colours are generated into #cat-colors from state.categories. */
 .badge {
   display: inline-block;
   padding: 0.2rem 0.55rem;
@@ -368,10 +370,9 @@ tr:last-child td { border-bottom: none; }
   text-transform: uppercase;
   flex-shrink: 0;
   border: 1px solid currentColor;
+  background: transparent;
+  color: var(--muted);
 }
-/* Group badge = outlined (transparent + border), matching the group scope chips. Per-group
-   colours are generated into #cat-colors from state.categories. */
-.badge { background: transparent; color: var(--muted); }
 
 .status-ok { color: var(--ok); }
 .status-error { color: var(--danger); }
@@ -443,10 +444,11 @@ tr:last-child td { border-bottom: none; }
 /* Validation/error line spans its own row above the chip + action buttons. */
 .ops-footer .form-error { flex-basis: 100%; margin: 0 0 0.25rem; order: -1; }
 .ops-footer .run-bar,
-.ops-footer .alter-actions { margin: 0; flex: 1; display: flex; gap: 0.5rem; }
-/* Primary (commit) action on the right; destructive Remove role separated on the far left. */
-.ops-footer .run-bar { justify-content: flex-end; }
-.ops-footer .alter-actions { justify-content: space-between; }
+.ops-footer .alter-actions { margin: 0; flex: 1; display: flex; align-items: center; gap: 0.5rem; justify-content: flex-end; }
+/* Both actions sit in the right-aligned cluster; the destructive Remove role goes to the LEFT
+   of the primary Save (the app-wide action-button convention). `order` is the whole mechanism —
+   this used to be `space-between` here plus a `margin-left:auto` on the button 770 lines below,
+   which cancelled each other out and made the real layout impossible to read from either rule. */
 #btn-alter-remove { order: -1; }
 
 /* Run-status chip (pinned left of the footer buttons): clickable summary of the last/ongoing
@@ -498,8 +500,7 @@ tr:last-child td { border-bottom: none; }
 
 /* Executed-queries popup (opened by the per-row magnifier). */
 #run-queries-dialog { max-width: min(820px, 94vw); }
-.run-queries-dialog-body { padding: 1.25rem; display: block; min-width: 520px; }
-.run-queries-dialog-body h2 { margin: 0 0 0.75rem; }
+.run-queries-dialog-body { min-width: 520px; }
 .run-queries-content {
   max-height: 60vh;
   overflow: auto;
@@ -514,37 +515,22 @@ tr:last-child td { border-bottom: none; }
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: var(--fs-sm);
 }
-.run-queries-dialog-body menu {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin: 1rem 0 0;
-  padding: 0;
-}
 
 #run-status-dialog { max-width: min(1040px, 96vw); }
-.run-status-dialog-body { padding: 1.25rem; display: block; min-width: 640px; }
-.run-status-dialog-body h2 { margin: 0 0 0.75rem; }
+.run-status-dialog-body { min-width: 640px; }
 .run-status-dialog-body .table-wrap { max-height: 60vh; overflow-y: auto; }
-.run-status-dialog-body menu {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin: 1rem 0 0;
-  padding: 0;
-}
 
 /* Pre-flight dependency popup (before a role is dropped). Narrow when nothing was found — it is
    then just a per-cluster "no dependencies" list; as wide as the viewport allows as soon as any
    cluster reports rows, because the Object column carries full function/table identifiers. */
 #deps-dialog { max-width: min(560px, 92vw); }
 #deps-dialog.wide { max-width: 98vw; }
-.deps-dialog-body { padding: 1.25rem; display: block; min-width: 420px; }
+.deps-dialog-body { min-width: 420px; }
 #deps-dialog.wide .deps-dialog-body { min-width: min(720px, 90vw); }
 /* The titlebar carries the ? hint, Reload, and the one SQL magnifier (every cluster runs the
    same query). Reload spins its icon while the re-check is in flight, reusing the run-status
    keyframes rather than defining a second spin. */
-.deps-dialog-body h2 { margin: 0 0 0.75rem; display: flex; align-items: center; gap: 0.4rem; }
+.deps-dialog-body h2 { display: flex; align-items: center; gap: 0.4rem; }
 #deps-reload.busy .ic { animation: run-status-spin 0.7s linear infinite; }
 #deps-reload:disabled { opacity: 0.6; cursor: default; }
 .deps-list {
@@ -579,13 +565,6 @@ tr:last-child td { border-bottom: none; }
 /* Object identifiers can be very long — the last <col> has no fixed width, so it absorbs the
    remaining space and wraps rather than stretching the dialog further. */
 .deps-table td:last-child { white-space: normal; word-break: break-word; }
-.deps-dialog-body menu {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin: 1rem 0 0;
-  padding: 0;
-}
 
 .ops-sidebar {
   background: var(--surface);
@@ -688,7 +667,6 @@ tr:last-child td { border-bottom: none; }
   gap: 0.75rem;
 }
 .ri-login { max-width: 50%; }
-.role-identity .ri-note:empty { display: none; }
 #role-login[readonly] { opacity: 0.7; cursor: default; }
 
 /* Inline comment editor (Fields / Raw). */
@@ -882,9 +860,7 @@ tr:last-child td { border-bottom: none; }
 .fn-row-exec { font-size: var(--fs-xs); color: var(--muted); }
 
 /* Template popup */
-#fn-form { padding: 1.25rem; display: grid; gap: 0.65rem; min-width: min(30rem, 84vw); }
-#fn-form h2 { margin: 0; }
-#fn-form label { display: flex; flex-direction: column; gap: 0.2rem; font-size: var(--fs-label); }
+#fn-form { display: grid; gap: 0.65rem; min-width: min(30rem, 84vw); }
 #fn-execution { width: auto; min-width: 12rem; }
 #fn-call { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-sm); resize: vertical; }
 .fn-placeholders { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
@@ -905,7 +881,6 @@ tr:last-child td { border-bottom: none; }
   color: var(--text);
 }
 .ph-chip:hover { border-color: var(--muted); }
-#fn-form menu { display: flex; gap: 0.5rem; justify-content: flex-end; margin: 0.5rem 0 0; padding: 0; }
 /* Default (revert-to-vanilla) sits on the far left, away from Cancel/Done. */
 #fn-dialog-default { margin-right: auto; }
 .fn-contract { margin: 0 0 0.75rem; color: var(--muted); font-size: var(--fs-sm); padding-right: 2.5rem; }
@@ -933,49 +908,64 @@ tr:last-child td { border-bottom: none; }
 
 #batch-concurrency { width: 5rem; }
 
-#confirm-form menu,
-#cluster-form menu,
-#group-form menu {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
-  margin: 0.5rem 0 0;
-  padding: 0;
-}
-
 #confirm-dialog p {
   margin: 0.5rem 0 1rem;
   line-height: 1.45;
   color: var(--text);
 }
 
+/* ---------------- Dialogs: shared chrome ----------------
+   Padding, heading, button row and label layout live here ONCE, keyed on the element, so a new
+   popup gets the house style by existing. The per-dialog blocks elsewhere in this file should
+   only carry what is genuinely specific: width, max-height, a scroll container. */
 dialog {
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  /* Zero here so each body supplies its own padding — a dialog whose content scrolls needs the
+     padding INSIDE the scroll container, not on the element that clips it. */
   padding: 0;
   background: var(--surface);
   color: var(--text);
   min-width: 360px;
   max-width: min(640px, 92vw);
 }
-
 dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
-/* All popup headers use the same size as the Clusters / Cluster groups popup. */
-dialog h2 { font-size: var(--fs-h2); }
 
-#cluster-form,
-#group-form {
-  padding: 1.25rem;
-  display: grid;
-  gap: 0.65rem;
+/* The direct child of every <dialog> is its body (a div or a form) and carries the padding. */
+dialog > div,
+dialog > form { padding: 1.25rem; }
+
+/* All popup headers match the Clusters / Cluster groups popup. The <form> bodies lay out with
+   `display: grid` + `gap`, so there the gap owns the spacing and the heading margin must be 0. */
+dialog h2 { font-size: var(--fs-h2); margin: 0 0 0.75rem; }
+dialog > form h2 { margin: 0; }
+
+/* Button row: right-aligned, primary rightmost (the app-wide convention). Individual buttons
+   opt out to the left with `margin-right: auto` (Test connection, Default, the status chip). */
+dialog menu {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+  padding: 0;
 }
 
-#cluster-form label,
-#group-form label {
+/* Label above its control, in a column. Deliberately NOT `dialog label`: the scope dialog nests
+   `.scope-cluster` / `.scope-group-head` labels that must stay row-direction (checkbox beside
+   text), so this matches only a body's own labels plus the two-up `.form-row` pairs. */
+dialog > form > label,
+dialog > div > label,
+dialog .form-row > label {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
   font-size: var(--fs-label);
+}
+
+#cluster-form,
+#group-form {
+  display: grid;
+  gap: 0.65rem;
 }
 /* Host + Port on one line. min-width:0 (here and on the inputs) lets flex-basis actually
    govern the width — without it each field floors at its input's intrinsic (size=20) width. */
@@ -1044,11 +1034,8 @@ dialog h2 { font-size: var(--fs-h2); }
 #cluster-form .form-sep { width: 100%; border: none; border-top: 1px solid var(--border); margin: 0.4rem 0; }
 /* Test connection sits on the left; Save / Cancel stay on the right. */
 #cluster-form menu #btn-test-cluster { margin-right: auto; }
-/* Success flash: instant green + "OK", then fade back to the resting style over ~1s. */
-#btn-test-cluster.test-ok { background: var(--ok); border-color: var(--ok); color: #fff; }
-#btn-test-cluster.test-fade { transition: background 1s ease, border-color 1s ease, color 1s ease; }
-
-/* Generic button feedback (confirmations/errors) + unsaved-changes marker. */
+/* Generic button feedback (confirmations/errors). Test connection reuses this rather than
+   carrying its own near-identical green-flash pair. */
 button.flash-ok { background: var(--ok); border-color: var(--ok); color: #fff; }
 button.flash-err { background: var(--danger); border-color: var(--danger); color: #fff; }
 button.flash-fade { transition: background .8s ease, border-color .8s ease, color .8s ease; }
@@ -1057,11 +1044,6 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .form-error { margin: 0.4rem 0 0; color: var(--danger); font-size: var(--fs-sm); }
 #group-form label.inline { flex-direction: row; align-items: center; gap: 0.5rem; }
 #group-form input[type="color"] { width: 3rem; min-height: 0; height: 2rem; padding: 0; cursor: pointer; }
-
-#confirm-form,
-#template-help-form {
-  padding: 1.25rem;
-}
 
 #template-help-form h3 {
   margin: 1rem 0 0.35rem;
@@ -1088,13 +1070,6 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   font-size: 0.85em;
 }
 
-#template-help-form menu {
-  display: flex;
-  justify-content: flex-end;
-  margin: 1rem 0 0;
-  padding: 0;
-}
-
 .hidden { display: none !important; }
 
 /* ---------------- Role form (shared Create/Alter) ---------------- */
@@ -1115,7 +1090,6 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   font-size: var(--fs-sm);
   color: var(--danger);
 }
-.alter-cluster-host { color: var(--muted); font-size: var(--fs-sm); }
 
 .alter-results { margin-top: 0.75rem; display: grid; gap: 0.4rem; }
 /* A result row is its own grid using the ONE template `renderAlterResults` puts on the container
@@ -1178,36 +1152,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 }
 
 .alter-detail { margin-top: 1rem; }
-.alter-detail-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-}
-.alter-detail-head h3 { margin: 0; font-weight: 500; }
 
-.alter-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.2rem 0.3rem 0.2rem 0.6rem;
-  border-radius: 999px;
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  background: rgba(110, 181, 255, 0.16);
-  color: var(--text);
-  border: 1px solid transparent;
-}
-.chip-added { background: rgba(127, 217, 154, 0.18); border-color: var(--ok); }
-.chip-removed {
-  background: transparent;
-  border-color: var(--danger);
-  color: var(--danger);
-  text-decoration: line-through;
-}
 /* Square action buttons (✎ / × / ↺) that sit beside a scope row, matching its height.
    Explicit width == height (var(--control-h)) — an aspect-ratio derived from a stretched
    flex height doesn't resolve reliably in WKWebView. .scope-row shares the same min-height. */
@@ -1240,14 +1185,6 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 
 .alter-add-priv { display: flex; gap: 0.4rem; margin-top: 0.7rem; }
 
-.alter-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-/* Remove role sits opposite Save changes. */
-#btn-alter-remove { margin-left: auto; }
-
 /* Consolidated single-user form */
 .alter-present {
   display: flex;
@@ -1269,28 +1206,15 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   letter-spacing: 0.03em;
   color: var(--muted);
 }
-.alter-identity {
-  background: transparent;
-  font-size: var(--fs-base);
-}
-.alter-identity .hint { margin: 0; }
 .alter-section {
   border-top: 1px solid var(--border);
   padding-top: 0.9rem;
   margin-top: 1rem;
 }
 .alter-section .alter-privs-label { display: block; margin-bottom: 0.5rem; }
-.alter-section .alter-chips { margin-bottom: 0.2rem; }
 
-.alter-account {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 1rem;
-}
-.alter-account label.inline { display: flex; align-items: center; gap: 0.35rem; padding-bottom: 0.5rem; }
-.alter-account label.danger { color: var(--danger); }
-
+/* Scope-label colours are generated per group into #cat-colors (keyed by data-cat); the colour
+   and background here are the neutral fallback for a label without a matching group. */
 .chip-scope {
   font-size: var(--fs-xs);
   font-weight: 600;
@@ -1300,15 +1224,20 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   border-radius: 999px;
   padding: 0.05rem 0.4rem;
 }
-/* Scope-label colours are generated per group into #cat-colors (keyed by data-cat);
-   this is the neutral fallback for labels without a matching group. */
-.chip-scope { color: var(--muted); background: rgba(154, 163, 181, 0.18); }
 /* Whole group matched: outlined + uppercase (like the bordered group boxes in Target
    selection). One cluster of a group: filled, no border. */
 .chip-scope.scope-kind-group { text-transform: uppercase; background: transparent; border: 1px solid currentColor; }
 .chip-scope.scope-kind-cluster { border: none; }
-/* Pending grant keeps its group colour (via data-cat) and is flagged with a leading "+". */
-.chip-scope.chip-scope-strike { text-decoration: line-through; color: var(--danger); background: transparent; border-color: var(--danger); }
+/* A pending grant (chip-scope-add) keeps its group colour via data-cat and is flagged with a
+   leading "+" in the markup, so it needs no rule here. A pending revoke drops data-cat and is
+   struck through in red. */
+.chip-scope-strike {
+  text-decoration: line-through;
+  opacity: 0.7;
+  color: var(--danger);
+  background: transparent;
+  border-color: var(--danger);
+}
 /* Privilege/attribute rows: [ name | labels ]  ✎ × ↺  (actions outside the row box) */
 .scope-rows { display: grid; gap: 0.35rem; }
 .scope-line { display: flex; align-items: stretch; gap: 0.35rem; }
@@ -1337,8 +1266,6 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .scope-row-labels .hint { margin: 0; }
 .scope-row-actions { display: flex; gap: 0.35rem; flex-shrink: 0; align-items: stretch; }
 .scope-row.is-removed .scope-row-name { text-decoration: line-through; color: var(--danger); }
-.chip-scope-strike { text-decoration: line-through; opacity: 0.7; }
-.row-note { font-size: var(--fs-xs); color: var(--danger); }
 
 /* Password section: field + checkbox side by side */
 .alter-password { display: flex; flex-direction: row; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
@@ -1350,10 +1277,6 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
    resizing itself as results come and go. */
 #search-dialog { max-width: min(1040px, 96vw); }
 .search-dialog-body { min-width: min(560px, 90vw); }
-.search-dialog-body,
-.comments-dialog-body { padding: 1.25rem; display: block; }
-.search-dialog-body h2,
-.comments-dialog-body h2 { margin: 0 0 0.75rem; }
 /* Scrolls as one box, so the header keeps sitting over its own columns while scrolling. The
    horizontal axis is the safety valve for a window too narrow for the configured columns' minimums
    — the alternative is chips clipped at the edge with no way to reach them. */
@@ -1361,40 +1284,21 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 /* Status chip on the left of the popup's button row, Close staying right (the same margin-right
    trick as #fn-dialog-default / #btn-test-cluster). */
 #search-status { margin-right: auto; }
-.search-dialog-body menu,
-.comments-dialog-body menu,
-.about-dialog-body menu {
-  margin: 1rem 0 0;
-  padding: 0;
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-}
 
 /* Cluster groups: right-aligned toolbar button + list popup */
 #btn-manage-groups { margin-left: auto; }
-.groups-dialog-body { padding: 1.25rem; display: block; min-width: 420px; }
+.groups-dialog-body { min-width: 420px; }
 .groups-dialog-body .settings-section-head { margin-top: 0; }
-.groups-dialog-body menu {
-  margin: 1rem 0 0;
-  padding: 0;
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-}
 
 /* Scope dialog */
-#scope-form { padding: 1.25rem; display: grid; gap: 0.6rem; }
-#scope-form h2 { margin: 0; }
-#scope-form > label { display: flex; flex-direction: column; gap: 0.25rem; font-size: var(--fs-label); }
+#scope-form { display: grid; gap: 0.6rem; }
+#scope-form > label { gap: 0.25rem; }
 .scope-targets { display: grid; gap: 0.6rem; max-height: 46vh; overflow-y: auto; }
 .scope-group { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 0.7rem; }
 .scope-group-head { font-weight: 600; display: flex; align-items: center; gap: 0.4rem; }
 .scope-clusters { display: grid; gap: 0.2rem; margin: 0.4rem 0 0 1.2rem; }
 .scope-cluster { display: flex; align-items: center; gap: 0.4rem; font-size: var(--fs-label); }
-.scope-cluster.scope-already { color: var(--muted); }
 .scope-cluster .hint { margin: 0; }
-#scope-form menu { margin: 0.5rem 0 0; padding: 0; display: flex; justify-content: flex-end; gap: 0.5rem; }
 
 /* Shared draggable list editor (comment fields, parent groups, search columns). */
 .list-editor {
@@ -1470,9 +1374,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 /* Settings row whose fields differ in height (e.g. list editor + toggle): top-align labels. */
 .settings-row-top { align-items: flex-start; }
 
-/* Preconfigured parent groups pickers (Create-role chips / scope checkboxes). */
-.parent-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-top: 0.5rem; }
-.parent-picker:empty { display: none; }
+/* Preconfigured parent groups pickers (scope-dialog chips). */
 .picker-label { font-size: var(--fs-xs); color: var(--muted); }
 .pick-chip {
   min-height: 0;
@@ -1507,4 +1409,3 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   font-family: var(--font);
   resize: vertical;
 }
-.comment-actions { display: flex; justify-content: flex-end; }
