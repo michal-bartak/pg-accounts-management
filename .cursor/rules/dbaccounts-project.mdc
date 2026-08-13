@@ -134,6 +134,25 @@ op-tabs right-aligned in the same bar (visible only while Operations is active).
 badges in CSS. Per-cluster outcomes render in the **Status** panel (hidden until
 non-empty). Do not add a heavy frontend framework unless requested.
 
+**UI density is one knob:** `html { font-size: 87.5% }` (= 14px) in `frontend/styles.css`. Every
+content-sized value in the stylesheet is a `rem`, so that one declaration scales text, `--fs-*`,
+`--control-h`/`--control-pad-*`, padding, gaps, table row heights and the `ch`-based grid tracks
+together. Keep it that way: new CSS uses `rem` for anything content-sized, `px` only for hairline
+borders (`1px`), radii and sub-10px decorations — a `px` width/`min-width` on a content box is the
+bug, since it stays full-size while everything around it shrinks. **No icon carries a
+`width`/`height`** (not in `index.html`, and `svgIcon`'s `size:` option was removed) — containers
+size glyphs in rem. Hand-synced rem pairs that must not drift:
+`th, td { padding: .55rem .75rem }` ↔ the `1.5rem` in `depsColgroup`; `.alter-result-head`'s
+`calc(0.7rem + 1px)` ↔ the search-result row's border+padding.
+Four tokens carry what rem cannot: **`--hairline: 1.15px`** for all borders (a flat `1px` is 1.75
+device px at 175% scaling and snaps to 1 *or* 2 depending on position, so borders read patchy;
+1.15px is always 2 there and still 1px at 100%) — decoration strokes stay literal px;
+**`--ink-lift` / `--ink-lift-control`** correct optical centring (browsers centre the line box, so
+ink lands low — 0.042em on chips, 0.086em on full-height buttons, measured from painted pixels;
+uppercase pills excluded); **`--checkbox-lift`** for the Target-selection checkbox. Retune the
+token, never sweep the rules. **`.section-label`** is the one small-uppercase section label
+(sized by `--fs-section`), replacing five drifted near-duplicates.
+
 **App-shell layout:** `body` is a flex column with `overflow:hidden` (no whole-page
 scroll); header + tabs fixed. Operations = two independently scrolling columns
 (`.ops-sidebar` / `.ops-main`); `.ops-main` has a scrolling `.ops-body` + pinned

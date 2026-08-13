@@ -19,6 +19,13 @@
   --prod: #e8a838;
   --uat: #6eb5ff;
   --radius: 8px;
+  /* Hairline borders. A plain 1px is 1.75 device px at 175% display scaling, which cannot
+     render exactly — the engine snaps each element's border box to whole device pixels, so
+     the SAME 1px border comes out 1 or 2 device px depending on where that element's edge
+     lands, and borders read patchy. 1.15px is 2.01 device px at 1.75 so it always snaps to
+     2; at 100%/125% it still rounds to 1px and at 200% to 2px, so nothing changes there.
+     Decoration strokes (checkbox tick, spinner ring, .update-badge) stay literal px. */
+  --hairline: 1.15px;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   /* Typography scale */
   --fs-xs: 0.75rem;   /* chips, scope labels, notes */
@@ -27,10 +34,27 @@
   --fs-label: 0.85rem;/* form field labels, sub-headings */
   --fs-h2: 1rem;      /* section headings */
   --fs-title: 1.35rem;/* app title */
+  --fs-section: 0.86rem; /* uppercase section labels (.section-label) — deliberately NOT
+                            --fs-xs: the labels carry section structure and need the weight,
+                            while chips and notes stay small. */
   /* Control sizing — shared by inputs, selects, buttons */
   --control-h: 2.1rem;
   --control-pad-y: 0.4rem;
   --control-pad-x: 0.55rem;
+  /* Optical text centring. A browser centres the LINE box, which reserves descender depth and
+     the diacritic headroom above the caps; Segoe UI is a bad case (ascent 1.08em vs descent
+     0.25em, cap 0.70em), so the visible ink lands BELOW the box centre. Measured off painted
+     pixels: 0.042em on a chip, 0.086em on a full-height button (the extra comes from the
+     min-height centring on top of the line-box asymmetry — hence two values, not one).
+     Applied as asymmetric padding, in em so it tracks each element's own font size.
+     Uppercase pills measured only 0.03em (sub-pixel) and are deliberately left alone —
+     lifting THEIR text is what would make the checkbox read low; see --checkbox-lift. */
+  --ink-lift: 0.042em;         /* chips and min-height:0 buttons */
+  --ink-lift-control: 0.086em; /* full-height buttons (--control-h) */
+  /* The Target-selection checkbox reads low against its group chip. Both boxes are centred to
+     the same device row, so this is optical, not geometric — hence a small explicit nudge
+     rather than an alignment change. */
+  --checkbox-lift: 0.07rem;
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239aa3b5' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
 }
 
@@ -81,7 +105,7 @@ select,
 textarea {
   min-height: var(--control-h);
   padding: var(--control-pad-y) var(--control-pad-x);
-  border: 1px solid var(--field-border);
+  border: var(--hairline) solid var(--field-border);
   border-radius: var(--radius);
   background: var(--field);
   color: var(--text);
@@ -100,7 +124,7 @@ input[type="checkbox"]:focus-visible,
 input[type="radio"]:focus-visible {
   outline: none;
   border-color: var(--primary);
-  box-shadow: inset 0 0 0 1px var(--primary);
+  box-shadow: inset 0 0 0 var(--hairline) var(--primary);
 }
 /* Controls whose own fill is already --primary (primary buttons, the active segmented tab, a
    checked checkbox): a primary ring would vanish into the fill, so use a light ring instead. */
@@ -108,14 +132,14 @@ button.primary:focus-visible,
 .segmented .seg-btn.active:focus-visible,
 input[type="checkbox"]:checked:focus-visible {
   border-color: #fff;
-  box-shadow: inset 0 0 0 1px #fff;
+  box-shadow: inset 0 0 0 var(--hairline) #fff;
 }
 
 /* Radios: one size everywhere, themed accent. */
 input[type="radio"] {
-  width: 1.15rem;
-  height: 1.15rem;
-  min-width: 1.15rem;
+  width: 1rem;
+  height: 1rem;
+  min-width: 1rem;
   margin: 0;
   accent-color: var(--primary);
   cursor: pointer;
@@ -126,11 +150,11 @@ input[type="radio"] {
 input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
-  width: 1.15rem;
-  height: 1.15rem;
-  min-width: 1.15rem;
+  width: 1rem;
+  height: 1rem;
+  min-width: 1rem;
   margin: 0;
-  border: 1px solid var(--field-border);
+  border: var(--hairline) solid var(--field-border);
   border-radius: 5px;
   background: var(--field);
   cursor: pointer;
@@ -140,12 +164,13 @@ input[type="checkbox"] {
 }
 input[type="checkbox"]::after {
   content: "";
-  width: 0.32rem;
-  height: 0.58rem;
+  width: 0.28rem;
+  height: 0.5rem;
   border: solid #fff;
+  /* Glyph stroke, not a hairline — stays a literal px so the tick keeps its weight. */
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
-  margin-top: -2px;
+  margin-top: -0.1rem;
   opacity: 0;
 }
 input[type="checkbox"]:checked {
@@ -154,6 +179,13 @@ input[type="checkbox"]:checked {
 }
 input[type="checkbox"]:checked::after { opacity: 1; }
 textarea { min-height: 5rem; line-height: 1.4; }
+
+/* Global UI density. Every content-sized value in this file is a rem, so the root
+   font-size is the ONE knob that scales text, control heights, padding, gaps and the
+   ch-based grid tracks together. 87.5% = 14px — the clean value nearest the ~88% target.
+   Keep it that way: new CSS uses rem for anything content-sized, and px only for
+   hairline borders, radii and sub-10px decorations (see the notes at those rules). */
+html { font-size: 87.5%; }
 
 html, body { height: 100%; }
 body {
@@ -179,7 +211,7 @@ body {
 
 .app-header {
   padding: 0.7rem 1.25rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--border);
 }
 /* Brand row: accent dot + (smaller) title + version chip + About button. */
 .brand { display: flex; align-items: center; gap: 0.5rem; }
@@ -189,20 +221,20 @@ body {
   font-weight: 600;
 }
 .brand-dot {
-  width: 10px; height: 10px; border-radius: 50%;
+  width: 0.625rem; height: 0.625rem; border-radius: 50%;
   background: var(--primary); box-shadow: 0 0 8px var(--primary);
   flex: 0 0 auto;
 }
 .app-ver {
   font-size: var(--fs-xs); color: var(--muted);
-  background: var(--field); border: 1px solid var(--field-border);
-  border-radius: 10px; padding: 1px 7px;
+  background: var(--field); border: var(--hairline) solid var(--field-border);
+  border-radius: 10px; padding: 1px 0.45rem;
 }
 /* Round, icon-only "About" button — matches the "?" hint badges (size, colour, 1px ring). */
 .info-btn {
-  width: 16px; height: 16px; min-height: 0; padding: 0; line-height: 1;
+  width: 1rem; height: 1rem; min-height: 0; padding: 0; line-height: 1;
   border-radius: 50%; font-size: 0.72rem; cursor: pointer;
-  background: transparent; border: 1px solid var(--hint-color); color: var(--hint-color);
+  background: transparent; border: var(--hairline) solid var(--hint-color); color: var(--hint-color);
   display: inline-flex; align-items: center; justify-content: center;
   position: relative;
 }
@@ -211,6 +243,8 @@ body {
   position: absolute; top: -2px; right: -2px;
   width: 7px; height: 7px; border-radius: 50%;
   background: var(--primary); box-shadow: 0 0 4px var(--primary);
+  /* A masking ring that separates the dot from the button beneath, not a hairline border —
+     stays a literal px so it never grows with --hairline. */
   border: 1px solid var(--bg); pointer-events: none;
 }
 .update-badge[hidden] { display: none; }
@@ -219,22 +253,19 @@ body {
 
 /* About dialog — appearance adapted from the audits project. The base `dialog` has
    padding:0, so (like the other dialog bodies) this one supplies its own. */
-.about-dialog-body { position: relative; width: min(440px, calc(100vw - 3rem)); padding: 1.35rem 1.5rem; }
+.about-dialog-body { position: relative; width: min(27.5rem, calc(100vw - 3rem)); padding: 1.35rem 1.5rem; }
 .about-x {
   position: absolute; top: 0.7rem; right: 0.7rem;
-  width: 26px; height: 26px; min-height: 0; padding: 0; line-height: 1;
-  border-radius: 6px; background: transparent; border: 1px solid transparent; color: var(--muted);
+  width: 1.625rem; height: 1.625rem; min-height: 0; padding: 0; line-height: 1;
+  border-radius: 6px; background: transparent; border: var(--hairline) solid transparent; color: var(--muted);
 }
 .about-x:not(:disabled):hover { background: var(--field); color: var(--text); }
 .about-head { display: flex; align-items: center; gap: 0.5rem; font-size: 1.15rem; }
 .about-desc { margin: 0.9rem 0 0; font-size: var(--fs-base); line-height: 1.55; color: var(--text); }
 .about-links { display: flex; gap: 0.6rem; margin: 1.1rem 0 0.25rem; }
 .about-links .about-link { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; }
-.about-links .about-link svg { flex: 0 0 auto; }
+.about-links .about-link svg { flex: 0 0 auto; width: 0.875rem; height: 0.875rem; }
 .about-section { margin-top: 1rem; }
-.about-section .about-lbl {
-  font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
-}
 .about-section p { margin: 0.25rem 0 0; font-size: var(--fs-sm); line-height: 1.5; }
 .about-ai { font-size: var(--fs-sm); color: var(--muted); }
 .about-link-inline { color: var(--primary); }
@@ -251,7 +282,7 @@ body {
   /* 1.25rem horizontal matches the header + panel content edges, so the right-aligned op-tabs
      line up with the Save/Create action buttons below. */
   padding: 0.5rem 1.25rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--border);
 }
 
 .tab {
@@ -280,7 +311,7 @@ main { flex: 1 1 auto; min-height: 0; overflow: hidden; }
 /* Staged editor footer: Discard/Save on the right, inline error on the left; border-top inset
    to the panel content (not the full window). */
 .clusters-footer,
-.settings-footer { flex: none; display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: flex-end; border-top: 1px solid var(--border); padding: 0.75rem 0 0; margin-top: 0.75rem; }
+.settings-footer { flex: none; display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: flex-end; border-top: var(--hairline) solid var(--border); padding: 0.75rem 0 0; margin-top: 0.75rem; }
 .clusters-footer .form-error,
 .settings-footer .form-error { margin: 0; margin-right: auto; }
 .settings-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
@@ -289,9 +320,10 @@ main { flex: 1 1 auto; min-height: 0; overflow: hidden; }
 
 button {
   min-height: var(--control-h);
-  padding: var(--control-pad-y) 0.85rem;
+  /* Asymmetric on purpose — see --ink-lift. The label is centred by ink, not by line box. */
+  padding: calc(var(--control-pad-y) - var(--ink-lift-control)) 0.85rem calc(var(--control-pad-y) + var(--ink-lift-control));
   border-radius: var(--radius);
-  border: 1px solid var(--border);
+  border: var(--hairline) solid var(--border);
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
@@ -305,7 +337,7 @@ button.primary {
 }
 button.primary:not(:disabled):hover { background: var(--primary-hover); }
 button.danger { border-color: var(--danger); color: var(--danger); }
-button.small { min-height: 0; padding: 0.25rem 0.5rem; font-size: var(--fs-sm); }
+button.small { min-height: 0; padding: calc(0.25rem - var(--ink-lift)) 0.5rem calc(0.25rem + var(--ink-lift)); font-size: var(--fs-sm); }
 /* A disabled button is fully inert — no hover/pointer reaction. */
 button:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
 
@@ -325,7 +357,7 @@ select option {
 
 .table-wrap {
   overflow: auto;
-  border: 1px solid var(--border);
+  border: var(--hairline) solid var(--border);
   border-radius: var(--radius);
 }
 
@@ -338,7 +370,7 @@ table {
 th, td {
   padding: 0.55rem 0.75rem;
   text-align: left;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--border);
 }
 
 th { background: var(--surface); color: var(--muted); font-weight: 500; }
@@ -359,6 +391,19 @@ tr:last-child td { border-bottom: none; }
 #groups-table td:last-child { width: 1%; white-space: nowrap; }
 #clusters-table td:last-child { padding-top: 0.25rem; padding-bottom: 0.25rem; }
 
+/* The ONE small-uppercase section label — Settings groups, the Settings meta block, the role
+   form's sections ("Present on", Privileges, Attributes, Settings) and About. This replaced
+   five near-identical rules (.settings-group-label, .settings-meta-label, .about-lbl,
+   .alter-meta-label, .alter-privs-label) that had drifted to three different letter-spacings.
+   `display` is deliberately NOT set here — .alter-meta-label rendered inline — so each
+   context opts in; likewise margin-bottom, which is the only genuine per-context difference. */
+.section-label {
+  font-size: var(--fs-section);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
 /* Group badge = outlined (transparent + border), matching the group scope chips. Per-group
    colours are generated into #cat-colors from state.categories. */
 .badge {
@@ -369,7 +414,7 @@ tr:last-child td { border-bottom: none; }
   font-weight: 600;
   text-transform: uppercase;
   flex-shrink: 0;
-  border: 1px solid currentColor;
+  border: var(--hairline) solid currentColor;
   background: transparent;
   color: var(--muted);
 }
@@ -382,9 +427,9 @@ tr:last-child td { border-bottom: none; }
    (.q-hint-pop) is fixed-positioned in JS so overflow:hidden containers never
    clip it, and clamped to the viewport. */
 .q-hint {
-  width: 16px; height: 16px; min-height: 0; padding: 0; line-height: 1;
+  width: 1rem; height: 1rem; min-height: 0; padding: 0; line-height: 1;
   flex: 0 0 auto; border-radius: 50%; font-size: 0.72rem; cursor: help;
-  color: var(--hint-color); background: transparent; border: 1px solid var(--hint-color);
+  color: var(--hint-color); background: transparent; border: var(--hairline) solid var(--hint-color);
   display: inline-flex; align-items: center; justify-content: center;
   vertical-align: middle; position: relative; top: -1px;
 }
@@ -395,9 +440,9 @@ tr:last-child td { border-bottom: none; }
 .q-hint:hover:not(:disabled),
 .q-hint:focus-visible { color: var(--hint-color); background: transparent; border-color: var(--hint-color); outline: none; }
 .q-hint-pop {
-  position: fixed; max-width: 280px;
+  position: fixed; max-width: 17.5rem;
   background: var(--surface); color: var(--text);
-  border: 1px solid var(--border); border-radius: var(--radius);
+  border: var(--hairline) solid var(--border); border-radius: var(--radius);
   padding: 0.5rem 0.7rem; font-size: var(--fs-sm); line-height: 1.45;
   z-index: 100; box-shadow: 0 6px 20px #0006; pointer-events: none;
   white-space: normal;
@@ -408,16 +453,16 @@ tr:last-child td { border-bottom: none; }
 .q-hint.q-warn,
 .q-hint.q-warn:hover,
 .q-hint.q-warn:focus-visible {
-  width: 16px; height: 16px; border-radius: 0; border: none;
+  width: 1rem; height: 1rem; border-radius: 0; border: none;
   background: transparent; color: var(--warn, #e8a838);
 }
-.q-hint.q-warn .ic { width: 16px; height: 16px; }
+.q-hint.q-warn .ic { width: 1rem; height: 1rem; }
 
 .ops-layout {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 17.5rem 1fr;
   gap: 1.25rem;
   padding: 1rem 1.25rem;
 }
@@ -440,7 +485,7 @@ tr:last-child td { border-bottom: none; }
 .ops-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0.25rem 0; }
 /* No horizontal padding: the footer's right edge lines up with the Settings/Clusters Save
    buttons (all at the panel content edge, 1.25rem from the window). */
-.ops-footer { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; border-top: 1px solid var(--border); padding: 0.75rem 0 0; margin-top: 0.5rem; }
+.ops-footer { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; border-top: var(--hairline) solid var(--border); padding: 0.75rem 0 0; margin-top: 0.5rem; }
 /* Validation/error line spans its own row above the chip + action buttons. */
 .ops-footer .form-error { flex-basis: 100%; margin: 0 0 0.25rem; order: -1; }
 .ops-footer .run-bar,
@@ -460,7 +505,7 @@ tr:last-child td { border-bottom: none; }
   gap: 0.4rem;
   padding: 0.35rem 0.55rem;
   background: transparent;
-  border: 1px solid transparent;
+  border: var(--hairline) solid transparent;
   border-radius: var(--radius);
   /* Neutral, constant color (button-sized) — the result is conveyed by the text, not colour. */
   color: var(--text);
@@ -499,12 +544,12 @@ tr:last-child td { border-bottom: none; }
 .rst-copy:hover { color: var(--primary); }
 
 /* Executed-queries popup (opened by the per-row magnifier). */
-#run-queries-dialog { max-width: min(820px, 94vw); }
-.run-queries-dialog-body { min-width: 520px; }
+#run-queries-dialog { max-width: min(51.25rem, 94vw); }
+.run-queries-dialog-body { min-width: 32.5rem; }
 .run-queries-content {
   max-height: 60vh;
   overflow: auto;
-  border: 1px solid var(--border);
+  border: var(--hairline) solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
   padding: 0.75rem;
@@ -516,17 +561,17 @@ tr:last-child td { border-bottom: none; }
   font-size: var(--fs-sm);
 }
 
-#run-status-dialog { max-width: min(1040px, 96vw); }
-.run-status-dialog-body { min-width: 640px; }
+#run-status-dialog { max-width: min(65rem, 96vw); }
+.run-status-dialog-body { min-width: 40rem; }
 .run-status-dialog-body .table-wrap { max-height: 60vh; overflow-y: auto; }
 
 /* Pre-flight dependency popup (before a role is dropped). Narrow when nothing was found — it is
    then just a per-cluster "no dependencies" list; as wide as the viewport allows as soon as any
    cluster reports rows, because the Object column carries full function/table identifiers. */
-#deps-dialog { max-width: min(560px, 92vw); }
+#deps-dialog { max-width: min(35rem, 92vw); }
 #deps-dialog.wide { max-width: 98vw; }
-.deps-dialog-body { min-width: 420px; }
-#deps-dialog.wide .deps-dialog-body { min-width: min(720px, 90vw); }
+.deps-dialog-body { min-width: 26.25rem; }
+#deps-dialog.wide .deps-dialog-body { min-width: min(45rem, 90vw); }
 /* The titlebar carries the ? hint, Reload, and the one SQL magnifier (every cluster runs the
    same query). Reload spins its icon while the re-check is in flight, reusing the run-status
    keyframes rather than defining a second spin. */
@@ -541,7 +586,7 @@ tr:last-child td { border-bottom: none; }
   gap: 1rem;
 }
 /* Three sections — no dependencies / could not be checked / dependencies found — each with a
-   small uppercase subheader (.alter-privs-label, the role form's section label). */
+   small uppercase subheader (the shared .section-label). */
 .deps-group { display: flex; flex-direction: column; gap: 0.5rem; }
 .deps-subhead { display: block; }
 /* Clean clusters are just chips, on the line below their subheader. */
@@ -568,7 +613,7 @@ tr:last-child td { border-bottom: none; }
 
 .ops-sidebar {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: var(--hairline) solid var(--border);
   border-radius: var(--radius);
   padding: 1rem;
 }
@@ -587,7 +632,7 @@ tr:last-child td { border-bottom: none; }
   padding: 0.6rem 0.75rem;
   font-size: var(--fs-base);
   line-height: 1.35;
-  border: 1px solid var(--border);
+  border: var(--hairline) solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
   cursor: pointer;
@@ -606,7 +651,14 @@ tr:last-child td { border-bottom: none; }
 
 /* Checked-state group tint is generated per group into #cat-colors. */
 
-.checkbox-group input[type="checkbox"] { flex-shrink: 0; }
+/* Scoped to the Target-selection rows: these checkboxes sit beside a group chip and read low
+   against it. Elsewhere (Settings rows, dialogs) a checkbox has no chip to align to, so the
+   nudge stays out of those. */
+.checkbox-group input[type="checkbox"] {
+  flex-shrink: 0;
+  position: relative;
+  top: calc(-1 * var(--checkbox-lift));
+}
 
 .checkbox-group .target-cluster-text {
   flex: 1;
@@ -619,7 +671,7 @@ tr:last-child td { border-bottom: none; }
 }
 
 .cluster-list {
-  max-height: 220px;
+  max-height: 13.75rem;
   overflow-y: auto;
 }
 
@@ -651,7 +703,7 @@ tr:last-child td { border-bottom: none; }
 .op-tab.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 
 .op-form { display: none; }
-.op-form.active { display: grid; gap: 0.75rem; max-width: 420px; }
+.op-form.active { display: grid; gap: 0.75rem; max-width: 26.25rem; }
 
 .op-form label {
   display: flex;
@@ -712,14 +764,14 @@ tr:last-child td { border-bottom: none; }
   margin-top: 1.25rem;
   padding: 0.75rem 1rem;
   background: transparent;
-  border: 1px solid var(--border);
+  border: var(--hairline) solid var(--border);
   border-radius: var(--radius);
 }
 
 .config-path-line {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
 }
 .config-path-line .config-path { flex: 1; }
 
@@ -728,7 +780,7 @@ tr:last-child td { border-bottom: none; }
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
+  padding: 0.25rem;
   background: transparent;
   border: none;
   cursor: pointer;
@@ -736,15 +788,12 @@ tr:last-child td { border-bottom: none; }
   border-radius: var(--radius);
 }
 .config-path-copy:hover { color: var(--primary); }
+/* Sized here, not by width/height attributes on the SVG, so the glyph scales with the root
+   font-size and matches .pw-copy exactly. Also covers .rst-view / .rst-copy and the deps
+   titlebar buttons (#deps-reload, #deps-view-sql), which reuse this class. */
+.config-path-copy svg { display: block; width: 0.875rem; height: 0.875rem; }
 
-.settings-meta-label {
-  display: block;
-  font-size: var(--fs-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  margin-bottom: 0.35rem;
-}
+.settings-meta .section-label { display: block; margin-bottom: 0.35rem; }
 
 .config-path {
   display: block;
@@ -773,7 +822,7 @@ tr:last-child td { border-bottom: none; }
 }
 
 /* Segmented control (e.g. Appearance) — connected buttons, one active. */
-.segmented { display: inline-flex; align-self: flex-start; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.segmented { display: inline-flex; align-self: flex-start; border: var(--hairline) solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .segmented .seg-btn {
   min-height: var(--control-h);
   border: none;
@@ -782,7 +831,7 @@ tr:last-child td { border-bottom: none; }
   color: var(--muted);
   padding: var(--control-pad-y) 0.9rem;
 }
-.segmented .seg-btn + .seg-btn { border-left: 1px solid var(--border); }
+.segmented .seg-btn + .seg-btn { border-left: var(--hairline) solid var(--border); }
 .segmented .seg-btn:hover:not(:disabled) { color: var(--text); border-color: var(--border); }
 .segmented .seg-btn.active { background: var(--primary); color: #fff; }
 .segmented .seg-btn:disabled { color: var(--muted); opacity: 0.4; cursor: default; }
@@ -802,7 +851,7 @@ tr:last-child td { border-bottom: none; }
 
 /* Grouped settings sections — same divider + small uppercase label as the role form. */
 .settings-group {
-  border-top: 1px solid var(--border);
+  border-top: var(--hairline) solid var(--border);
   padding-top: 1rem;
   margin-top: 1.25rem;
 }
@@ -812,14 +861,7 @@ tr:last-child td { border-bottom: none; }
   margin-top: 0;
 }
 .settings-group .settings-row { margin-bottom: 0; }
-.settings-group-label {
-  display: block;
-  font-size: var(--fs-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--muted);
-  margin-bottom: 0.75rem;
-}
+.settings-group > .section-label { display: block; margin-bottom: 0.75rem; }
 .settings-group-head {
   display: flex;
   flex-wrap: wrap;
@@ -827,7 +869,7 @@ tr:last-child td { border-bottom: none; }
   gap: 0.75rem;
   margin-bottom: 0.75rem;
 }
-.settings-group-head .settings-group-label { margin-bottom: 0; }
+.settings-group-head .section-label { margin-bottom: 0; }
 .settings-num { width: 6rem; }
 /* Inline checkbox + label (overrides the column layout of .settings-row label). */
 .settings-field .settings-check,
@@ -846,7 +888,7 @@ tr:last-child td { border-bottom: none; }
    Collapses to one column when the panel is too narrow. */
 .settings-two-col {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
   gap: 1rem 2rem;
   align-items: start;
 }
@@ -873,7 +915,7 @@ tr:last-child td { border-bottom: none; }
 .ph-group-label { font-size: var(--fs-xs); color: var(--muted); margin-left: 0.15rem; }
 .ph-chip {
   min-height: 0;
-  padding: 0.15rem 0.5rem;
+  padding: calc(0.15rem - var(--ink-lift)) 0.5rem calc(0.15rem + var(--ink-lift));
   border-radius: 999px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: var(--fs-xs);
@@ -905,6 +947,7 @@ tr:last-child td { border-bottom: none; }
   color: var(--muted);
 }
 .icon-btn:hover { border-color: var(--muted); color: var(--text); }
+.icon-btn svg { display: block; width: 1rem; height: 1rem; }
 
 #batch-concurrency { width: 5rem; }
 
@@ -919,15 +962,15 @@ tr:last-child td { border-bottom: none; }
    popup gets the house style by existing. The per-dialog blocks elsewhere in this file should
    only carry what is genuinely specific: width, max-height, a scroll container. */
 dialog {
-  border: 1px solid var(--border);
+  border: var(--hairline) solid var(--border);
   border-radius: var(--radius);
   /* Zero here so each body supplies its own padding — a dialog whose content scrolls needs the
      padding INSIDE the scroll container, not on the element that clips it. */
   padding: 0;
   background: var(--surface);
   color: var(--text);
-  min-width: 360px;
-  max-width: min(640px, 92vw);
+  min-width: 22.5rem;
+  max-width: min(40rem, 92vw);
 }
 dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 
@@ -1000,7 +1043,7 @@ dialog .form-row > label {
 .pw-toggle { right: 0.4rem; }
 .pw-copy { right: 1.95rem; }
 .pw-toggle svg { display: block; width: 1.05rem; height: 1.05rem; }
-.pw-copy svg { display: block; width: 0.875rem; height: 0.875rem; } /* 14px */
+.pw-copy svg { display: block; width: 0.875rem; height: 0.875rem; }
 .pw-toggle:hover,
 .pw-copy:hover { opacity: 1; }
 .pw-toggle:disabled,
@@ -1015,7 +1058,7 @@ dialog .form-row > label {
   justify-content: center;
   width: var(--control-h);
   height: var(--control-h);
-  border: 1px solid var(--border);
+  border: var(--hairline) solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
@@ -1026,12 +1069,12 @@ dialog .form-row > label {
    inline-flex button it would otherwise collapse to a thin sliver (the eye/copy escape this only
    via their absolute-positioned parents). */
 /* Size the glyph to match the text-glyph icons on .scope-act edit/delete buttons (which render at
-   --fs-base ≈ 13px ink), so this bordered icon button reads at the same weight as those. */
+   --fs-base), so this bordered icon button reads at the same weight as those. */
 .pw-gen svg { display: block; width: 0.85rem; height: 0.85rem; flex-shrink: 0; }
 .pw-gen:hover { opacity: 1; }
 .pw-gen:disabled { opacity: 0.35; pointer-events: none; cursor: default; }
 /* Separator before the (bottom) Category field. */
-#cluster-form .form-sep { width: 100%; border: none; border-top: 1px solid var(--border); margin: 0.4rem 0; }
+#cluster-form .form-sep { width: 100%; border: none; border-top: var(--hairline) solid var(--border); margin: 0.4rem 0; }
 /* Test connection sits on the left; Save / Cancel stay on the right. */
 #cluster-form menu #btn-test-cluster { margin-right: auto; }
 /* Generic button feedback (confirmations/errors). Test connection reuses this rather than
@@ -1079,7 +1122,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   display: block;
   max-width: none;
 }
-.role-identity { max-width: 420px; margin-bottom: 0.5rem; }
+.role-identity { max-width: 26.25rem; margin-bottom: 0.5rem; }
 
 .alter-search { display: flex; gap: 0.5rem; align-items: center; }
 .alter-search input[type="search"] { flex: 1; }
@@ -1118,7 +1161,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   width: 100%;
   text-align: left;
   padding: 0.55rem 0.7rem;
-  border: 1px solid var(--border);
+  border: var(--hairline) solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
@@ -1188,7 +1231,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
    the surrounding button; pointer-events:none keeps clicks/drag on the button, not the path. */
 .ic { display: block; pointer-events: none; }
 .scope-act .ic,
-.le-del .ic { width: 15px; height: 15px; }
+.le-del .ic { width: 0.9375rem; height: 0.9375rem; }
 
 .alter-add-priv { display: flex; gap: 0.4rem; margin-top: 0.7rem; }
 
@@ -1206,19 +1249,12 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 /* The presence ✎ edit button sits immediately after the "Present on" title, before the
    cluster labels. */
 .alter-present #btn-present-edit { margin-right: 0.2rem; }
-.alter-meta-label,
-.alter-privs-label {
-  font-size: var(--fs-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--muted);
-}
 .alter-section {
-  border-top: 1px solid var(--border);
+  border-top: var(--hairline) solid var(--border);
   padding-top: 0.9rem;
   margin-top: 1rem;
 }
-.alter-section .alter-privs-label { display: block; margin-bottom: 0.5rem; }
+.alter-section > .section-label { display: block; margin-bottom: 0.5rem; }
 
 /* Scope-label colours are generated per group into #cat-colors (keyed by data-cat); the colour
    and background here are the neutral fallback for a label without a matching group. */
@@ -1233,7 +1269,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 }
 /* Whole group matched: outlined + uppercase (like the bordered group boxes in Target
    selection). One cluster of a group: filled, no border. */
-.chip-scope.scope-kind-group { text-transform: uppercase; background: transparent; border: 1px solid currentColor; }
+.chip-scope.scope-kind-group { text-transform: uppercase; background: transparent; border: var(--hairline) solid currentColor; }
 .chip-scope.scope-kind-cluster { border: none; }
 /* A pending grant (chip-scope-add) keeps its group colour via data-cat and is flagged with a
    leading "+" in the markup, so it needs no rule here. A pending revoke drops data-cat and is
@@ -1255,7 +1291,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   gap: 0.6rem;
   min-height: var(--control-h);
   padding: 0.3rem 0.5rem;
-  border: 1px solid var(--border);
+  border: var(--hairline) solid var(--border);
   border-radius: var(--radius);
   background: var(--field);
 }
@@ -1276,14 +1312,14 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 
 /* Password section: field + checkbox side by side */
 .alter-password { display: flex; flex-direction: row; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-.alter-password .pw-field { min-width: 260px; }
+.alter-password .pw-field { min-width: 16.25rem; }
 .alter-password label.inline { display: flex; align-items: center; gap: 0.35rem; }
 
 
 /* Wide enough for the configured search columns (Settings → Find role) without the popup
    resizing itself as results come and go. */
-#search-dialog { max-width: min(1040px, 96vw); }
-.search-dialog-body { min-width: min(560px, 90vw); }
+#search-dialog { max-width: min(65rem, 96vw); }
+.search-dialog-body { min-width: min(35rem, 90vw); }
 /* Scrolls as one box, so the header keeps sitting over its own columns while scrolling. The
    horizontal axis is the safety valve for a window too narrow for the configured columns' minimums
    — the alternative is chips clipped at the edge with no way to reach them. */
@@ -1294,14 +1330,14 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 
 /* Cluster groups: right-aligned toolbar button + list popup */
 #btn-manage-groups { margin-left: auto; }
-.groups-dialog-body { min-width: 420px; }
+.groups-dialog-body { min-width: 26.25rem; }
 .groups-dialog-body .settings-section-head { margin-top: 0; }
 
 /* Scope dialog */
 #scope-form { display: grid; gap: 0.6rem; }
 #scope-form > label { gap: 0.25rem; }
 .scope-targets { display: grid; gap: 0.6rem; max-height: 46vh; overflow-y: auto; }
-.scope-group { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 0.7rem; }
+.scope-group { border: var(--hairline) solid var(--border); border-radius: var(--radius); padding: 0.5rem 0.7rem; }
 .scope-group-head { font-weight: 600; display: flex; align-items: center; gap: 0.4rem; }
 .scope-clusters { display: grid; gap: 0.2rem; margin: 0.4rem 0 0 1.2rem; }
 .scope-cluster { display: flex; align-items: center; gap: 0.4rem; font-size: var(--fs-label); }
@@ -1385,7 +1421,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .picker-label { font-size: var(--fs-xs); color: var(--muted); }
 .pick-chip {
   min-height: 0;
-  padding: 0.2rem 0.6rem;
+  padding: calc(0.2rem - var(--ink-lift)) 0.6rem calc(0.2rem + var(--ink-lift));
   font-size: var(--fs-sm);
   border-radius: 999px;
   background: var(--bg);
@@ -1395,10 +1431,10 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .scope-preconfigured { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
 
 /* Comments dialog — fixed width so it doesn't jitter as field/comment lengths change. */
-#comments-dialog { width: min(560px, 92vw); }
+#comments-dialog { width: min(35rem, 92vw); }
 #comments-list { display: grid; gap: 0.9rem; max-height: 55vh; overflow-y: auto; }
 .comment-version {
-  border: 1px solid var(--border);
+  border: var(--hairline) solid var(--border);
   border-radius: var(--radius);
   padding: 0.6rem 0.75rem;
   display: flex;

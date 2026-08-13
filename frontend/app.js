@@ -1549,7 +1549,7 @@ function depsColgroup(rows) {
 
 /** A section heading, reusing the role form's small-uppercase section label. */
 function depsSubhead(text) {
-  return `<div class="alter-privs-label deps-subhead">${escapeHtml(text)}</div>`;
+  return `<div class="section-label deps-subhead">${escapeHtml(text)}</div>`;
 }
 
 /** Section 1 — clusters with nothing depending on the role: chips only, no per-cluster decision. */
@@ -2281,18 +2281,18 @@ function escapeAttr(s) {
 // keeps them out of the accessibility tree — the enclosing button's aria-label
 // names the action. Stroke geometry from Feather/Lucide (MIT).
 //
-// `svgIcon(body, {cls, viewBox, w, size})`: `w` = stroke width, `size` = an
-// explicit px width/height for containers that don't size the svg via CSS.
-const svgIcon = (body, { cls = '', viewBox = '0 0 24 24', w = 2, size = 0 } = {}) => {
-  const dims = size ? ` width="${size}" height="${size}"` : '';
+// `svgIcon(body, {cls, viewBox, w})`: `w` = stroke width. Icons carry NO width/height —
+// every container sizes its glyph in rem from styles.css, so icons scale with the root
+// font-size instead of pinning themselves to a pixel count that drifts out of step.
+const svgIcon = (body, { cls = '', viewBox = '0 0 24 24', w = 2 } = {}) => {
   return (
-    `<svg class="ic${cls ? ' ' + cls : ''}"${dims} viewBox="${viewBox}" fill="none" ` +
+    `<svg class="ic${cls ? ' ' + cls : ''}" viewBox="${viewBox}" fill="none" ` +
     `stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" ` +
     `aria-hidden="true" focusable="false">${body}</svg>`
   );
 };
 const ICONS = {
-  // Row / list action icons (sized 15px via `.scope-act .ic` / `.le-del .ic`).
+  // Row / list action icons (sized in rem via `.scope-act .ic` / `.le-del .ic`).
   edit: svgIcon(
     '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
     { cls: 'ic-edit' },
@@ -2307,12 +2307,12 @@ const ICONS = {
   ),
   gen: svgIcon('<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>', { cls: 'ic-gen' }),
   // Small 16-grid icons with an explicit px size (used in run-status / copy buttons).
-  copy: svgIcon('<rect x="5" y="1" width="10" height="11" rx="2"/><rect x="1" y="4" width="10" height="11" rx="2"/>', { cls: 'ic-copy', viewBox: '0 0 16 16', w: 1.5, size: 14 }),
-  check: svgIcon('<polyline points="2,8 6,13 14,3"/>', { cls: 'ic-check', viewBox: '0 0 16 16', w: 2.5, size: 14 }),
-  search: svgIcon('<circle cx="7" cy="7" r="5"/><line x1="10.5" y1="10.5" x2="15" y2="15"/>', { cls: 'ic-search', viewBox: '0 0 16 16', w: 1.5, size: 14 }),
+  copy: svgIcon('<rect x="5" y="1" width="10" height="11" rx="2"/><rect x="1" y="4" width="10" height="11" rx="2"/>', { cls: 'ic-copy', viewBox: '0 0 16 16', w: 1.5 }),
+  check: svgIcon('<polyline points="2,8 6,13 14,3"/>', { cls: 'ic-check', viewBox: '0 0 16 16', w: 2.5 }),
+  search: svgIcon('<circle cx="7" cy="7" r="5"/><line x1="10.5" y1="10.5" x2="15" y2="15"/>', { cls: 'ic-search', viewBox: '0 0 16 16', w: 1.5 }),
   // refresh-cw on the 16 grid, so it matches `search` where the two sit side by side (the 24-grid
   // `gen` is the same shape but belongs to the password generator).
-  refresh: svgIcon('<polyline points="14 2.5 14 6 10.5 6"/><polyline points="2 13.5 2 10 5.5 10"/><path d="M3.13 6a5.5 5.5 0 0 1 9.08-2.05L14 6M2 10l1.79 1.95A5.5 5.5 0 0 0 12.87 10"/>', { cls: 'ic-refresh', viewBox: '0 0 16 16', w: 1.5, size: 14 }),
+  refresh: svgIcon('<polyline points="14 2.5 14 6 10.5 6"/><polyline points="2 13.5 2 10 5.5 10"/><path d="M3.13 6a5.5 5.5 0 0 1 9.08-2.05L14 6M2 10l1.79 1.95A5.5 5.5 0 0 0 12.87 10"/>', { cls: 'ic-refresh', viewBox: '0 0 16 16', w: 1.5 }),
   // Standalone amber warning (the .q-warn hint badge has no circle chrome, so a triangle fits).
   warn: svgIcon('<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13.5"/><line x1="12" y1="16.5" x2="12.01" y2="16.5"/>', { cls: 'ic-warn' }),
 };
@@ -3095,7 +3095,7 @@ function renderAlterDetail() {
       scopeLabelsHtml(describeScope(addIds), 'chip-scope-add') +
       scopeLabelsHtml(describeScope(new Set(roleRemoveClusters)), 'chip-scope-strike');
     present.innerHTML =
-      `<span class="alter-meta-label">Present on</span>` +
+      `<span class="section-label">Present on</span>` +
       `<button type="button" class="scope-act" id="btn-present-edit" title="Add / remove role on clusters" aria-label="Add / remove role on clusters">${ICONS.edit}</button>` +
       `<span class="alter-cluster-badges">${presentLabels || '<span class="hint">no clusters</span>'}</span>`;
     present.classList.remove('hidden');
@@ -3137,7 +3137,7 @@ function renderAlterDetail() {
       );
       editHead += `
     <div class="alter-section">
-      <div class="alter-privs-label">Comment</div>
+      <div class="section-label">Comment</div>
       <div class="alter-add-priv">
         <button type="button" class="small btn-two-line${staged ? ' is-added' : ''}" id="btn-alter-comments">Comments differ across clusters<br>view / edit per cluster</button>
       </div>
@@ -3172,7 +3172,7 @@ function renderAlterDetail() {
   root.innerHTML = `
     ${editHead}
     <div class="alter-section">
-      <div class="alter-privs-label">Privileges ${hintBadge('Each privilege shows the clusters/groups it is granted on. Use ✎ to add or remove clusters, × to revoke everywhere.')}</div>
+      <div class="section-label">Privileges ${hintBadge('Each privilege shows the clusters/groups it is granted on. Use ✎ to add or remove clusters, × to revoke everywhere.')}</div>
       <div class="scope-rows" id="alter-privs">${privHtml}</div>
       <div class="alter-add-priv">
         <button type="button" class="list-add" id="btn-alter-add">Add privilege…</button>
@@ -3180,12 +3180,12 @@ function renderAlterDetail() {
     </div>
 
     <div class="alter-section">
-      <div class="alter-privs-label">Attributes ${hintBadge('Each attribute shows where it is enabled. Use ✎ to enable/disable per cluster, × to disable everywhere.')}</div>
+      <div class="section-label">Attributes ${hintBadge('Each attribute shows where it is enabled. Use ✎ to enable/disable per cluster, × to disable everywhere.')}</div>
       <div class="scope-rows" id="alter-attrs">${attrRows}</div>
     </div>
 
     <div class="alter-section">
-      <div class="alter-privs-label">Settings ${hintBadge('Role GUCs (ALTER ROLE … SET/RESET). Use ✎ to set on chosen clusters, × to reset everywhere it has that value.')}</div>
+      <div class="section-label">Settings ${hintBadge('Role GUCs (ALTER ROLE … SET/RESET). Use ✎ to set on chosen clusters, × to reset everywhere it has that value.')}</div>
       <div class="scope-rows" id="alter-configs">${cfgHtml}</div>
       <div class="alter-add-priv">
         <button type="button" class="list-add" id="btn-alter-add-config">Add setting…</button>
@@ -3193,7 +3193,7 @@ function renderAlterDetail() {
     </div>
 
     <div class="alter-section">
-      <div class="alter-privs-label">Password</div>
+      <div class="section-label">Password</div>
       <div class="alter-password">
         <span class="pw-field">
           <input type="password" id="alter-password" autocapitalize="none" autocomplete="off" placeholder="new password" />

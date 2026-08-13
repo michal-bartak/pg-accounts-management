@@ -467,6 +467,35 @@ operation and every `prop` a real `model.DBFunctions`/`DBReads` field — is pin
 
 ## Frontend (`frontend/`)
 
+**UI density is one knob: `html { font-size: 87.5% }`** (= 14px; [styles.css](frontend/styles.css),
+just above `html, body { height:100% }`). Every content-sized value in the stylesheet is a `rem`,
+so that single declaration scales text, `--fs-*`, `--control-h`/`--control-pad-*`, padding, gaps,
+table row heights and the `ch`-based grid tracks together. **Keep it that way**: new CSS uses `rem`
+for anything content-sized and `px` only for hairline borders (`1px`), radii, and sub-10px
+decorations (scrollbar, `.update-badge`) — a `px` width or `min-width` on a box that holds content
+is the bug, because it stays full-size while everything around it shrinks. **No icon carries a
+`width`/`height`** — not in `index.html`, not from `svgIcon` (its `size:` option was removed); every
+container sizes its glyph in rem, so a hand-written SVG with `width="14"` is the thing that drifts
+out of step. Two rem values are hand-synced and must not drift:
+`th, td { padding: .55rem .75rem }` with the `1.5rem` in `depsColgroup`, and
+`.alter-result-head`'s `calc(0.7rem + 1px)` with the search-result row's border+padding.
+
+Four density tokens carry the parts a plain `rem` cannot:
+**`--hairline: 1.15px`** for every border (a flat `1px` is 1.75 device px at 175% display scaling,
+so the engine snaps it to 1 *or* 2 device px depending on the element's position and borders read
+patchy; 1.15px is 2.01 device px there — always 2 — and still rounds to 1px at 100%). Decoration
+strokes (checkbox tick, spinner, `.update-badge` ring) stay literal px.
+**`--ink-lift` / `--ink-lift-control`** correct optical centring: browsers centre the *line box*,
+which reserves descender depth and diacritic headroom, so visible ink lands low — measured off
+painted pixels at 0.042em on a chip and 0.086em on a full-height button. Applied as asymmetric
+padding. Uppercase pills are deliberately excluded (0.03em, sub-pixel). **`--checkbox-lift`** nudges
+the Target-selection checkbox, which reads low against its group chip even though both boxes centre
+on the same device row. All four are single values — retune, don't sweep.
+
+**`.section-label` is the ONE small-uppercase section label** (Settings groups, Settings meta, the
+role form's sections, About), sized by `--fs-section`. It replaced five near-identical rules that
+had drifted to three letter-spacings; it sets no `display`/`margin`, so each context opts in.
+
 **App shell**: header + tabs bar are fixed (`body` is a flex column, `overflow:hidden`,
 no page scroll); `main` fills the rest. Each panel manages its own scroll. Operations is
 a two-column grid — left `.ops-sidebar` and right `.ops-main` scroll **independently**;
