@@ -43,6 +43,15 @@ func (a *App) GetConfigPath() string {
 	return a.store.ConfigPath()
 }
 
+// GetDefaultTemplates returns the built-in call templates and introspection queries — the same
+// values a fresh config is seeded with. The Settings editor's "Default" button reverts a template
+// to these, so the frontend does NOT keep its own copy of the SQL: the defaults live in
+// config.DefaultConfig() alone and a change there reaches the button with no second edit.
+func (a *App) GetDefaultTemplates() model.DefaultTemplates {
+	def := config.DefaultConfig()
+	return model.DefaultTemplates{DBFunctions: def.DBFunctions, DBReads: def.DBReads}
+}
+
 // GetAppVersion returns build metadata (version, git commit, build date).
 func (a *App) GetAppVersion() model.AppVersion {
 	i := version.Get()
@@ -83,6 +92,14 @@ func (a *App) ReloadConfig() (model.Config, error) {
 		return model.Config{}, err
 	}
 	return a.store.Get(), nil
+}
+
+// SaveSettings persists the whole Settings page atomically: everything validates before anything
+// is written, so a rejected value leaves the saved config exactly as it was. Replaces the previous
+// sequence of SaveParentRoles → SaveCommentFields → SaveDBFunctions → … calls, each of which wrote
+// the config file separately and could leave it half-updated.
+func (a *App) SaveSettings(p model.SettingsPayload) error {
+	return a.store.SaveSettings(p)
 }
 
 func (a *App) SaveDBFunctions(fn model.DBFunctions) error {
@@ -194,10 +211,6 @@ func (a *App) TestConnectionInput(in model.ClusterInput, auth model.AuthContext)
 		Password:    in.Password,
 	}
 	return pg.TestConnection(cluster, auth)
-}
-
-func (a *App) RunOperation(req model.RunRequest) ([]model.ClusterResult, error) {
-	return a.batch.Run(req)
 }
 
 // RunRoleBatch applies, per cluster, an ordered list of operations inside a single transaction

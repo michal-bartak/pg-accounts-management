@@ -18,6 +18,8 @@ export function GetConfig():Promise<model.Config>;
 
 export function GetConfigPath():Promise<string>;
 
+export function GetDefaultTemplates():Promise<model.DefaultTemplates>;
+
 export function GetPendingUpdate():Promise<model.UpdateInfo>;
 
 export function LoadRoleDependencies(arg1:model.RoleDependenciesRequest):Promise<Array<model.ClusterRoleDependencies>>;
@@ -45,6 +47,8 @@ export function SaveDBReads(arg1:model.DBReads):Promise<void>;
 export function SaveParentRoles(arg1:Array<string>):Promise<void>;
 
 export function SaveSearchColumns(arg1:Array<model.SearchColumn>):Promise<void>;
+
+export function SaveSettings(arg1:model.SettingsPayload):Promise<void>;
 
 export function SaveTargetSelection(arg1:model.TargetSelection):Promise<void>;
 

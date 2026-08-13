@@ -34,6 +34,10 @@ export function GetConfigPath() {
   return window['go']['main']['App']['GetConfigPath']();
 }
 
+export function GetDefaultTemplates() {
+  return window['go']['main']['App']['GetDefaultTemplates']();
+}
+
 export function GetPendingUpdate() {
   return window['go']['main']['App']['GetPendingUpdate']();
 }
@@ -88,6 +92,10 @@ export function SaveParentRoles(arg1) {
 
 export function SaveSearchColumns(arg1) {
   return window['go']['main']['App']['SaveSearchColumns'](arg1);
+}
+
+export function SaveSettings(arg1) {
+  return window['go']['main']['App']['SaveSettings'](arg1);
 }
 
 export function SaveTargetSelection(arg1) {

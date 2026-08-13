@@ -275,6 +275,55 @@ func (s *Store) UpdateDBReads(reads model.DBReads) error {
 	return s.save()
 }
 
+// SaveSettings validates and applies the whole Settings page in ONE write. Every field is
+// validated BEFORE anything is assigned, so a rejected template can no longer leave the parent
+// groups and comment fields already persisted (which is what the previous seven-call sequence
+// did). Command templates are checked against the comment fields FROM THIS PAYLOAD, so adding a
+// field and using it as a ${{key}} placeholder in the same save works without ordering tricks.
+func (s *Store) SaveSettings(p model.SettingsPayload) error {
+	parents, err := validateParentRoles(p.ParentRoles)
+	if err != nil {
+		return err
+	}
+	fields, err := validateCommentFields(p.CommentFields)
+	if err != nil {
+		return err
+	}
+	cols, err := validateSearchColumns(p.SearchColumns)
+	if err != nil {
+		return err
+	}
+	keys := make([]string, 0, len(fields))
+	for _, f := range fields {
+		if f.Key != "" {
+			keys = append(keys, f.Key)
+		}
+	}
+	if err := validateDBFunctions(p.DBFunctions, keys...); err != nil {
+		return err
+	}
+	reads := p.DBReads
+	migrateDBReads(&reads) // a blank query from the editor falls back to its default
+	if err := validateDBReads(reads); err != nil {
+		return err
+	}
+	batch := p.Batch
+	if batch.MaxConcurrency <= 0 {
+		batch.MaxConcurrency = 5
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cfg.ParentRoles = parents
+	s.cfg.CommentFields = fields
+	s.cfg.SearchColumns = cols
+	s.cfg.DBFunctions = p.DBFunctions
+	s.cfg.DBReads = reads
+	s.cfg.Batch = batch
+	s.cfg.UI = normalizeUI(p.UI)
+	return s.save()
+}
+
 func (s *Store) UpdateBatch(batch model.BatchSettings) error {
 	if batch.MaxConcurrency <= 0 {
 		batch.MaxConcurrency = 5
@@ -285,16 +334,22 @@ func (s *Store) UpdateBatch(batch model.BatchSettings) error {
 	return s.save()
 }
 
-func (s *Store) UpdateUI(ui model.UISettings) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.cfg.UI = model.UISettings{
+// normalizeUI coerces the UI block to valid values. Field-by-field (not a blanket copy) so a
+// field added to UISettings has to be considered here rather than silently riding through.
+func normalizeUI(ui model.UISettings) model.UISettings {
+	return model.UISettings{
 		Theme:                  model.NormalizeTheme(ui.Theme),
 		CommentDefaultView:     model.NormalizeCommentView(ui.CommentDefaultView),
 		StageCreateOnTargetAdd: ui.StageCreateOnTargetAdd,
 		CheckForUpdates:        ui.CheckForUpdates,
 		PasswordGen:            ui.PasswordGen.Normalized(),
 	}
+}
+
+func (s *Store) UpdateUI(ui model.UISettings) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cfg.UI = normalizeUI(ui)
 	return s.save()
 }
 

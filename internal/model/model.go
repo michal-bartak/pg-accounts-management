@@ -96,6 +96,30 @@ type DBReads struct {
 	RoleDependencies DBRead `yaml:"role_dependencies" json:"roleDependencies"`
 }
 
+// SettingsPayload is everything the Settings page stages, saved in ONE atomic call. It used to
+// be seven separate bound methods invoked in sequence, each writing the config file: a rejection
+// partway through left the earlier ones persisted while the UI reported failure. It also forced
+// the caller to order the calls by hand, because the command templates are validated against the
+// configured comment fields — here both arrive together and validation sees the new set directly.
+type SettingsPayload struct {
+	ParentRoles   []string       `json:"parentRoles"`
+	CommentFields []CommentField `json:"commentFields"`
+	SearchColumns []SearchColumn `json:"searchColumns"`
+	DBFunctions   DBFunctions    `json:"dbFunctions"`
+	DBReads       DBReads        `json:"dbReads"`
+	Batch         BatchSettings  `json:"batch"`
+	UI            UISettings     `json:"ui"`
+}
+
+// DefaultTemplates carries the built-in call templates and introspection queries to the
+// frontend, so the Settings editor's "Default" button can revert a template without the SQL
+// being duplicated in app.js. Config-file shape is irrelevant here — this type is only ever
+// returned over the Wails bridge.
+type DefaultTemplates struct {
+	DBFunctions DBFunctions `json:"dbFunctions"`
+	DBReads     DBReads     `json:"dbReads"`
+}
+
 type BatchSettings struct {
 	MaxConcurrency int `yaml:"max_concurrency" json:"maxConcurrency"`
 }

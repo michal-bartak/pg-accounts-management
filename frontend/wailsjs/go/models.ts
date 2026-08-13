@@ -839,6 +839,38 @@ export namespace model {
 	
 	
 	
+	export class DefaultTemplates {
+	    dbFunctions: DBFunctions;
+	    dbReads: DBReads;
+	
+	    static createFrom(source: any = {}) {
+	        return new DefaultTemplates(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.dbFunctions = this.convertValues(source["dbFunctions"], DBFunctions);
+	        this.dbReads = this.convertValues(source["dbReads"], DBReads);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	
 	
@@ -1049,6 +1081,48 @@ export namespace model {
 	
 	
 	
+	export class SettingsPayload {
+	    parentRoles: string[];
+	    commentFields: CommentField[];
+	    searchColumns: SearchColumn[];
+	    dbFunctions: DBFunctions;
+	    dbReads: DBReads;
+	    batch: BatchSettings;
+	    ui: UISettings;
+	
+	    static createFrom(source: any = {}) {
+	        return new SettingsPayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.parentRoles = source["parentRoles"];
+	        this.commentFields = this.convertValues(source["commentFields"], CommentField);
+	        this.searchColumns = this.convertValues(source["searchColumns"], SearchColumn);
+	        this.dbFunctions = this.convertValues(source["dbFunctions"], DBFunctions);
+	        this.dbReads = this.convertValues(source["dbReads"], DBReads);
+	        this.batch = this.convertValues(source["batch"], BatchSettings);
+	        this.ui = this.convertValues(source["ui"], UISettings);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	export class TestConnectionRequest {
 	    clusterId: string;
