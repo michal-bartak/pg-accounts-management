@@ -298,8 +298,10 @@ into prose, it goes stale.
    `func(model.ClusterProgress)` callback, invoked from each goroutine on cluster start ("running")
    and finish ("done"); `App.RunRoleBatch` passes a closure that `wailsruntime.EventsEmit`s each as
    a `role-batch-progress` event (the runner stays Wails-free per the import table). `pg.ExecuteOperation`/`execRoleConfig`/
-   `runQuery` take a `pg.Querier` (satisfied by `*pgx.Conn` and `pgx.Tx`). The legacy single-op
-   `App.RunOperation`/`batch.Run` (one autocommit statement) is kept but no longer used by the UI.
+   `runQuery` take a `pg.Querier` (satisfied by `*pgx.Conn` and `pgx.Tx`). This is the ONLY write
+   path — the legacy single-op `App.RunOperation`/`batch.Run`/`batch.runOne`/`pg.CallFunction`/
+   `commands.ValidateRequest` were deleted (the UI never called them; `model.RunRequest` stays,
+   `PreviewTargets` uses it).
 2. **Read (introspection), catalog queries — added for "Alter role".**
    [internal/pg/introspect.go](internal/pg/introspect.go): `SearchRoles` (matches
    `rolname` or `COMMENT ON ROLE` via `pg_shdescription`), `RoleDetail` (existence,
@@ -337,10 +339,17 @@ into prose, it goes stale.
 
 ## Bound methods (`app.go` → `window.go.main.App`)
 
-Config/clusters/groups: `GetConfig`, `GetConfigPath`, `ReloadConfig`, `AddCluster`,
+Config/clusters/groups: `GetConfig`, `GetConfigPath`, `GetDefaultTemplates` (the built-in call
+templates + introspection queries, so the Settings editor's **Default** button has no second copy
+of the SQL — see the DB-templates section), `ReloadConfig`, `AddCluster`,
 `UpdateCluster`, `DeleteCluster`, `AddCategory`, `UpdateCategory`, `DeleteCategory`,
-`SaveDBFunctions`, `SaveDBReads` (introspection queries), `SaveBatchSettings`, `SaveUISettings`,
-`SaveParentRoles`, `SaveCommentFields`, `SaveSearchColumns` (Find-role result columns),
+**`SaveSettings(SettingsPayload)`** (the whole Settings page in ONE atomic write — parent groups,
+comment fields, search columns, db_functions, db_reads, batch, ui; everything validates before
+anything is assigned, and command templates are validated against the comment fields *in the same
+payload*, so no call ordering is required). The per-section `SaveDBFunctions`, `SaveDBReads`,
+`SaveBatchSettings`, `SaveUISettings`, `SaveParentRoles`, `SaveCommentFields`, `SaveSearchColumns`
+are kept but no longer used by the UI — the Settings page was previously seven sequential calls,
+each writing config.yaml, which left the file half-updated when a later one was rejected. Also
 `SaveTargetSelection`, `SaveClusters`
 (staged Clusters editor — replaces the whole clusters+categories set at once via
 `Store.SaveClustersAndCategories`; the per-item `Add/Update/Delete Cluster/Category` are kept
@@ -358,7 +367,7 @@ the running version catches up). **Update-available badge**: a small `--primary`
 Run/test: `TestConnection` (by saved cluster id), `TestConnectionInput` (ad-hoc
 `ClusterInput`+`Auth`, used by the cluster editor to test on-screen values),
 `PreviewTargets`, `RunRoleBatch(RoleBatchRequest)` (per-cluster transactional batch; the UI's
-create/update/remove path), `RunOperation(RunRequest)` (legacy single-op, kept but unused by the UI).
+create/update/remove path, and now the only write path).
 Introspection (Alter role): `SearchRoles(RoleSearchRequest)` (→ `[]ClusterRoleMatches`, one per
 cluster),
 `LoadRoleDetails(RoleDetailsRequest)`, `LoadRoleDependencies(RoleDependenciesRequest)` (the
@@ -441,11 +450,17 @@ Extend all of: `calltemplate.AllowedPlaceholders` + `placeholderKindFor` (+ a ne
 `fieldConfigName` for unquoted GUC names); `commands` op const + `BuildArgs` +
 `ValidateOperation`; `model.DBFunctions` + `*Params` + `OperationSpec`;
 `config.store.DefaultConfig` + `dbfunctions.go` migrate/validate lists; the `DB_FUNCTIONS`
-table in `frontend/app.js` — each entry is `[key, title, prop, placeholders, defaultCall,
-defaultExecution, contract]`; `defaultCall`/`defaultExecution` **mirror the backend default**
-(the `#fn-dialog` **Default** button reverts to them) and `contract` is the one-sentence
-description shown in the dialog — plus `readDBFunctionsFromEditor`/`savedDBFunctions`; example
-config; and tests in `calltemplate`/`commands`/`config`.
+table in `frontend/app.js` — each entry is `{key, title, prop, placeholders, contract}`, where
+`contract` is the one-sentence description shown in the dialog; example config; and tests in
+`calltemplate`/`commands`/`config`.
+
+**The frontend holds NO copy of the default SQL.** `DB_FUNCTIONS`/`DB_READS` carry only UI
+metadata; the `#fn-dialog` **Default** button reverts from `defaultTemplates`, fetched once at
+startup via `App.GetDefaultTemplates()` (= `config.DefaultConfig()`). So a default changes in
+exactly one place. What is left of the cross-language contract — that every op key is a real
+operation and every `prop` a real `model.DBFunctions`/`DBReads` field — is pinned by
+[frontend_contract_test.go](frontend_contract_test.go), which parses the two tables out of
+`app.js`; it fails loudly if their literal shape changes rather than silently passing.
 
 ## Frontend (`frontend/`)
 
@@ -459,11 +474,13 @@ and Settings are single-column with a fixed toolbar / pinned Save-settings foote
 **Action-button convention (keep consistent):** the primary/commit button is the emphasized
 (`.primary`) one, placed **rightmost**; Cancel/secondary sits to its left; destructive actions
 (e.g. Remove role) sit to the **left of the primary**, still in the right-aligned cluster.
-This holds for dialog `<menu>`s (`[Cancel] [Primary]`, all right-aligned) and page footers
-(Create role / Save changes / Settings & Clusters `[Discard] [Save]` right-aligned; Remove role
-renders left of Save via `#btn-alter-remove{order:-1}`, with `margin-left:auto` (styles.css
-~L1146) pulling the pair right — that later rule overrides the earlier `space-between`
-far-left intent at ~L450). The **Test connections** button lives in the Clusters
+This holds for dialog `<menu>`s (`[Cancel] [Primary]`, all right-aligned — from the ONE shared
+`dialog menu` rule, not per-popup copies) and page footers (Create role / Save changes /
+Settings & Clusters `[Discard] [Save]` right-aligned; Remove role renders left of Save via
+`.ops-footer .alter-actions{justify-content:flex-end}` + `#btn-alter-remove{order:-1}` — `order`
+is the whole mechanism, and both rules now sit together). A button opts out to the LEFT of a
+right-aligned row with `margin-right:auto` (Test connection, `#fn-dialog-default`,
+`#search-status`). The **Test connections** button lives in the Clusters
 toolbar (`btn-test-clusters` → `testAllClusters`): it tests every configured cluster and
 writes the outcome into a per-row **Status** column (`setClusterStatus`). Cluster rows have
 no per-row Test button (testing on-screen values is done from the cluster editor via
@@ -493,10 +510,14 @@ same look as the role form): **General** (Appearance theme + Max concurrency), *
 parent groups**, **Comments** (Comment fields + Preferred comment view), **Role Details** (search
 result columns), and **DB command
 templates**. Parent groups, Comment fields and Find-role columns are drag-orderable add/remove
-**list editors**
-built from the shared `listRowHtml`/`wireListEditor` helpers (drag handle + remove ×, `Add…`
-button), staged in `parentRolesDraft` / `commentFieldsDraft` / `searchColumnsDraft`
-(`#parent-roles-editor` / `#comment-fields-editor` / `#search-columns-editor`). DB templates are a
+**list editors** — all three are ONE widget, described by the **`LIST_EDITORS`** table (id, add
+button, focus target, draft get/set, `seed` from saved config, `blank` row, `row` markup, `edit`
+handler) and driven by `renderListEditor`/`seedListEditor`/`renderListEditors` plus a single
+wiring loop over the table; `listRowHtml`/`wireListEditor` supply the grip + remove × + drag
+reorder. **Add a fourth list editor by adding a table entry, nothing else.** Drafts stay the
+module-level `parentRolesDraft` / `commentFieldsDraft` / `searchColumnsDraft`
+(`#parent-roles-editor` / `#comment-fields-editor` / `#search-columns-editor`) because
+`readSearchColumnsFromEditor`, `settingsDirty` and the unit tests address them by name. DB templates are a
 compact list of command names; clicking one opens
 the `#fn-dialog` popup (execution type, call template, clickable placeholder chips — staged in
 `dbFnDraft`). The popup's titlebar (`.fn-titlebar`) has a square **help icon button** (`#fn-help`,
@@ -505,7 +526,8 @@ reference — the old Settings-level *Template syntax help* button was removed, 
 in **every** template editor popup. An **Introspection queries** section (`#db-reads-editor`,
 driven by `DB_READS`) sits in a two-column grid (`.settings-two-col`) beside DB command templates;
 it lists the four read queries (incl. `role_dependencies`) and opens the **same** `#fn-dialog` in **read mode**
-(`fnDialogMode`/`openReadDialog`): the execution select is hidden (`setFnDialogExecutionRow`),
+(`openTemplateDialog('read'|'write', key)` — one opener for both, `fnDialogMode` records which):
+the execution select is hidden (`setFnDialogExecutionRow`),
 the placeholder chips show a single **`${rolename}`** chip
 (`renderFnPlaceholders([{token:'${rolename}',kind:'builtin'}])`),
 and the contract sentence + query textarea + **Default** button remain; Done stages into
@@ -648,7 +670,7 @@ main.go, app.go           Wails entry + bound methods
 internal/model/           Shared JSON-tagged types + RunRequest (stdlib only)
 internal/calltemplate/    Template parse/validate/SQL build (stdlib only)
 internal/config/          YAML persistence, DBFunction migrate/validate
-internal/pg/              DSN, auth, Connect, CallFunction, introspect.go (reads)
+internal/pg/              DSN, auth, Connect, ExecuteOperation, introspect.go (reads)
 internal/batch/           Concurrent executor + all-cluster scan
 internal/commands/        Op validation + arg maps + attribute keyword whitelist
 internal/update/          GitHub-Releases version check (stdlib http + semver compare)

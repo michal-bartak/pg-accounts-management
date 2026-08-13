@@ -24,6 +24,7 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 - A comment field named like a built-in no longer corrupts what `set_comment` writes in function mode (the comment could be re-serialized, or an empty one stored as NULL).
 - Adding a comment field and using it in a call template in the same Settings save now works.
+- **Settings saves are all-or-nothing** — a rejected template or field no longer leaves the earlier sections of the page already written to the config file while the error is reported.
 - A comment containing `${` no longer fails the operation.
 
 ## [0.9.0] - 2026-08-12

@@ -43,9 +43,17 @@ Example template: [`config.example.yaml`](config.example.yaml). Implemented in `
 - `AddCluster`, `UpdateCluster`, `DeleteCluster` (per-item; kept but unused by the UI now)
 - `SaveClusters(ClustersConfig)` — staged Clusters editor: replaces the whole clusters+categories
   set atomically via `Store.SaveClustersAndCategories` (validate + UUID/slug ids + referential integrity)
-- `SaveDBFunctions`, `SaveBatchSettings`, `SaveUISettings`, `SaveParentRoles`, `SaveTargetSelection`
+- `SaveSettings(SettingsPayload)` — the whole Settings page in ONE atomic write (parent groups,
+  comment fields, search columns, db_functions, db_reads, batch, ui). Everything validates before
+  anything is assigned, and templates are validated against the comment fields in the same payload.
+  The per-section `SaveDBFunctions`/`SaveDBReads`/`SaveBatchSettings`/`SaveUISettings`/
+  `SaveParentRoles`/`SaveCommentFields`/`SaveSearchColumns` remain but are unused by the UI.
+- `GetDefaultTemplates` — built-in call templates + read queries for the editor's Default button,
+  so `frontend/app.js` keeps no copy of the default SQL
+- `SaveTargetSelection`
 - `TestConnection`, `PreviewTargets`, `RunRoleBatch` (per-cluster transactional batch — the
-  create/update/remove path), `RunOperation` (legacy single-op, unused by the UI)
+  create/update/remove path, and the only write path; the legacy single-op `RunOperation`/
+  `batch.Run`/`pg.CallFunction`/`commands.ValidateRequest` were deleted)
 - **Introspection (reads, for Alter role):** `SearchRoles`, `LoadRoleDetails`,
   `LoadRoleDependencies` — scan the
   **selected** clusters concurrently (`internal/pg/introspect.go` + `batch.Runner`),
@@ -295,7 +303,7 @@ main.go, app.go           Wails entry + bindings
 internal/config/          YAML persistence
 internal/model/           Shared types + RunRequest
 internal/calltemplate/    Call template parse/validate/SQL build (stdlib only)
-internal/pg/              DSN, auth, Connect, CallFunction, introspect.go (role reads)
+internal/pg/              DSN, auth, Connect, ExecuteOperation, introspect.go (role reads)
 internal/batch/           Concurrent executor + all-cluster scan (Search/LoadRoleDetails)
 internal/commands/        Op validation + arg maps
 internal/update/          GitHub-Releases version check (stdlib http + semver compare)
