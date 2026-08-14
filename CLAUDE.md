@@ -17,13 +17,47 @@ into prose, it goes stale.
 
 ## Product decisions (don't regress)
 
+- **Two config files, one directory** ([internal/config/paths.go](internal/config/paths.go)):
+  **`config.yaml`** = app configuration (templates, reads, parent roles, comment fields, search
+  columns, batch, ui, window size, seen version); **`clusters.yaml`** = `categories`, `clusters`,
+  `targets`. The directory resolution is unchanged and hand-rolled per OS (macOS
+  `~/Library/Application Support/DbAccounts`, Linux `~/.config/dbaccounts`, Windows
+  `%APPDATA%\DbAccounts`) — **`os.UserConfigDir` is deliberately not used**, and there is no
+  env/XDG override.
+  **The split is one tag, not a copy of the field list**: `model.Config` embeds
+  **`model.ClusterSet`** (Categories/Clusters/Targets) anonymously with **`yaml:"-"`**, and
+  `model.ClustersFile` is `{Version, ClusterSet \`yaml:",inline"\`}`. So a new *cluster-scoped*
+  field added to `ClusterSet` lands in clusters.yaml automatically and a new *app-scoped* field
+  added to `Config` lands in config.yaml automatically — **don't** replace this with per-field
+  `yaml:"-"` tags plus a parallel struct, which is exactly the drift this avoids. The embed is
+  transparent to the wire format: `encoding/json` **and** the Wails generator flatten it, so
+  `models.ts`'s `Config` keeps `categories`/`clusters`/`targets` top-level and the frontend still
+  reads `state.clusters` etc. (same precedent as `RunRequest`/`OperationSpec`).
+  `Store` keeps **one** `path` field and *derives* `clustersPath()` from `filepath.Dir(s.path)` —
+  that is what lets every `&Store{path: …}` test literal keep working. It returns `""` for a
+  path-less store (`NewStoreFromConfig`), and `atomicWriteFile` **rejects an empty path**, because
+  `filepath.Dir("")` is `"."` and a relative `clusters.yaml` would otherwise be written into the
+  process CWD — passwords included. Writers partition cleanly (no method touches both halves), so
+  each file stays atomic on its own and there is no cross-file transaction: the eight cluster /
+  category / target writers call `saveClusters()`, every other writer calls `save()`.
+  `Load` is a **pure reader** (a missing file yields that half's defaults in memory; `NewStore`'s
+  `writeMissingFiles` does the seeding), so `ReloadConfig` never creates anything; a file that
+  exists but doesn't parse is a hard error rather than a silent empty state.
+  **First run must never error**: with neither file present, `Load` yields the built-in defaults and
+  `writeMissingFiles` writes both at `0600` — pinned by `TestNewStoreFirstRun`, which redirects
+  `HOME`/`APPDATA` so it exercises `ConfigDir`'s real per-OS branch and its `MkdirAll`.
+  **There is deliberately no migration and no legacy-key guard.** A pre-split `config.yaml` still
+  carrying `categories`/`clusters`/`targets` simply has them ignored (`yaml.Unmarshal` leaves
+  `KnownFields` off) and dropped by the next write; the app was never released with the old layout,
+  so nothing needs rescuing. Don't add a probe back.
 - **Auth resolution** ([internal/pg/auth.go](internal/pg/auth.go)): user (`ResolveUser`) =
   cluster `connect_user` → `PGUSER` → **OS login user** (`user.Current()`, like psql/libpq) →
   error; password (`ResolvePassword`) = **cluster `password`** → `AuthContext.Password` (unused by
   the UI) → `PGPASSWORD` → `~/.pgpass` → empty (trust, like psql). The `AuthContext` from the run
   dialog is still always empty from the UI. **The one credential in config is the optional
   per-cluster `password`** — an opt-in, plain-text field on `model.Cluster`/`ClusterInput`
-  (`yaml:"password,omitempty"`), stored in the private config (`save()` writes mode `0600`) and
+  (`yaml:"password,omitempty"`), stored in the private **`clusters.yaml`** (`saveClusters()` writes
+  mode `0600`) and
   editable in the Clusters cluster editor as a **masked field with a 👁 reveal toggle** next to
   Connect user (the two share a `.form-row`, borrowing the Host/Port width mechanism). When set it
   is used directly; when blank the app falls back to `PGPASSWORD`/`~/.pgpass` as before. It rides on
@@ -74,11 +108,20 @@ into prose, it goes stale.
   (a **one-liner** only — see the search-status decision below)
   — plus a red button flash. Run/batch outcomes stay in the **run-status chip** (unchanged); rare
   clipboard failures log to the console.
-- **Preconfigured parent groups** (`Config.ParentRoles`, YAML `parent_roles`) are a
+- **Preconfigured role parents** (`Config.ParentRoles`, YAML `parent_roles`) are a
   Settings-managed list of bare-identifier role names, saved via `SaveParentRoles`
   (`Store.UpdateParentRoles` validates identifier syntax, dedupes). They are offered as
   pick-list choices (toggle **chips**) in both the Create-role and Alter-role
-  Add-privilege dialogs, several at once. Create-role uses the **same `${parent_roles}`
+  **Assign-parents** dialogs, several at once. **The UI wording is "role parents", never
+  "privileges" or "parent groups"** — any role can be a parent, so the old labels were wrong (the
+  Settings section is *Preconfigured role parents* / *Add parent…*, the role-form section is
+  *Role Parents* — title case, as the user specified — with *Assign parents…*, and the dialog is
+  *Assign parents* with a *Role names* field). Only the labels changed: the YAML/JSON contract
+  (`parent_roles`, `parentRoles`, `grant_parents`) is untouched, so don't "fix" it to match.
+  The dialog's *Role names* field takes a **comma-separated list** (`parseRoleNameList`: split on
+  `,`, trim, drop blanks, dedupe; the only rejection left is a NUL, since `ROLE_NAME_RE` excludes
+  commas by design) which merges with the picked chips, then goes to `addParentScope`.
+  Create-role uses the **same `${parent_roles}`
   placeholder as grant/revoke** (there is no singular `${parent_role}`): statement mode → a
   double-quoted identifier list (`"a", "b"`), function mode → an inline `ARRAY['a', 'b']` literal
   (values verbatim, `'`-bearing values rejected; empty → `NULL`). The selected parents are published
@@ -153,16 +196,27 @@ into prose, it goes stale.
   `search_columns: []` means "rolename only" and must survive a restart — hence `Load` keys the
   default off `== nil` and `sanitizeSearchColumns` preserves nil-ness. The frontend `searchColumns()`
   therefore has **no default fallback** (unlike `commentFields()`), or an explicit empty list would
-  resurrect the default. `searchCellValues` picks each value from the first cluster in
-  `byGroupThenAlias` order (results arrive in completion order), flagging `≠` when clusters disagree.
+  resurrect the default. `searchCellValues` returns one **string** per column — the first non-empty
+  value in `byGroupThenAlias` order (results arrive in completion order). Clusters disagreeing about a
+  value is deliberately **not** flagged in a search row (a `≠` marker was tried and read as an
+  unexplained artifact): the popup is for finding a role, and reconciliation is reported once the role
+  is loaded, by the "Comments differ" banner and the Comments dialog.
   **Layout — CSS subgrid, no measuring.** Rows stay single-line clickable `<button>`s. The
   CONTAINER `#alter-results` owns the column tracks (`--search-cols`, set by
   `searchGridTemplate(colCount)`); the header (`.alter-result-head`) and every row set
   `grid-column: 1 / -1` + `grid-template-columns: subgrid`, so the browser sizes each column to its
   widest cell across all rows and they align for free. Tracks are
-  `fit-content(40ch)` (rolename), one `fit-content(30ch)` per configured column, then
-  `minmax(8ch, auto)` for the chips — `fit-content(<cap>)` means "as wide as the content needs, up
-  to the cap", and the trailing `auto` max soaks up leftover width so the chips stay flush right.
+  `fit-content(40ch)` (rolename), one **`minmax(4ch, max-content)`** per configured column, then
+  `minmax(8ch, auto)` for the chips. **The chips track is the only flexible one**, and both halves of
+  that are measured decisions — a column's max must be neither `fit-content(<cap>)` nor `auto`:
+  a **cap** made a long value (a raw `${comment}` above all) ellipsize while hundreds of px sat
+  unused further right; an **`auto`** max stretched every column past its content, because grid's
+  final step hands leftover space to each auto-max track — with short values that padded each column
+  by ~240px, so a name and the email beside it sat a quarter of a row apart. `max-content` stops a
+  column at its text, so the values read as a table and the slack collects in the chips track, which
+  is last and `justify-self: end` — the chips stay flush right and the gap lands in the one place it
+  looks deliberate. The chips' `8ch` floor lets them shrink (and wrap) under real pressure instead of
+  forcing a horizontal scrollbar and crushing the rolename.
   Two constraints, don't undo them: (1) a subgrid child's own border+padding **insets its tracks**,
   so `.alter-result-head`'s horizontal padding must stay `calc(0.7rem + 1px)` = the row's
   padding + border, or header and rows fall out of alignment; (2) the column gap lives on the
@@ -173,9 +227,8 @@ into prose, it goes stale.
   This **replaced ~165 lines** that measured text with canvas `measureText` against fonts read from
   throwaway DOM probes, plus a second render pass to pin the chip track. It is why the app requires
   **WebKit 16 / macOS 12+ / WebKitGTK 2.38+** (WebView2 is evergreen) — see the platform note in
-  [docs installation](docs/src/content/docs/installation.md). One deliberate behaviour change: a
-  column past its cap now ellipsizes rather than turning into `1fr` and absorbing free space; the
-  chips track takes the slack instead. `pg.ParseFullName` / `RoleMatch.FullName` /
+  [docs installation](docs/src/content/docs/installation.md). A column still ellipsizes — but only
+  once the free space is actually used up, not at a fixed cap. `pg.ParseFullName` / `RoleMatch.FullName` /
   `ClusterRoleDetail.FullName` were **removed** earlier with this feature — don't reintroduce a
   hardcoded key.
 - **One shared role form for Create and Alter.** Both modes render through
@@ -342,11 +395,12 @@ into prose, it goes stale.
 
 ## Bound methods (`app.go` → `window.go.main.App`)
 
-Config/clusters/groups: `GetConfig`, `GetConfigPath`, `GetDefaultTemplates` (the built-in call
+Config/clusters/groups: `GetConfig`, `GetConfigPath`, `GetClustersPath` (the two file paths, shown
+as a *Config files* pair in the Settings meta block), `GetDefaultTemplates` (the built-in call
 templates + introspection queries, so the Settings editor's **Default** button has no second copy
 of the SQL — see the DB-templates section), `ReloadConfig`, `AddCluster`,
 `UpdateCluster`, `DeleteCluster`, `AddCategory`, `UpdateCategory`, `DeleteCategory`,
-**`SaveSettings(SettingsPayload)`** (the whole Settings page in ONE atomic write — parent groups,
+**`SaveSettings(SettingsPayload)`** (the whole Settings page in ONE atomic write — role parents,
 comment fields, search columns, db_functions, db_reads, batch, ui; everything validates before
 anything is assigned, and command templates are validated against the comment fields *in the same
 payload*, so no call ordering is required). The per-section `SaveDBFunctions`, `SaveDBReads`,
@@ -379,8 +433,9 @@ pre-flight dependency check run before any `remove_role`).
 ## Operations (call templates, `internal/calltemplate/`)
 
 `db_functions.<op>.call` + optional `.execution` (`function` | `statement` | `block`).
-Defaults in [internal/config/store.go](internal/config/store.go); example in
-[config.example.yaml](config.example.yaml); DSL in [sql/README.md](sql/README.md).
+Defaults in [internal/config/store.go](internal/config/store.go); examples in
+[config.example.yaml](config.example.yaml) / [clusters.example.yaml](clusters.example.yaml);
+DSL in [sql/README.md](sql/README.md).
 
 **Two placeholder namespaces, and they never overlap** (`internal/calltemplate`): **`${name}`** is a
 built-in from the **closed** per-op set (`AllowedPlaceholders`), **`${{name}}`** is always a
@@ -480,17 +535,23 @@ out of step. Two rem values are hand-synced and must not drift:
 `th, td { padding: .55rem .75rem }` with the `1.5rem` in `depsColgroup`, and
 `.alter-result-head`'s `calc(0.7rem + 1px)` with the search-result row's border+padding.
 
-Four density tokens carry the parts a plain `rem` cannot:
+Three density tokens carry the parts a plain `rem` cannot:
 **`--hairline: 1.15px`** for every border (a flat `1px` is 1.75 device px at 175% display scaling,
 so the engine snaps it to 1 *or* 2 device px depending on the element's position and borders read
 patchy; 1.15px is 2.01 device px there — always 2 — and still rounds to 1px at 100%). Decoration
 strokes (checkbox tick, spinner, `.update-badge` ring) stay literal px.
-**`--ink-lift` / `--ink-lift-control`** correct optical centring: browsers centre the *line box*,
-which reserves descender depth and diacritic headroom, so visible ink lands low — measured off
-painted pixels at 0.042em on a chip and 0.086em on a full-height button. Applied as asymmetric
-padding. Uppercase pills are deliberately excluded (0.03em, sub-pixel). **`--checkbox-lift`** nudges
+**`--ink-lift`** corrects optical centring: browsers centre the *line box*, which reserves descender
+depth and diacritic headroom, so the cap band can land off centre. How far off depends **only on the
+font size**, via `(fontBoxAscent - fontBoxDescent - capHeight) / 2` — measured against painted
+pixels, 0.455px at `--fs-sm` (= the 0.042em token), 0.30px at `--fs-xs`, and **0.06px at
+`--fs-base`, i.e. nothing**. So it is applied as asymmetric padding to the small-font elements only
+(`button.small`, `.ph-chip`, `.pick-chip`); **full-height buttons take no lift** and stay symmetric
+like `.tab`/`.seg-btn`. `min-height` is not a factor — a button centres its line box in its content
+box and splits the slack evenly, so an earlier `--ink-lift-control: 0.086em` on buttons was an
+overcorrection that pushed labels ~1px above centre; it was removed, don't reintroduce it.
+Uppercase pills are deliberately excluded (0.03em, sub-pixel). **`--checkbox-lift`** nudges
 the Target-selection checkbox, which reads low against its group chip even though both boxes centre
-on the same device row. All four are single values — retune, don't sweep.
+on the same device row. All three are single values — retune, don't sweep.
 
 **`.section-label` is the ONE small-uppercase section label** (Settings groups, Settings meta, the
 role form's sections, About), sized by `--fs-section`. It replaced five near-identical rules that
@@ -539,9 +600,9 @@ toolbar hosts the right-aligned **Cluster groups** button (`btn-manage-groups` �
 Save button, so it lives here rather than Settings). Settings is organised into
 divider-separated **`.settings-group`** sections (small uppercase `.settings-group-label`,
 same look as the role form): **General** (Appearance theme + Max concurrency), **Preconfigured
-parent groups**, **Comments** (Comment fields + Preferred comment view), **Role Details** (search
+role parents**, **Comments** (Comment fields + Preferred comment view), **Role Details** (search
 result columns), and **DB command
-templates**. Parent groups, Comment fields and Find-role columns are drag-orderable add/remove
+templates**. Role parents, Comment fields and Find-role columns are drag-orderable add/remove
 **list editors** — all three are ONE widget, described by the **`LIST_EDITORS`** table (id, add
 button, focus target, draft get/set, `seed` from saved config, `blank` row, `row` markup, `edit`
 handler) and driven by `renderListEditor`/`seedListEditor`/`renderListEditors` plus a single
@@ -578,8 +639,16 @@ would overflow) so `overflow:hidden` panels never clip it. The badges carry **no
 keyboard-focusable they open on an explicit **Enter/Space** press (toggle) and close on
 blur/Escape — **not** on plain focus (which used to flash the hint while tabbing past).
 Delegated `mouseover` + `keydown` handlers drive it, so JS-rendered badges (e.g. the
-Alter-role sections) work without per-element wiring. Used on Privileges/Attributes/Settings
+Alter-role sections) work without per-element wiring. Used on Role Parents/Attributes/Settings
 (Alter role), and the Cluster-groups / Find-role / Comments dialogs.
+**The badge's optical nudge rides on `vertical-align` (`0.07em`), never on `position/top`.** A badge
+sits in one of two container kinds: **inline** (`.section-label`, `.settings-field-label`, a dialog
+`h2`), where it is baseline-aligned and needs lifting; or **flex** (`.settings-check-line`,
+`#cluster-form .field-label-row`, `.rce-field-label`), where `align-items: center` already centres
+it. `vertical-align` is ignored for flex items *by spec*, so the correction self-scopes to the
+contexts that need it — whereas the old `top: -1px` applied to both and left every flex label's badge
+~1.1px high (measured −1.06/−1.31 vs the label's cap band; now −0.06/−0.31). Don't reintroduce a
+`top`, and don't "fix" a new flex label with a per-context reset.
 
 **Shared UI conventions (solve once, apply everywhere — don't re-patch per popup).**
 Open every `<dialog>` via the **`openModal(dlgOrId)`** helper in
@@ -598,7 +667,7 @@ keyboard — keeps the ring and their place in the tab order. Note the mechanism
 **not** rely on the `close` event (some engines don't fire it for a programmatic `.close()`) nor on
 a focus event (the restore can happen without one). A `<form method="dialog">` submit still closes
 natively, bypassing the helper. Settings list editors focus the new row's
-input after an Add (parent-group `.pr-value`, comment-field `.cf-key`). Focus indicators are
+input after an Add (role-parent `.pr-value`, comment-field `.cf-key`). Focus indicators are
 **keyboard-only** (`:focus-visible`) and **inset** (border-colour + `inset` box-shadow; a
 light ring on primary-filled controls where a primary ring would vanish) so scroll containers
 / `overflow:hidden` never clip them — one rule in `styles.css` covers text fields, buttons and
@@ -631,7 +700,7 @@ The header is a `.brand` row (accent dot + smaller title + version chip + round 
   deleted `renderDetailErrors`) is gone, and with it the alias-printed-twice duplication;
   `stripClusterPrefix` drops the `connect to <alias>: ` that `pg.Connect` adds when the message
   renders in a table that already has a Cluster column.
-- **Privileges** (parent roles) and **Attributes** (superuser/createrole/createdb/
+- **Role Parents** (`#alter-parents`) and **Attributes** (superuser/createrole/createdb/
   inherit/login/replication/bypassrls) render one-per-row: name left, **scope labels**
   right. Completeness is judged **per group**: all selected clusters of a group matched
   → one **outlined** (bordered, transparent) uppercase group label — matching the bordered
@@ -665,6 +734,17 @@ The header is a `.brand` row (accent dot + smaller title + version chip + round 
   version editable via its own Fields/Raw editor (`commentVersionEditors`). It has no per-row
   save — **OK** stages edits into `commentOverrides` (`commitCommentsDialog`), **Cancel**
   discards, and the staged comments publish with everything else on **Save changes**.
+  **Fields layout — `.rce-fields` is a responsive grid**, `repeat(auto-fill, minmax(14rem, 1fr))`,
+  so the keys flow into as many columns as the width allows (2 at an 800px window, 3 at 1024, 4 at
+  1280 — the form gets window − 21.25rem) instead of one tall column. One class-level rule serves
+  **both** the inline editor and the Comments dialog, which emits the same container. Two things not
+  to undo: (1) **`auto-fill`, not `auto-fit`** — auto-fit collapses the empty tracks, so with only
+  the two default comment fields each input would stretch to half the form; (2) **`.role-identity`
+  carries no `max-width`** — it used to cap the block at 26.25rem, which fixed the column count at
+  one, so the login input holds its own `13.125rem` cap instead (the width it had as 50% of that
+  cap). `#comments-dialog` is `min(44rem, 94vw)` **with a matching `max-width`**, since the base
+  `dialog` rule caps at `min(40rem, 92vw)` and would otherwise clamp it; 44rem holds that grid at
+  exactly two columns (three would need ~47.7rem).
 - **Password** row: a masked field inside a `.pw-field` with an overlaid **Copy** icon
   (`#btn-copy-password`, left) + **reveal eye** (`.pw-toggle`, right), a **Generate** icon button
   (`#btn-gen-password`, `.pw-gen`) to the right of the field, and the **Set password** checkbox.
@@ -701,7 +781,7 @@ The header is a `.brand` row (accent dot + smaller title + version chip + round 
 main.go, app.go           Wails entry + bound methods
 internal/model/           Shared JSON-tagged types + RunRequest (stdlib only)
 internal/calltemplate/    Template parse/validate/SQL build (stdlib only)
-internal/config/          YAML persistence, DBFunction migrate/validate
+internal/config/          YAML persistence (config.yaml + clusters.yaml), migrate/validate
 internal/pg/              DSN, auth, Connect, ExecuteOperation, introspect.go (reads)
 internal/batch/           Concurrent executor + all-cluster scan
 internal/commands/        Op validation + arg maps + attribute keyword whitelist

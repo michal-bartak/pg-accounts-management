@@ -43,6 +43,12 @@ func (a *App) GetConfigPath() string {
 	return a.store.ConfigPath()
 }
 
+// GetClustersPath returns the clusters.yaml path (clusters, groups, target selection), shown in
+// Settings beside the config path.
+func (a *App) GetClustersPath() string {
+	return a.store.ClustersPath()
+}
+
 // GetDefaultTemplates returns the built-in call templates and introspection queries — the same
 // values a fresh config is seeded with. The Settings editor's "Default" button reverts a template
 // to these, so the frontend does NOT keep its own copy of the SQL: the defaults live in

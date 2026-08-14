@@ -224,16 +224,41 @@ func NormalizeCommentView(view string) string {
 	return CommentViewFields
 }
 
+// ClusterSet is everything persisted in clusters.yaml: the cluster inventory, the groups it
+// references, and the remembered target selection. It is kept out of config.yaml because it is
+// site-specific (and carries the optional plain-text per-cluster password), while config.yaml
+// holds shareable app configuration — templates, comment fields, UI preferences.
+//
+// It is embedded anonymously in Config, so readers still write cfg.Clusters / cfg.Categories /
+// cfg.Targets and the JSON wire shape stays flat (encoding/json and the Wails generator both
+// flatten an embedded struct — see RunRequest/OperationSpec). The `yaml:"-"` on the embed in
+// Config is the whole mechanism of the file split: a new cluster-scoped field added HERE lands
+// in clusters.yaml automatically, and a new app-scoped field added to Config lands in
+// config.yaml automatically. Neither needs a per-field tag to remember.
+type ClusterSet struct {
+	Categories []Category `yaml:"categories" json:"categories"`
+	Clusters   []Cluster  `yaml:"clusters" json:"clusters"`
+	// Targets is the last target selection on the Operations page (cluster groups and/or
+	// specific clusters), remembered across re-renders and restarts. Empty = "all groups".
+	Targets TargetSelection `yaml:"targets,omitempty" json:"targets"`
+}
+
+// ClustersFile is the on-disk shape of clusters.yaml.
+type ClustersFile struct {
+	Version    int `yaml:"version"`
+	ClusterSet `yaml:",inline"`
+}
+
 type Config struct {
-	Version     int           `yaml:"version" json:"version"`
-	Categories  []Category    `yaml:"categories" json:"categories"`
-	Clusters    []Cluster     `yaml:"clusters" json:"clusters"`
+	Version int `yaml:"version" json:"version"`
+	// ClusterSet is persisted in clusters.yaml, never here — see its doc comment.
+	ClusterSet  `yaml:"-"`
 	DBFunctions DBFunctions   `yaml:"db_functions" json:"dbFunctions"`
 	DBReads     DBReads       `yaml:"db_reads" json:"dbReads"`
 	Batch       BatchSettings `yaml:"batch" json:"batch"`
 	UI          UISettings    `yaml:"ui" json:"ui"`
-	// ParentRoles are preconfigured parent groups offered as pick-list choices when
-	// granting privileges (Create role / Alter role), instead of typing role names.
+	// ParentRoles are preconfigured role parents offered as pick-list choices when assigning
+	// role parents (Create role / Alter role), instead of typing role names.
 	ParentRoles []string `yaml:"parent_roles,omitempty" json:"parentRoles"`
 	// CommentFields are the JSON keys the app surfaces as labeled inputs when a role
 	// comment holds JSON (Create role / Alter role). Ordered; keys not listed here are
@@ -245,9 +270,6 @@ type Config struct {
 	// `search_columns: []`, while an absent key (older config) still gets the default
 	// "Full name" column.
 	SearchColumns []SearchColumn `yaml:"search_columns" json:"searchColumns"`
-	// Targets is the last target selection on the Operations page (cluster groups and/or
-	// specific clusters), remembered across re-renders and restarts. Empty = "all groups".
-	Targets TargetSelection `yaml:"targets,omitempty" json:"targets"`
 	// WindowWidth/WindowHeight are the last OS window size (Wails WindowGetSize, not the
 	// webview viewport), restored on next launch. 0 = use the built-in default.
 	WindowWidth  int `yaml:"window_width,omitempty" json:"windowWidth,omitempty"`

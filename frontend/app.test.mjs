@@ -81,6 +81,9 @@ sandbox.removeEventListener = () => {};
 sandbox.console = console;
 sandbox.setTimeout = () => 0;
 sandbox.clearTimeout = () => {};
+// Unlike setTimeout above, this one DOES invoke its callback, so a deferred-to-next-frame side
+// effect (revealPickedClusters' scroll) is observable synchronously in a test.
+sandbox.requestAnimationFrame = (fn) => { fn(); return 0; };
 
 const ctx = vm.createContext(sandbox);
 vm.runInContext(source, ctx, { filename: 'app.js' });
@@ -325,9 +328,39 @@ test('buildAlterClusterOps: presence-add create_role carries the granted parents
   assert.equal(r.grant, 'gr_new');
 });
 
-// addPrivilegeScope: "Add privilege" is additive — it must never revoke where the privilege
-// already lives. Regression for the bug where adding P1 to cluster D revoked it from A/B/C.
-test('addPrivilegeScope: adding an existing privilege to a new cluster grants D and revokes nothing', () => {
+// The Assign-parents field takes a comma-separated LIST (the label is plural and its ? hint says
+// so). Comma is the parent-list delimiter app-wide, so splitting on it cannot narrow what a single
+// name may contain — ROLE_NAME_RE already excludes commas.
+test('parseRoleNameList: comma-separated, trimmed, blanks dropped, duplicates collapsed', () => {
+  const r = evalJSON(`({
+    list: parseRoleNameList('gr_devs_ro, app_ro'),
+    messy: parseRoleNameList('  a , b ,, a ,'),
+    single: parseRoleNameList('app_ro'),
+    blank: parseRoleNameList('   '),
+    empty: parseRoleNameList(''),
+    spacey: parseRoleNameList('Mixed Case Role'),
+    nul: parseRoleNameList('ok,ba\\u0000d'),
+  })`);
+  assert.deepEqual(r.list, { roles: ['gr_devs_ro', 'app_ro'], invalid: null });
+  // Trimmed, the blank between the two commas skipped, the trailing comma ignored, 'a' not repeated.
+  assert.deepEqual(r.messy, { roles: ['a', 'b'], invalid: null });
+  assert.deepEqual(r.single, { roles: ['app_ro'], invalid: null });
+  // No name at all is not an error here — confirmScopeDialog reports it, since picking a chip alone
+  // is a valid way to assign a parent.
+  assert.deepEqual(r.blank, { roles: [], invalid: null });
+  assert.deepEqual(r.empty, { roles: [], invalid: null });
+  // A role name may contain spaces and case (the backend double-quotes identifiers), so this is one
+  // name, not three — only a comma splits.
+  assert.deepEqual(r.spacey, { roles: ['Mixed Case Role'], invalid: null });
+  // NUL is the only thing left that a split part can fail on; the valid names before it are kept so
+  // the message can name the offender.
+  assert.equal(r.nul.invalid, 'ba d');
+  assert.deepEqual(r.nul.roles, ['ok']);
+});
+
+// addParentScope: "Assign parents" is additive — it must never revoke where the parent already
+// lives. Regression for the bug where adding P1 to cluster D revoked it from A/B/C.
+test('addParentScope: assigning an existing parent to a new cluster grants D and revokes nothing', () => {
   const r = evalJSON(`(() => {
     alterDetails = [
       { clusterId:'A', exists:true, parents:['P1'], attributes:{}, settings:{}, comment:'' },
@@ -336,7 +369,7 @@ test('addPrivilegeScope: adding an existing privilege to a new cluster grants D 
       { clusterId:'D', exists:true, parents:[],     attributes:{}, settings:{}, comment:'' },
     ];
     alterAdd = new Map(); alterRevoke = new Map();
-    addPrivilegeScope(['P1'], new Set(['D']));
+    addParentScope(['P1'], new Set(['D']));
     return { add:[...(alterAdd.get('P1')||[])].sort(), rev:[...(alterRevoke.get('P1')||[])].sort() };
   })()`);
   assert.deepEqual(r.add, ['D']); // only D newly granted
@@ -344,7 +377,7 @@ test('addPrivilegeScope: adding an existing privilege to a new cluster grants D 
 });
 
 // Adding a cluster that had a pending revoke cancels that revoke (grant wins), still no over-revoke.
-test('addPrivilegeScope: granting a cluster clears its pending revoke and merges with prior adds', () => {
+test('addParentScope: granting a cluster clears its pending revoke and merges with prior adds', () => {
   const r = evalJSON(`(() => {
     alterDetails = [
       { clusterId:'A', exists:true, parents:['P1'], attributes:{}, settings:{}, comment:'' },
@@ -353,14 +386,14 @@ test('addPrivilegeScope: granting a cluster clears its pending revoke and merges
     ];
     alterAdd = new Map([['P1', new Set(['B'])]]);
     alterRevoke = new Map([['P1', new Set(['A'])]]);
-    addPrivilegeScope(['P1'], new Set(['A','C']));
+    addParentScope(['P1'], new Set(['A','C']));
     return { add:[...(alterAdd.get('P1')||[])].sort(), rev:[...(alterRevoke.get('P1')||[])].sort() };
   })()`);
   assert.deepEqual(r.add, ['B', 'C']); // prior add B kept; C newly granted; A already present so not re-added
   assert.deepEqual(r.rev, []);         // pending revoke of A cancelled by granting A
 });
 
-// Shared primitives used by all three sections (privileges, attributes, settings).
+// Shared primitives used by all three sections (role parents, attributes, settings).
 test('scopeMergeAdd: additive — extends add over desired, cancels revoke there, never touches others', () => {
   const r = evalJSON(`(() => {
     const add = new Set(['x']), rev = new Set(['a','z']);
@@ -1077,7 +1110,7 @@ test('searchTemplateError: guides ${full_name} to ${{full_name}}', () => {
   assert.match(r[7], /Empty/);
 });
 
-test('searchCellValues: stable pick in configured order, flagged when clusters disagree', () => {
+test('searchCellValues: stable pick in configured order, disagreement not flagged', () => {
   const r = evalJSON(`(() => {
     state = { categories: [{ id:'prod', label:'Production' }, { id:'uat', label:'UAT' }] };
     const cols = [{ label:'Name', template:'\${{full_name}}' }, { label:'Mail', template:'\${{e_mail}}' }];
@@ -1090,12 +1123,26 @@ test('searchCellValues: stable pick in configured order, flagged when clusters d
       { clusterId:'p1', alias:'prod-1', category:'prod', comment:'{"full_name":"Ann"}' },
       { clusterId:'u1', alias:'uat-1',  category:'uat',  comment:'{"full_name":"Ann"}' },
     ]};
-    return { varying: searchCellValues(group, cols), same: searchCellValues(consistent, cols) };
+    // Each column is searched on its own, so a row can mix clusters: the name only exists on
+    // prod-1, the mail only on uat-1. Documented in docs/…/configuration/role-details.md.
+    const split = { loginName:'cid', clusters: [
+      { clusterId:'u1', alias:'uat-1',  category:'uat',  comment:'{"e_mail":"cid@example.com"}' },
+      { clusterId:'p1', alias:'prod-1', category:'prod', comment:'{"full_name":"Cid C"}' },
+    ]};
+    return {
+      varying: searchCellValues(group, cols),
+      same: searchCellValues(consistent, cols),
+      split: searchCellValues(split, cols),
+    };
   })()`);
-  // prod-1 sorts first (configured group order), so its value is the one shown.
-  assert.deepEqual(r.varying[0], { text: 'Bob B', varies: true });
-  assert.deepEqual(r.varying[1], { text: '', varies: false }); // no e_mail anywhere
-  assert.deepEqual(r.same[0], { text: 'Ann', varies: false }); // equal values are not "varying"
+  // prod-1 sorts first (configured group order), so its value is the one shown — and a differing
+  // value on uat-1 changes nothing about the cell: the search row carries no "differs" marker, since
+  // reconciliation belongs to the loaded role (Comments banner / dialog), not to finding one.
+  assert.deepEqual(r.varying, ['Bob B', '']); // second column: no e_mail anywhere
+  assert.deepEqual(r.same, ['Ann', '']);
+  // A cluster with nothing for a column is SKIPPED, not rendered empty — so the Mail column falls
+  // through prod-1 to uat-1, and the two columns of one row report different clusters.
+  assert.deepEqual(r.split, ['Cid C', 'cid@example.com']);
 });
 
 test('searchColumns: an empty list means role name only (no default fallback)', () => {
@@ -1115,9 +1162,9 @@ test('searchColumns: an empty list means role name only (no default fallback)', 
 });
 
 // Column widths are CSS's job now (the container's tracks + subgrid on rows/header), so what is
-// left to test is the track LIST: one per configured column, capped, between a rolename track and
-// the chips track. The sizing itself is the browser's and is verified in a real engine instead.
-test('searchGridTemplate: rolename + one capped track per column + the chips track', () => {
+// left to test is the track LIST: one flexible track per configured column, between a rolename track
+// and the chips track. The sizing itself is the browser's and is verified in a real engine instead.
+test('searchGridTemplate: rolename + one flexible track per column + the chips track', () => {
   const r = evalJSON(`({
     none: searchGridTemplate(0),
     one: searchGridTemplate(1),
@@ -1125,12 +1172,16 @@ test('searchGridTemplate: rolename + one capped track per column + the chips tra
   })`);
   // No configured columns: rolename + chips only.
   assert.equal(r.none, 'fit-content(40ch) minmax(8ch, auto)');
-  // fit-content(<cap>) = "as wide as the content needs, up to the cap" — the browser measures the
-  // real text, which is what replaced the canvas approximation.
-  assert.equal(r.one, 'fit-content(40ch) fit-content(30ch) minmax(8ch, auto)');
-  assert.equal(r.three, 'fit-content(40ch) fit-content(30ch) fit-content(30ch) fit-content(30ch) minmax(8ch, auto)');
-  // The chips close the row with a reserved minimum, and their `auto` max absorbs leftover width so
-  // they stay flush right without a second measure pass.
+  // Each column is minmax(4ch, max-content): no cap, so a long value grows to its content instead of
+  // ellipsizing early — but no `auto` max either, or grid's stretch step would pad every column with
+  // a share of the leftover and push the next column far from the previous one's text.
+  assert.equal(r.one, 'fit-content(40ch) minmax(4ch, max-content) minmax(8ch, auto)');
+  assert.equal(
+    r.three,
+    'fit-content(40ch) minmax(4ch, max-content) minmax(4ch, max-content) minmax(4ch, max-content) minmax(8ch, auto)',
+  );
+  // The chips track is the flexible one in every case: it is last and end-aligned, so it holds the
+  // leftover width, keeping the chips flush right and the slack in one deliberate-looking place.
   for (const t of [r.none, r.one, r.three]) assert.match(t, /minmax\(8ch, auto\)$/);
 });
 
@@ -1230,4 +1281,64 @@ test('closeModal: drops the focus the UA restores after a pointer-driven open, k
   assert.equal(r.byKeyboard.closed, 2);
   assert.equal(r.byKeyboard.blurs, 0);
   assert.equal(r.byKeyboard.active, true);
+});
+
+// ---------------------------------------------------------------------------------------------
+test('revealPickedClusters: opens the collapsed cluster list only when a restored pick is really there', () => {
+  const r = evalJSON(`(() => {
+    const realGet = document.getElementById;
+    const realQSA = document.querySelectorAll;
+    // Drive the real function against a recording stand-in for the sidebar.
+    const run = (picks, checkedValues) => {
+      const rec = { toggled: [], aria: null, caret: null, scrolled: null };
+      const caret = { textContent: '▸' };
+      const btn = {
+        setAttribute(k, v) { if (k === 'aria-expanded') rec.aria = v; },
+        querySelector: (sel) => (sel === '.caret' ? caret : null),
+      };
+      let hidden = true;
+      const list = { classList: {
+        toggle(cls, on) { if (cls === 'hidden') { hidden = on; rec.toggled.push(on); } },
+        contains: () => hidden,
+      } };
+      const inputs = ['c1', 'c2', 'c3'].map((v) => {
+        const label = { scrollIntoView(o) { rec.scrolled = { value: v, block: o && o.block }; } };
+        return { value: v, checked: checkedValues.includes(v), closest: () => label };
+      });
+      document.getElementById = (id) =>
+        id === 'btn-toggle-clusters' ? btn : id === 'cluster-checkboxes' ? list : null;
+      document.querySelectorAll = () => inputs;
+      selectedClusterIds = new Set(picks);
+      revealPickedClusters();
+      rec.hidden = hidden;
+      rec.caret = caret.textContent;
+      return rec;
+    };
+    const noPicks = run([], []);
+    const stalePick = run(['gone'], []);   // remembered id whose cluster has since been deleted
+    const livePick = run(['c2'], ['c2']);
+    document.getElementById = realGet;     // leave the stub as we found it
+    document.querySelectorAll = realQSA;
+    selectedClusterIds = new Set();
+    return { noPicks, stalePick, livePick };
+  })()`);
+
+  // Nothing picked (the default "all groups") → the list is left exactly as it was.
+  assert.deepEqual(r.noPicks.toggled, []);
+  assert.equal(r.noPicks.hidden, true);
+  assert.equal(r.noPicks.scrolled, null);
+
+  // A pick whose cluster no longer exists → still collapsed, rather than opening an empty-looking
+  // list. This is the branch that reads `checked` off the DOM instead of trusting the Set.
+  assert.deepEqual(r.stalePick.toggled, []);
+  assert.equal(r.stalePick.hidden, true);
+  assert.equal(r.stalePick.scrolled, null);
+
+  // A live pick → expanded, with aria-expanded and the caret kept in step, and that row brought
+  // into view by the minimum amount ('nearest' keeps .ops-sidebar from scrolling too).
+  assert.deepEqual(r.livePick.toggled, [false]); // toggle('hidden', false) = un-hide
+  assert.equal(r.livePick.hidden, false);
+  assert.equal(r.livePick.aria, 'true');
+  assert.equal(r.livePick.caret, '▾');
+  assert.deepEqual(r.livePick.scrolled, { value: 'c2', block: 'nearest' });
 });

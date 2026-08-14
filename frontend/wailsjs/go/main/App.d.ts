@@ -14,6 +14,8 @@ export function DeleteCluster(arg1:string):Promise<void>;
 
 export function GetAppVersion():Promise<model.AppVersion>;
 
+export function GetClustersPath():Promise<string>;
+
 export function GetConfig():Promise<model.Config>;
 
 export function GetConfigPath():Promise<string>;

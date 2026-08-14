@@ -26,6 +26,10 @@ export function GetAppVersion() {
   return window['go']['main']['App']['GetAppVersion']();
 }
 
+export function GetClustersPath() {
+  return window['go']['main']['App']['GetClustersPath']();
+}
+
 export function GetConfig() {
   return window['go']['main']['App']['GetConfig']();
 }

@@ -136,9 +136,11 @@ jobs:
           merge-multiple: true
           path: dist
 
-      # The release description opens with this version's CHANGELOG.md section — the
-      # human-readable summary. GitHub's auto-generated "What's Changed" commit list is
-      # appended below it by generate_release_notes.
+      # The release description is this version's CHANGELOG.md section — the human-readable
+      # summary — plus the install notes below; nothing is auto-appended (see
+      # generate_release_notes). The CHANGELOG.md link in the body is pinned to `main`, NOT the
+      # tag: that way it always resolves and always shows the complete history, including
+      # releases published after this one.
       - name: Extract changelog section
         id: changelog
         run: |
@@ -164,13 +166,21 @@ jobs:
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
           draft: ${{ inputs.draft }}
-          generate_release_notes: true
+          # OFF so the release description is exactly the body below. GitHub's generator always
+          # ends with a "**Full Changelog**: <compare url>" footer and offers no way to suppress
+          # just that line (.github/release.yml only categorises/excludes PRs) — and for this repo
+          # the footer was ALL it produced: "What's Changed" is built from merged pull requests,
+          # and this repo merges local branches instead, so v0.9.0's notes carried no such section.
+          # If PRs ever become the workflow here, turning this back on brings that list back — and
+          # the footer with it; dropping the footer alone then means fetching the notes from
+          # POST /repos/{owner}/{repo}/releases/generate-notes and filtering that line out.
+          generate_release_notes: false
           body: |
             ## What's new
 
             ${{ steps.changelog.outputs.notes }}
 
-            📖 [Full changelog](https://github.com/michal-bartak/pg-accounts-management/blob/main/CHANGELOG.md) — every release, summarised for users. The commit-level list is under **What's Changed** below. (Pinned to `main`, not the tag, so it always resolves and always shows the complete history.)
+            📖 [CHANGELOG.md](https://github.com/michal-bartak/pg-accounts-management/blob/main/CHANGELOG.md) - all changes
 
             ### Installing
 

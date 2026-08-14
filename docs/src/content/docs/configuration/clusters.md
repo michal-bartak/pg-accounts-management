@@ -60,7 +60,7 @@ The app resolves credentials the way `psql` does. First match wins:
   trust authentication).
 
 :::caution[The password is stored in clear text]
-The optional per-cluster password is written to the configuration file. The file is created
+The optional per-cluster password is written to `clusters.yaml`. The file is created
 with owner-only permissions, but it is not encrypted. Leave it blank and use `~/.pgpass` if
 that matters to you.
 :::

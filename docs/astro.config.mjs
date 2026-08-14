@@ -9,7 +9,11 @@ export default defineConfig({
   base: '/pg-accounts-management',
   // Pages that moved when the docs were split into Usage / Configuration sections.
   redirects: {
-    '/call-templates': '/configuration/call-templates/',
+    '/call-templates': '/pg-accounts-management/configuration/call-templates/',
+    // Renamed when "Privileges" became "Role parents" in the UI. NOTE the destination carries the
+    // `base` and the key does not: Astro prefixes the route it matches but emits the destination
+    // verbatim, so a base-less destination sends GitHub Pages to a 404.
+    '/usage/privileges': '/pg-accounts-management/usage/parent-roles/',
   },
   integrations: [
     starlight({
@@ -76,7 +80,7 @@ export default defineConfig({
             { label: 'Overview', link: '/usage/' },
             { label: 'Finding the role to alter', link: '/usage/find-role/' },
             { label: 'Altering the comment', link: '/usage/comments/' },
-            { label: 'Altering privileges', link: '/usage/privileges/' },
+            { label: 'Altering role parents', link: '/usage/parent-roles/' },
             { label: 'Altering attributes', link: '/usage/attributes/' },
             { label: 'Altering settings', link: '/usage/role-settings/' },
             { label: 'Setting a password', link: '/usage/password/' },
@@ -93,7 +97,7 @@ export default defineConfig({
             { label: 'Comment fields', link: '/configuration/comment-fields/' },
             { label: 'Role Details', link: '/configuration/role-details/' },
             { label: 'Call templates', link: '/configuration/call-templates/' },
-            { label: 'Preconfigured parent groups', link: '/configuration/parent-roles/' },
+            { label: 'Preconfigured role parents', link: '/configuration/parent-roles/' },
             { label: 'Password generator', link: '/configuration/password-generator/' },
             { label: 'General settings', link: '/configuration/general/' },
           ],

@@ -185,9 +185,9 @@
         </div>
 
         <div class="settings-group">
-          <span class="section-label">Preconfigured parent groups <button type="button" class="q-hint" data-hint="Role names offered as pick-list choices when granting privileges in Create role and Alter role. Drag the handle to reorder.">?</button></span>
+          <span class="section-label">Preconfigured role parents <button type="button" class="q-hint" data-hint="Role names offered as pick-list choices when assigning role parents in Create role and Alter role. Any role can be a parent. Drag the handle to reorder.">?</button></span>
           <div id="parent-roles-editor" class="list-editor"></div>
-          <button type="button" class="list-add" id="btn-add-parent-role">Add group…</button>
+          <button type="button" class="list-add" id="btn-add-parent-role">Add parent…</button>
         </div>
 
         <div class="settings-group">
@@ -232,10 +232,16 @@
         </div>
 
         <div class="settings-meta">
-          <span class="section-label">Config file</span>
+          <span class="section-label">Config files</span>
           <div class="config-path-line">
             <code id="config-path" class="config-path"></code>
             <button type="button" id="btn-copy-config-path" class="config-path-copy" title="Copy path" aria-label="Copy config path to clipboard">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="1" width="10" height="11" rx="2"/><rect x="1" y="4" width="10" height="11" rx="2"/></svg>
+            </button>
+          </div>
+          <div class="config-path-line">
+            <code id="clusters-path" class="config-path"></code>
+            <button type="button" id="btn-copy-clusters-path" class="config-path-copy" title="Copy path" aria-label="Copy clusters path to clipboard">
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="1" width="10" height="11" rx="2"/><rect x="1" y="4" width="10" height="11" rx="2"/></svg>
             </button>
           </div>
@@ -299,8 +305,8 @@
 
   <dialog id="scope-dialog">
     <form method="dialog" id="scope-form" autocapitalize="none">
-      <h2 id="scope-dialog-title">Add privilege</h2>
-      <label id="scope-role-label">Role name
+      <h2 id="scope-dialog-title">Assign parents</h2>
+      <label id="scope-role-label"><span class="field-label-row">Role names <button type="button" class="q-hint" data-hint="Enter comma separated role names and/or pick from predefined ones.">?</button></span>
         <input name="role" id="scope-role" autocapitalize="none" autocomplete="off" spellcheck="false" />
       </label>
       <div id="scope-preconfigured" class="scope-preconfigured hidden"></div>

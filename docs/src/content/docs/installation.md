@@ -96,20 +96,23 @@ If the app fails to start, the WebView libraries are missing or the wrong versio
 DbAccounts links against webkit2gtk **4.1** (`libwebkit2gtk-4.1-0` on Debian/Ubuntu,
 `webkit2gtk4.1` on Fedora/RHEL).
 
-## Configuration file
+## Configuration files
 
-On first launch the app writes a default config, which you can edit in the app (Clusters and
+On first launch the app writes two default files, which you can edit in the app (Clusters and
 Settings tabs) or on disk.
 
-| OS | Path |
-|----|------|
-| macOS | `~/Library/Application Support/DbAccounts/config.yaml` |
-| Linux | `~/.config/dbaccounts/config.yaml` |
-| Windows | `%AppData%\DbAccounts\config.yaml` |
+| OS | Directory |
+|----|-----------|
+| macOS | `~/Library/Application Support/DbAccounts/` |
+| Linux | `~/.config/dbaccounts/` |
+| Windows | `%AppData%\DbAccounts\` |
 
-The config holds clusters, groups, and call templates. See
+`config.yaml` holds call templates and app settings; `clusters.yaml` holds your clusters, their
+groups, and the remembered target selection. See
 [`config.example.yaml`](https://github.com/michal-bartak/pg-accounts-management/blob/main/config.example.yaml)
-for a reference, and [Configuration](/pg-accounts-management/configuration/) for what each
+and
+[`clusters.example.yaml`](https://github.com/michal-bartak/pg-accounts-management/blob/main/clusters.example.yaml)
+for references, and [Configuration](/pg-accounts-management/configuration/) for what each
 part does.
 
 ## Credentials
@@ -120,7 +123,7 @@ The app resolves credentials the way `psql` does. First match wins:
 2. **Password** — the cluster's **Password**, else `PGPASSWORD`, else a match in `~/.pgpass`,
    else none (works with trust auth or an empty password).
 
-The per-cluster password is optional and stored in clear text in the config file, which is
+The per-cluster password is optional and stored in clear text in `clusters.yaml`, which is
 written with owner-only permissions. Leave it blank to keep credentials out of the file
 entirely. See the PostgreSQL docs on
 [`.pgpass`](https://www.postgresql.org/docs/current/libpq-pgpass.html).

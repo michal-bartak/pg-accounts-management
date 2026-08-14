@@ -1,5 +1,8 @@
 # DbAccounts example config — copy structure only; app creates its own file on first launch.
 #
+# Clusters, cluster groups and the target selection live in clusters.yaml beside this file —
+# see clusters.example.yaml.
+#
 # db_functions.<operation>.call — template body
 # db_functions.<operation>.execution — function | statement | block (default: function)
 # See sql/README.md
@@ -9,35 +12,6 @@
 #   - set parent role → "... || $n::text[]"
 
 version: 1
-# Cluster groups. color = base hex (shades derived); confirm = require the
-# production-style confirm popup before running against that group's clusters.
-# Edit these in-app under Settings → Cluster groups.
-categories:
-  - id: production
-    label: Production
-    color: "#e8a838"
-    confirm: true
-  - id: uat
-    label: UAT
-    color: "#6eb5ff"
-    confirm: false
-clusters: []
-# Cluster fields: alias, host, port, database, category (a group id above), sslmode,
-# connect_user, password. connect_user and password are optional:
-#   - connect_user: blank → PGUSER env → OS login user (like psql).
-#   - password: optional plain-text password (this config is private, written mode 0600).
-#     When set it is used directly; when blank the app falls back to PGPASSWORD → ~/.pgpass.
-# Example:
-# clusters:
-#   - id: 00000000-0000-0000-0000-000000000000
-#     alias: prod-main
-#     host: db.example.com
-#     port: 5432
-#     database: postgres
-#     category: production
-#     sslmode: require
-#     connect_user: admin
-#     password: "s3cret"   # optional; omit to use PGPASSWORD / ~/.pgpass
 # Defaults are vanilla PostgreSQL DDL (statement mode), shown below. Override any command
 # with a privileged wrapper function (execution: function) or a PL/pgSQL block — e.g. so a
 # low-privilege connect user can act through a SECURITY DEFINER function that also writes an
@@ -187,15 +161,8 @@ ui:
     symbols: false
     exclude_similar: false
 
-# targets: the last Operations-page target selection, remembered across restarts. Managed by
-# the app (updated whenever you toggle a group/cluster checkbox). Omit or leave empty for the
-# default "all groups selected".
-# targets:
-#   category_ids: [production, uat]
-#   cluster_ids: [prod_eu_1]
-
-# parent_roles: preconfigured parent groups offered as pick-list choices when granting
-# privileges (Create role / Alter role). Bare identifiers; several can be granted at once.
+# parent_roles: preconfigured role parents offered as pick-list choices when assigning role
+# parents (Create role / Alter role). Bare identifiers; several can be assigned at once.
 parent_roles:
   - gr_devs_ro
   - gr_reporting

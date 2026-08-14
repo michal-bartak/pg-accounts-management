@@ -42,15 +42,19 @@
   --control-pad-y: 0.4rem;
   --control-pad-x: 0.55rem;
   /* Optical text centring. A browser centres the LINE box, which reserves descender depth and
-     the diacritic headroom above the caps; Segoe UI is a bad case (ascent 1.08em vs descent
-     0.25em, cap 0.70em), so the visible ink lands BELOW the box centre. Measured off painted
-     pixels: 0.042em on a chip, 0.086em on a full-height button (the extra comes from the
-     min-height centring on top of the line-box asymmetry — hence two values, not one).
-     Applied as asymmetric padding, in em so it tracks each element's own font size.
-     Uppercase pills measured only 0.03em (sub-pixel) and are deliberately left alone —
-     lifting THEIR text is what would make the checkbox read low; see --checkbox-lift. */
-  --ink-lift: 0.042em;         /* chips and min-height:0 buttons */
-  --ink-lift-control: 0.086em; /* full-height buttons (--control-h) */
+     diacritic headroom, so the cap band (cap top → baseline, what the eye reads as the text
+     block) can land off centre. How far off depends only on the FONT SIZE, via the metrics the
+     engine reports at that size: (fontBoxAscent - fontBoxDescent - capHeight) / 2. Measured
+     against painted pixels — 0.82rem: 0.455px (0.040em, hence this token); 0.75rem: 0.30px;
+     --fs-base 0.9rem: 0.06px, i.e. nothing. So it is applied as asymmetric padding, in em, ONLY
+     to the small-font elements (button.small, .ph-chip, .pick-chip). Full-height buttons take
+     NO lift: they run at --fs-base, and min-height contributes nothing to the problem (a button
+     centres its line box in its content box and splits the min-height slack evenly). An earlier
+     0.086em on them was an overcorrection — it pushed labels ~1px ABOVE centre and out of step
+     with .tab / .seg-btn, which are symmetric. Uppercase pills measured only 0.03em (sub-pixel)
+     and are left alone — lifting THEIR text is what would make the checkbox read low; see
+     --checkbox-lift. */
+  --ink-lift: 0.042em;         /* chips and min-height:0 buttons — NOT full-height buttons */
   /* The Target-selection checkbox reads low against its group chip. Both boxes are centred to
      the same device row, so this is optical, not geometric — hence a small explicit nudge
      rather than an alignment change. */
@@ -164,13 +168,17 @@ input[type="checkbox"] {
 }
 input[type="checkbox"]::after {
   content: "";
-  width: 0.28rem;
-  height: 0.5rem;
+  width: 0.22rem;
+  height: 0.4rem;
   border: solid #fff;
-  /* Glyph stroke, not a hairline — stays a literal px so the tick keeps its weight. */
-  border-width: 0 2px 2px 0;
+  /* Glyph stroke, not a hairline — stays a literal px so the tick keeps its weight, and 1.5px is
+     exactly 3 device px at 2x (unlike 1.75px, which lands on 3.5 and gets snapped). Scaled with
+     the legs above: the glyph spans ~6.2px of the 12px inner box, where 0.28/0.5rem at a 2px
+     stroke spanned 7.7px and crowded the corners. */
+  border-width: 0 1.5px 1.5px 0;
   transform: rotate(45deg);
-  margin-top: -0.1rem;
+  /* The rotated L's ink sits below the box centre; nudge scales with the legs (-0.1 × 0.4/0.5). */
+  margin-top: -0.08rem;
   opacity: 0;
 }
 input[type="checkbox"]:checked {
@@ -320,8 +328,9 @@ main { flex: 1 1 auto; min-height: 0; overflow: hidden; }
 
 button {
   min-height: var(--control-h);
-  /* Asymmetric on purpose — see --ink-lift. The label is centred by ink, not by line box. */
-  padding: calc(var(--control-pad-y) - var(--ink-lift-control)) 0.85rem calc(var(--control-pad-y) + var(--ink-lift-control));
+  /* Symmetric, and matching the input/select rule above so a button and a field in the same row
+     line up. At --fs-base the cap band already centres to within 0.06px — see --ink-lift. */
+  padding: var(--control-pad-y) 0.85rem;
   border-radius: var(--radius);
   border: var(--hairline) solid var(--border);
   background: var(--surface);
@@ -431,7 +440,18 @@ tr:last-child td { border-bottom: none; }
   flex: 0 0 auto; border-radius: 50%; font-size: 0.72rem; cursor: help;
   color: var(--hint-color); background: transparent; border: var(--hairline) solid var(--hint-color);
   display: inline-flex; align-items: center; justify-content: center;
-  vertical-align: middle; position: relative; top: -1px;
+  /* Optical centring on the label's CAP BAND, and it must ride on `vertical-align` — not on a
+     `position: relative; top`, which is what this used to be. A badge sits in one of two kinds of
+     container: an inline one (.section-label, .settings-field-label, a dialog h2), where it is
+     baseline-aligned and needs lifting off the baseline; or a flex/grid one
+     (.settings-check-line, #cluster-form .field-label-row, .rce-field-label), where
+     `align-items: center` already centres it. `top` applied to BOTH, so it overshot by ~1.1px in
+     every flex label — reported as "the ? sits 1px too high" next to checkboxes and field labels.
+     `vertical-align` is ignored for flex items by spec, so the correction now lands only where it
+     is needed and a new flex label can't reintroduce the bug. Measured against painted pixels:
+     ±0.08px in the common label sizes, +0.5px on a 1rem dialog h2 (the em tracks the badge's own
+     font, not the parent's, which is the one thing the old `top` did slightly better). */
+  vertical-align: 0.07em;
 }
 /* Deliberately understated and the SAME in every state: a muted glyph in a matching 1px ring
    on a transparent fill. --hint-color is --muted softened (per theme, via color-mix).
@@ -718,7 +738,10 @@ tr:last-child td { border-bottom: none; }
   flex-direction: column;
   gap: 0.75rem;
 }
-.ri-login { max-width: 50%; }
+/* Own cap, in rem: .role-identity is deliberately uncapped so the comment editor can use the form's
+   width, and a percentage here would track that instead. 13.125rem = the width this input had when
+   it was 50% of the old 26.25rem cap, so the login row is unchanged. */
+.ri-login { max-width: 13.125rem; }
 #role-login[readonly] { opacity: 0.7; cursor: default; }
 
 /* Inline comment editor (Fields / Raw). */
@@ -735,10 +758,17 @@ tr:last-child td { border-bottom: none; }
 }
 .rce-label { font-size: var(--fs-label); }
 .rce-mode { flex: 0 0 auto; }
+/* Comment fields flow into as many columns as fit, so a handful of keys costs a couple of rows
+   instead of a screenful. Same intrinsic idiom as .settings-two-col — this stylesheet has no media
+   queries and shouldn't gain its first one. Shared with the Comments dialog, which emits the same
+   .rce-fields container.
+   `auto-fill`, NOT `auto-fit`: auto-fit collapses the empty tracks, so the default two comment
+   fields would each stretch to half the (now full-width) form. auto-fill keeps the tracks, so a
+   field is never wider than one column while the column COUNT still follows the window. */
 .rce-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.5rem 0.75rem;
 }
 .rce-field {
   display: flex;
@@ -1122,7 +1152,9 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   display: block;
   max-width: none;
 }
-.role-identity { max-width: 26.25rem; margin-bottom: 0.5rem; }
+/* NOT capped: the comment editor lives here and its Fields grid earns a column per 14rem of form
+   width, so a cap would fix the column count. The login input carries its own cap instead. */
+.role-identity { margin-bottom: 0.5rem; }
 
 .alter-search { display: flex; gap: 0.5rem; align-items: center; }
 .alter-search input[type="search"] { flex: 1; }
@@ -1169,8 +1201,10 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 }
 .alter-result-row:hover { border-color: var(--primary); }
 .alter-login { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* One configured search column (Settings → Find role). Overlong values ellipsize rather than
-   wrapping the row; the column's own width comes from the shared grid template. */
+/* One configured search column (Settings → Find role). The column's width comes from the shared
+   grid template, which lets it grow into the free space; a value only ellipsizes once that space is
+   used up, and never wraps the row. `min-width: 0` is what allows the shrink — without it the cell's
+   content would floor the track. */
 .alter-cell {
   color: var(--muted);
   font-size: var(--fs-sm);
@@ -1179,7 +1213,6 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.alter-cell-varies { color: var(--warn, #e8a838); font-weight: 600; }
 /* Styled like a `th` (muted, normal case) rather than a small-uppercase section label — these are
    column headers. Padding matches the row's border+padding; see the shared rule above for why. */
 .alter-result-head {
@@ -1190,9 +1223,11 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   font-size: var(--fs-base);
 }
 .alter-result-head .alter-cell { font-weight: 500; color: var(--muted); }
-/* Last grid track. Its `auto` max stretches to absorb leftover space when no column is flexible,
-   so justify-self keeps the chips flush right; `margin-left:auto` covers the flex contexts that
-   reuse this class (e.g. the Present-on block, which overrides it). */
+/* Last grid track, so justify-self keeps the chips flush right — and it is deliberately the ONLY
+   track that absorbs leftover width (see searchGridTemplate): the configured columns stop at their
+   content, so the slack collects here, between the last value and the chips, instead of being
+   spread through the row. `margin-left:auto` covers the flex contexts that reuse this class (e.g.
+   the Present-on block, which overrides it). */
 .alter-cluster-badges {
   margin-left: auto;
   justify-self: end;
@@ -1233,7 +1268,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .scope-act .ic,
 .le-del .ic { width: 0.9375rem; height: 0.9375rem; }
 
-.alter-add-priv { display: flex; gap: 0.4rem; margin-top: 0.7rem; }
+.alter-add-row { display: flex; gap: 0.4rem; margin-top: 0.7rem; }
 
 /* Consolidated single-user form */
 .alter-present {
@@ -1343,7 +1378,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .scope-cluster { display: flex; align-items: center; gap: 0.4rem; font-size: var(--fs-label); }
 .scope-cluster .hint { margin: 0; }
 
-/* Shared draggable list editor (comment fields, parent groups, search columns). */
+/* Shared draggable list editor (comment fields, role parents, search columns). */
 .list-editor {
   display: flex;
   flex-direction: column;
@@ -1356,7 +1391,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   align-items: center;
 }
 .le-row input { flex: 1 1 0; min-width: 0; }
-/* The primary text field (comment key / parent group value) shares one fixed width so the two
+/* The primary text field (comment key / role-parent value) shares one fixed width so the two
    editors line up; the comment label takes the remaining space. */
 .le-row .cf-key,
 .le-row .pr-value { flex: 0 0 13rem; }
@@ -1403,11 +1438,11 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   font-size: var(--fs-base);
   line-height: 1;
 }
-/* Add… buttons (Settings list editors + Operations privilege/setting) — full control height. */
+/* Add… buttons (Settings list editors + Operations parent/setting) — full control height. */
 .list-add { align-self: flex-start; }
 /* Gap between a list editor and its own Add… button. Keyed on the structure rather than a list of
    button ids, so a new Settings list editor is spaced correctly without touching this rule. The
-   Operations privilege/setting buttons sit inside .alter-add-priv, so they are unaffected. */
+   Operations parent/setting buttons sit inside .alter-add-row, so they are unaffected. */
 .list-editor + .list-add { margin-top: 0.5rem; }
 /* Inside a .settings-field (a gapped flex column, e.g. Comment fields) the parent's own gap already
    sits between the two, so subtract it — otherwise that editor's button clears more than the ones
@@ -1417,7 +1452,8 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 /* Settings row whose fields differ in height (e.g. list editor + toggle): top-align labels. */
 .settings-row-top { align-items: flex-start; }
 
-/* Preconfigured parent groups pickers (scope-dialog chips). */
+/* Chip pickers: preconfigured role parents (scope dialog) and template placeholders (#fn-dialog).
+   Only the latter captions itself — the parent chips sit under the "Role names" label instead. */
 .picker-label { font-size: var(--fs-xs); color: var(--muted); }
 .pick-chip {
   min-height: 0;
@@ -1430,8 +1466,11 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .pick-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 .scope-preconfigured { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
 
-/* Comments dialog — fixed width so it doesn't jitter as field/comment lengths change. */
-#comments-dialog { width: min(35rem, 92vw); }
+/* Comments dialog — fixed width so it doesn't jitter as field/comment lengths change; wide enough
+   for TWO comment-field columns (~19.5rem each after the body/box padding). `max-width` is not
+   redundant: the base `dialog` rule caps at min(40rem, 92vw) and would clamp this back. Three
+   columns would need ~47.7rem, so this width holds the grid at two on purpose. */
+#comments-dialog { width: min(44rem, 94vw); max-width: min(44rem, 94vw); }
 #comments-list { display: grid; gap: 0.9rem; max-height: 55vh; overflow-y: auto; }
 .comment-version {
   border: var(--hairline) solid var(--border);

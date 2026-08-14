@@ -72,9 +72,9 @@ func TestSaveSettingsRejectsWithoutPartialWrite(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name:    "invalid parent group",
+			name:    "invalid role parent",
 			mutate:  func(p *model.SettingsPayload) { p.ParentRoles = []string{"has space"} },
-			wantErr: "invalid parent group",
+			wantErr: "invalid role parent",
 		},
 		{
 			name:    "invalid comment field key",

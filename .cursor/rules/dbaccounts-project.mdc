@@ -25,17 +25,22 @@ Cross-platform **PostgreSQL role maintenance** desktop app: manage clusters, bat
 - pgx v5, yaml.v3, google/uuid
 - Bindings: `frontend/wailsjs/` — **auto-generated** by Wails; do not hand-edit; regenerate via `wails dev` / `wails build`
 
-## Config file
+## Config files
 
-| OS | Path |
-|----|------|
-| macOS | `~/Library/Application Support/DbAccounts/config.yaml` |
-| Linux | `~/.config/dbaccounts/config.yaml` |
-| Windows | `%AppData%\DbAccounts\config.yaml` |
+Two files in one directory:
 
-Example template: [`config.example.yaml`](config.example.yaml). Implemented in `internal/config/` (`paths.go`, `store.go`).
+| OS | Directory |
+|----|-----------|
+| macOS | `~/Library/Application Support/DbAccounts/` |
+| Linux | `~/.config/dbaccounts/` |
+| Windows | `%AppData%\DbAccounts\` |
 
-**YAML keys:** `version`, `categories`, `clusters`, `db_functions.<op>.call`, `db_functions.<op>.execution`, `batch.max_concurrency` (default 5), `ui.theme`, `ui.password_gen` (role-form random password generator: `length` clamped `[6,128]`/default 10, class toggles `lowercase/uppercase/digits/symbols`, `exclude_similar`; at least one class stays on — Settings → Password generator, persisted via `SaveUISettings`/`UISettings.PasswordGen`), `parent_roles` (preconfigured parent groups — bare identifiers, offered as pick-list choices when granting privileges; Create-role uses the same `parent_roles` placeholder as grant/revoke). Legacy `name`/`params` migrated on load.
+`config.yaml` = app configuration; `clusters.yaml` = `categories`, `clusters`, `targets`. Example
+templates: [`config.example.yaml`](config.example.yaml),
+[`clusters.example.yaml`](clusters.example.yaml). Implemented in `internal/config/` (`paths.go`,
+`store.go`); the split is the `yaml:"-"` on `model.Config`'s embedded `model.ClusterSet`.
+
+**YAML keys:** `version`, `categories`/`clusters`/`targets` (clusters.yaml), `db_functions.<op>.call`, `db_functions.<op>.execution`, `batch.max_concurrency` (default 5), `ui.theme`, `ui.password_gen` (role-form random password generator: `length` clamped `[6,128]`/default 10, class toggles `lowercase/uppercase/digits/symbols`, `exclude_similar`; at least one class stays on — Settings → Password generator, persisted via `SaveUISettings`/`UISettings.PasswordGen`), `parent_roles` (preconfigured role parents — bare identifiers, offered as pick-list choices in the Assign-parents dialog, whose Role names field takes a comma-separated list; Create-role uses the same `parent_roles` placeholder as grant/revoke). Legacy `name`/`params` migrated on load.
 
 ## Wails API (`app.go` → `window.go.main.App`)
 
@@ -43,7 +48,7 @@ Example template: [`config.example.yaml`](config.example.yaml). Implemented in `
 - `AddCluster`, `UpdateCluster`, `DeleteCluster` (per-item; kept but unused by the UI now)
 - `SaveClusters(ClustersConfig)` — staged Clusters editor: replaces the whole clusters+categories
   set atomically via `Store.SaveClustersAndCategories` (validate + UUID/slug ids + referential integrity)
-- `SaveSettings(SettingsPayload)` — the whole Settings page in ONE atomic write (parent groups,
+- `SaveSettings(SettingsPayload)` — the whole Settings page in ONE atomic write (role parents,
   comment fields, search columns, db_functions, db_reads, batch, ui). Everything validates before
   anything is assigned, and templates are validated against the comment fields in the same payload.
   The per-section `SaveDBFunctions`/`SaveDBReads`/`SaveBatchSettings`/`SaveUISettings`/
@@ -144,13 +149,16 @@ bug, since it stays full-size while everything around it shrinks. **No icon carr
 size glyphs in rem. Hand-synced rem pairs that must not drift:
 `th, td { padding: .55rem .75rem }` ↔ the `1.5rem` in `depsColgroup`; `.alter-result-head`'s
 `calc(0.7rem + 1px)` ↔ the search-result row's border+padding.
-Four tokens carry what rem cannot: **`--hairline: 1.15px`** for all borders (a flat `1px` is 1.75
+Three tokens carry what rem cannot: **`--hairline: 1.15px`** for all borders (a flat `1px` is 1.75
 device px at 175% scaling and snaps to 1 *or* 2 depending on position, so borders read patchy;
 1.15px is always 2 there and still 1px at 100%) — decoration strokes stay literal px;
-**`--ink-lift` / `--ink-lift-control`** correct optical centring (browsers centre the line box, so
-ink lands low — 0.042em on chips, 0.086em on full-height buttons, measured from painted pixels;
-uppercase pills excluded); **`--checkbox-lift`** for the Target-selection checkbox. Retune the
-token, never sweep the rules. **`.section-label`** is the one small-uppercase section label
+**`--ink-lift`** corrects optical centring (browsers centre the line box, so the cap band can land
+off centre by `(fontBoxAscent - fontBoxDescent - capHeight) / 2` — measured 0.455px at `--fs-sm`
+= the 0.042em token, but only 0.06px at `--fs-base`, so it goes on the small-font elements
+(`button.small`, `.ph-chip`, `.pick-chip`) and **full-height buttons stay symmetric** like
+`.tab`/`.seg-btn`; `min-height` is not a factor, and the removed `--ink-lift-control: 0.086em`
+overcorrected buttons by ~1px — don't reintroduce it; uppercase pills excluded);
+**`--checkbox-lift`** for the Target-selection checkbox. Retune the token, never sweep the rules. **`.section-label`** is the one small-uppercase section label
 (sized by `--fs-section`), replacing five drifted near-duplicates.
 
 **App-shell layout:** `body` is a flex column with `overflow:hidden` (no whole-page
@@ -176,7 +184,10 @@ the Clusters toolbar (right-aligned `btn-manage-groups` → `#groups-dialog` lis
 behind a **`?` help badge** (`.q-hint`, via `hintBadge(text)`); mouse hover shows a shared
 `position:fixed`, viewport-clamped popover (`.q-hint-pop`) driven by delegated
 `mouseover`/`keydown` handlers (no forced `tabindex`; opens on Enter/Space when
-keyboard-focused, not on plain focus).
+keyboard-focused, not on plain focus). Its optical nudge rides on `vertical-align: 0.07em`, never a
+`position/top`: flex containers centre the badge themselves and ignore `vertical-align`, so the
+correction self-scopes to inline labels — a `top` applied to both and left every flex label ~1.1px
+high.
 
 **Shared UI conventions (solve once, don't re-patch per popup):** open every `<dialog>` via
 the `openModal(dlgOrId)` helper (never bare `.showModal()`) — it drops `showModal()`'s
@@ -195,7 +206,9 @@ title + version chip + `ⓘ #btn-about`) opens `#about-dialog` (`GetAppVersion`;
 **Alter role** (search-then-edit): clicking the **Alter role** op-tab opens a search
 dialog (no separate "Find user" button) that searches the *selected*
 clusters (name + `COMMENT ON ROLE`), grouped by login; picking one opens a single
-consolidated form. Privileges (`pg_auth_members`) and attributes (superuser, createrole,
+consolidated form. Role Parents (`pg_auth_members`; labelled "Role Parents", never "Privileges" —
+the *Assign parents…* button opens the scope dialog, whose *Role names* field takes a
+comma-separated list via `parseRoleNameList`) and attributes (superuser, createrole,
 createdb, inherit, login, replication, bypassrls) list one-per-row with **scope labels**
 judged per group (outlined/bordered group label when all selected clusters of a group match
 — matching Target selection's group boxes — else filled per-cluster labels; coloured by
@@ -223,10 +236,14 @@ helpers. **Find-role result columns are configured too**, never a hardcoded comm
 → **Role Details** list editor / `searchColumnsDraft`) is rendered frontend-side by
 `renderSearchTemplate` over `RoleMatch.Comment` — same two namespaces as the call templates:
 `${{<key>}}` = any JSON comment key, and the closed bare set's only member `${comment}` =
-the raw comment, unresolved → `''`, result whitespace-collapsed; `searchCellValues` flags `≠` when
-clusters disagree. Layout: **CSS subgrid**. The container `#alter-results` owns the tracks
+the raw comment, unresolved → `''`, result whitespace-collapsed; `searchCellValues` returns one string
+per column (first non-empty in `byGroupThenAlias` order) and does **not** flag clusters disagreeing —
+that is reported after the role loads, by the "Comments differ" banner and the Comments dialog. Layout: **CSS subgrid**. The container `#alter-results` owns the tracks
 (`--search-cols` from `searchGridTemplate(colCount)`: `fit-content(40ch)` rolename, one
-`fit-content(30ch)` per column, `minmax(8ch, auto)` chips); the header and every row are
+`minmax(4ch, max-content)` per column, `minmax(8ch, auto)` chips — a column's max is neither a
+`fit-content` cap (which ellipsized long values while space sat unused) nor `auto` (which stretched
+every column past its content and pushed the next one ~240px away); the chips track is the only
+flexible one, and being last + `justify-self: end` it holds the slack and stays flush right); the header and every row are
 `grid-column: 1 / -1` + `grid-template-columns: subgrid`, so the browser does the sizing. A subgrid
 child's border+padding insets its tracks, so `.alter-result-head` must keep
 `padding: 0 calc(0.7rem + 1px)` to match the row; the column gap lives on the container and is
@@ -271,7 +288,10 @@ combined)**→set_config→reset_config→set_comment; create prepends `create_r
 (`buildCreateClusterOps`). Comment persists via `set_comment` (per-cluster `commentOverrides` wins,
 else `assembleComment`; create's/presence-add's `create_role` gets its comment-field placeholders
 from `commentFieldArgs(effectiveComment)`, follow-up `set_comment` authoritative). When comments vary the inline editor hides and the Comments
-dialog reconciles per cluster (`commentVersionEditors`). One shared
+dialog reconciles per cluster (`commentVersionEditors`). `.rce-fields` (both surfaces) is a
+`repeat(auto-fill, minmax(14rem, 1fr))` grid — `auto-fill` on purpose, or two fields would stretch
+across the form — and `.role-identity` is deliberately uncapped so the column count can follow the
+window; the login input carries its own 13.125rem cap. One shared
 `confirmScopeDialog`/`buildScopeTargets` (no create fork). **Errors never touch the role form**:
 `executeRoleBatch` returns the results array or `null`; on `null`/any per-cluster failure the
 Save/Create/Remove paths leave the form + pending edits intact (chip/popup are the only error

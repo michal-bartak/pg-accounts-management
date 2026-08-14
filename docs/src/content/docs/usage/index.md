@@ -48,7 +48,7 @@ retroactively widen an open form — search again.
 
 ## Scope labels
 
-Wherever clusters are listed — Present on, privilege rows, attributes, settings, comments,
+Wherever clusters are listed — Present on, role-parent rows, attributes, settings, comments,
 search results — the app uses the same labels, coloured by group:
 
 <figure class="shot">

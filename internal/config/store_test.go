@@ -3,26 +3,31 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 
 	"github.com/michalbartak/dbaccounts/internal/model"
 )
 
-// Save writes atomically (temp file + rename) and leaves no stray temp files behind, and the
+// Both savers write atomically (temp file + rename) and leave no stray temp files behind, and the
 // persisted content round-trips through Load.
 func TestSaveIsAtomicAndRoundTrips(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
 	s := &Store{path: path, cfg: DefaultConfig()}
 
+	if err := s.Save(); err != nil {
+		t.Fatal(err)
+	}
+	// AddCluster writes clusters.yaml only; Save above wrote both.
 	if _, err := s.AddCluster(model.ClusterInput{
 		Alias: "c1", Host: "h1", Database: "db", Category: "production", ConnectUser: "u",
 	}); err != nil {
 		t.Fatal(err)
 	}
 
-	// A real config file exists (rename completed) and no leftover *.tmp siblings remain.
+	// Both real files exist (renames completed) and no leftover *.tmp siblings remain.
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -31,8 +36,10 @@ func TestSaveIsAtomicAndRoundTrips(t *testing.T) {
 	for _, e := range entries {
 		names = append(names, e.Name())
 	}
-	if len(names) != 1 || names[0] != "config.yaml" {
-		t.Fatalf("dir entries = %v, want [config.yaml] (no temp files left behind)", names)
+	// os.ReadDir sorts by filename, so clusters.yaml comes first.
+	want := []string{"clusters.yaml", "config.yaml"}
+	if !slices.Equal(names, want) {
+		t.Fatalf("dir entries = %v, want %v (no temp files left behind)", names, want)
 	}
 
 	// Content round-trips: a fresh store loading the same path sees the added cluster.

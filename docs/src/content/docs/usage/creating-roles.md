@@ -17,7 +17,7 @@ selected in **Target selection**.
 ![Create role](../../../assets/usage/create-role-form-dark.png)
 
 </div>
-<figcaption>Create role — login name, comment editor, privileges, attributes, settings</figcaption>
+<figcaption>Create role — login name, comment editor, role parents, attributes, settings</figcaption>
 </figure>
 
 It is the same form as Alter, over an empty baseline: every edit is a grant, an enable, or a
@@ -27,7 +27,7 @@ set. Fill in what you need:
 |------|-------|
 | **Login name** | Required. The only field you must fill. |
 | **Comment** | Same [comment editor](/pg-accounts-management/usage/comments/), Fields or Raw. |
-| **Privileges** | Parent roles, including the [preconfigured chips](/pg-accounts-management/configuration/parent-roles/). |
+| **Role Parents** | The roles it becomes a member of, including the [preconfigured chips](/pg-accounts-management/configuration/parent-roles/). |
 | **Attributes** | The role flags, per cluster. |
 | **Settings** | Role-level parameters, per cluster. |
 | **Password** | Tick [Set password](/pg-accounts-management/usage/password/) to set one at creation. |
