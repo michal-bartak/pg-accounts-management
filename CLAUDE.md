@@ -17,13 +17,47 @@ into prose, it goes stale.
 
 ## Product decisions (don't regress)
 
+- **Two config files, one directory** ([internal/config/paths.go](internal/config/paths.go)):
+  **`config.yaml`** = app configuration (templates, reads, parent roles, comment fields, search
+  columns, batch, ui, window size, seen version); **`clusters.yaml`** = `categories`, `clusters`,
+  `targets`. The directory resolution is unchanged and hand-rolled per OS (macOS
+  `~/Library/Application Support/DbAccounts`, Linux `~/.config/dbaccounts`, Windows
+  `%APPDATA%\DbAccounts`) — **`os.UserConfigDir` is deliberately not used**, and there is no
+  env/XDG override.
+  **The split is one tag, not a copy of the field list**: `model.Config` embeds
+  **`model.ClusterSet`** (Categories/Clusters/Targets) anonymously with **`yaml:"-"`**, and
+  `model.ClustersFile` is `{Version, ClusterSet \`yaml:",inline"\`}`. So a new *cluster-scoped*
+  field added to `ClusterSet` lands in clusters.yaml automatically and a new *app-scoped* field
+  added to `Config` lands in config.yaml automatically — **don't** replace this with per-field
+  `yaml:"-"` tags plus a parallel struct, which is exactly the drift this avoids. The embed is
+  transparent to the wire format: `encoding/json` **and** the Wails generator flatten it, so
+  `models.ts`'s `Config` keeps `categories`/`clusters`/`targets` top-level and the frontend still
+  reads `state.clusters` etc. (same precedent as `RunRequest`/`OperationSpec`).
+  `Store` keeps **one** `path` field and *derives* `clustersPath()` from `filepath.Dir(s.path)` —
+  that is what lets every `&Store{path: …}` test literal keep working. It returns `""` for a
+  path-less store (`NewStoreFromConfig`), and `atomicWriteFile` **rejects an empty path**, because
+  `filepath.Dir("")` is `"."` and a relative `clusters.yaml` would otherwise be written into the
+  process CWD — passwords included. Writers partition cleanly (no method touches both halves), so
+  each file stays atomic on its own and there is no cross-file transaction: the eight cluster /
+  category / target writers call `saveClusters()`, every other writer calls `save()`.
+  `Load` is a **pure reader** (a missing file yields that half's defaults in memory; `NewStore`'s
+  `writeMissingFiles` does the seeding), so `ReloadConfig` never creates anything; a file that
+  exists but doesn't parse is a hard error rather than a silent empty state.
+  **First run must never error**: with neither file present, `Load` yields the built-in defaults and
+  `writeMissingFiles` writes both at `0600` — pinned by `TestNewStoreFirstRun`, which redirects
+  `HOME`/`APPDATA` so it exercises `ConfigDir`'s real per-OS branch and its `MkdirAll`.
+  **There is deliberately no migration and no legacy-key guard.** A pre-split `config.yaml` still
+  carrying `categories`/`clusters`/`targets` simply has them ignored (`yaml.Unmarshal` leaves
+  `KnownFields` off) and dropped by the next write; the app was never released with the old layout,
+  so nothing needs rescuing. Don't add a probe back.
 - **Auth resolution** ([internal/pg/auth.go](internal/pg/auth.go)): user (`ResolveUser`) =
   cluster `connect_user` → `PGUSER` → **OS login user** (`user.Current()`, like psql/libpq) →
   error; password (`ResolvePassword`) = **cluster `password`** → `AuthContext.Password` (unused by
   the UI) → `PGPASSWORD` → `~/.pgpass` → empty (trust, like psql). The `AuthContext` from the run
   dialog is still always empty from the UI. **The one credential in config is the optional
   per-cluster `password`** — an opt-in, plain-text field on `model.Cluster`/`ClusterInput`
-  (`yaml:"password,omitempty"`), stored in the private config (`save()` writes mode `0600`) and
+  (`yaml:"password,omitempty"`), stored in the private **`clusters.yaml`** (`saveClusters()` writes
+  mode `0600`) and
   editable in the Clusters cluster editor as a **masked field with a 👁 reveal toggle** next to
   Connect user (the two share a `.form-row`, borrowing the Host/Port width mechanism). When set it
   is used directly; when blank the app falls back to `PGPASSWORD`/`~/.pgpass` as before. It rides on
@@ -361,7 +395,8 @@ into prose, it goes stale.
 
 ## Bound methods (`app.go` → `window.go.main.App`)
 
-Config/clusters/groups: `GetConfig`, `GetConfigPath`, `GetDefaultTemplates` (the built-in call
+Config/clusters/groups: `GetConfig`, `GetConfigPath`, `GetClustersPath` (the two file paths, shown
+as a *Config files* pair in the Settings meta block), `GetDefaultTemplates` (the built-in call
 templates + introspection queries, so the Settings editor's **Default** button has no second copy
 of the SQL — see the DB-templates section), `ReloadConfig`, `AddCluster`,
 `UpdateCluster`, `DeleteCluster`, `AddCategory`, `UpdateCategory`, `DeleteCategory`,
@@ -398,8 +433,9 @@ pre-flight dependency check run before any `remove_role`).
 ## Operations (call templates, `internal/calltemplate/`)
 
 `db_functions.<op>.call` + optional `.execution` (`function` | `statement` | `block`).
-Defaults in [internal/config/store.go](internal/config/store.go); example in
-[config.example.yaml](config.example.yaml); DSL in [sql/README.md](sql/README.md).
+Defaults in [internal/config/store.go](internal/config/store.go); examples in
+[config.example.yaml](config.example.yaml) / [clusters.example.yaml](clusters.example.yaml);
+DSL in [sql/README.md](sql/README.md).
 
 **Two placeholder namespaces, and they never overlap** (`internal/calltemplate`): **`${name}`** is a
 built-in from the **closed** per-op set (`AllowedPlaceholders`), **`${{name}}`** is always a
@@ -745,7 +781,7 @@ The header is a `.brand` row (accent dot + smaller title + version chip + round 
 main.go, app.go           Wails entry + bound methods
 internal/model/           Shared JSON-tagged types + RunRequest (stdlib only)
 internal/calltemplate/    Template parse/validate/SQL build (stdlib only)
-internal/config/          YAML persistence, DBFunction migrate/validate
+internal/config/          YAML persistence (config.yaml + clusters.yaml), migrate/validate
 internal/pg/              DSN, auth, Connect, ExecuteOperation, introspect.go (reads)
 internal/batch/           Concurrent executor + all-cluster scan
 internal/commands/        Op validation + arg maps + attribute keyword whitelist

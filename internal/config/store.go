@@ -19,16 +19,16 @@ import (
 // the package that actually embeds these values in SQL — rather than in a copy of the pattern here.
 var isIdentifier = calltemplate.IsIdentifier
 
-var ErrNotFound = errors.New("config not found")
-
 func DefaultConfig() model.Config {
 	return model.Config{
 		Version: 1,
-		Categories: []model.Category{
-			{ID: "production", Label: "Production", Color: "#e8a838", Confirm: true},
-			{ID: "uat", Label: "UAT", Color: "#6eb5ff", Confirm: false},
+		ClusterSet: model.ClusterSet{
+			Categories: []model.Category{
+				{ID: "production", Label: "Production", Color: "#e8a838", Confirm: true},
+				{ID: "uat", Label: "UAT", Color: "#6eb5ff", Confirm: false},
+			},
+			Clusters: []model.Cluster{},
 		},
-		Clusters: []model.Cluster{},
 		// Defaults are vanilla PostgreSQL DDL (statement mode). Deployments that need
 		// privileged wrapper functions override these in config / the Settings editor.
 		DBFunctions: model.DBFunctions{
@@ -131,37 +131,58 @@ func NewStore() (*Store, error) {
 	}
 	s := &Store{path: path}
 	if err := s.Load(); err != nil {
-		if errors.Is(err, ErrNotFound) {
-			s.cfg = DefaultConfig()
-			if saveErr := s.Save(); saveErr != nil {
-				return nil, saveErr
-			}
-			return s, nil
-		}
 		return nil, err
 	}
-	return s, nil
+	return s, s.writeMissingFiles()
 }
 
+// clustersPath is clusters.yaml next to the main config file. A store with no path
+// (NewStoreFromConfig, used by tests and tooling) has no clusters path either: deriving one
+// would resolve to a RELATIVE "clusters.yaml" and drop a real file — per-cluster passwords
+// included — into the process's working directory.
+func (s *Store) clustersPath() string {
+	if s.path == "" {
+		return ""
+	}
+	return filepath.Join(filepath.Dir(s.path), clustersFileName)
+}
+
+// Load reads both files and swaps in the result. It never writes: a missing file yields that
+// half's defaults in memory, and NewStore persists them via writeMissingFiles. ReloadConfig
+// therefore can't create anything. s.cfg is assigned once, at the end, so a concurrent reader
+// never sees a half-swapped config.
 func (s *Store) Load() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	data, err := os.ReadFile(s.path)
+	cfg, err := readMainFile(s.path)
+	if err != nil {
+		return err
+	}
+	cs, err := readClustersFile(s.clustersPath())
+	if err != nil {
+		return err
+	}
+	cfg.ClusterSet = cs
+	s.cfg = cfg
+	return nil
+}
+
+// readMainFile parses config.yaml and normalizes everything that lives in it. A missing file is
+// not an error — it yields the built-in defaults.
+func readMainFile(path string) (model.Config, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return ErrNotFound
+			return DefaultConfig(), nil
 		}
-		return err
+		return model.Config{}, err
 	}
 	var cfg model.Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return fmt.Errorf("parse config: %w", err)
+		return model.Config{}, fmt.Errorf("parse config: %w", err)
 	}
 	if cfg.Version == 0 {
 		cfg.Version = 1
-	}
-	if len(cfg.Categories) == 0 {
-		cfg.Categories = DefaultConfig().Categories
 	}
 	if cfg.Batch.MaxConcurrency <= 0 {
 		cfg.Batch.MaxConcurrency = 5
@@ -182,22 +203,73 @@ func (s *Store) Load() error {
 	}
 	migrateDBFunctions(&cfg.DBFunctions)
 	migrateDBReads(&cfg.DBReads)
-	s.cfg = cfg
+	return cfg, nil
+}
+
+// readClustersFile parses clusters.yaml. A missing file yields the built-in group set with no
+// clusters — the same thing a config with no `categories:` key has always produced. A file that
+// exists but does not parse is a hard error: coming up with "no clusters" would show an empty
+// Clusters tab, and the user's next edit would atomically overwrite the file they still want.
+//
+// Clusters and Targets are never substituted: `clusters: []` means the user has none, and must
+// round-trip as empty rather than resurrect anything.
+func readClustersFile(path string) (model.ClusterSet, error) {
+	if path == "" {
+		return DefaultConfig().ClusterSet, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return DefaultConfig().ClusterSet, nil
+		}
+		return model.ClusterSet{}, err
+	}
+	var f model.ClustersFile
+	if err := yaml.Unmarshal(data, &f); err != nil {
+		return model.ClusterSet{}, fmt.Errorf("parse clusters: %w", err)
+	}
+	if len(f.Categories) == 0 {
+		f.Categories = DefaultConfig().Categories
+	}
+	return f.ClusterSet, nil
+}
+
+// writeMissingFiles creates whichever of the two files does not exist yet, so a fresh install
+// lands a complete, hand-editable pair on disk. It deliberately does NOT rewrite a file that is
+// already there — on an upgrade, config.yaml must keep what the user has in it until they
+// actually change a setting.
+func (s *Store) writeMissingFiles() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, err := os.Stat(s.path); os.IsNotExist(err) {
+		if err := s.save(); err != nil {
+			return err
+		}
+	}
+	if _, err := os.Stat(s.clustersPath()); os.IsNotExist(err) {
+		if err := s.saveClusters(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-// Save marshals and atomically persists the config. Callers that already hold the write
-// lock (the Update*/Add*/Delete* methods) use the unlocked save() instead to avoid a
-// re-entrant deadlock.
+// Save marshals and atomically persists both files. Callers that already hold the write
+// lock (the Update*/Add*/Delete* methods) use the unlocked save()/saveClusters() instead to
+// avoid a re-entrant deadlock.
 func (s *Store) Save() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.save()
+	if err := s.save(); err != nil {
+		return err
+	}
+	return s.saveClusters()
 }
 
-// save persists s.cfg. The caller must hold s.mu. It writes to a temp file in the same
-// directory and renames it over the target, so a crash / full disk / interrupted write
-// never leaves a truncated or empty config.yaml (os.WriteFile truncates in place).
+// save persists the app-configuration half of s.cfg to config.yaml. The caller must hold s.mu.
+// It writes to a temp file in the same directory and renames it over the target, so a crash /
+// full disk / interrupted write never leaves a truncated or empty file (os.WriteFile truncates
+// in place). The embedded ClusterSet carries `yaml:"-"`, so it is not written here.
 func (s *Store) save() error {
 	data, err := yaml.Marshal(s.cfg)
 	if err != nil {
@@ -206,8 +278,25 @@ func (s *Store) save() error {
 	return atomicWriteFile(s.path, data, 0o600)
 }
 
+// saveClusters persists the clusters/groups/targets set to clusters.yaml. The caller must hold
+// s.mu. Same atomic temp+rename and 0600 mode as save(): the optional per-cluster password
+// lives in this file now.
+func (s *Store) saveClusters() error {
+	data, err := yaml.Marshal(model.ClustersFile{Version: 1, ClusterSet: s.cfg.ClusterSet})
+	if err != nil {
+		return err
+	}
+	return atomicWriteFile(s.clustersPath(), data, 0o600)
+}
+
 // atomicWriteFile writes data to a sibling temp file, fsyncs it, and renames it over path.
 func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
+	// A path-less store (NewStoreFromConfig) must not write. Without this, filepath.Dir("")
+	// is "." and a derived name like "clusters.yaml" would resolve to a real relative file
+	// in the working directory — passwords and all.
+	if path == "" {
+		return errors.New("config: store has no file path")
+	}
 	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*.tmp")
 	if err != nil {
 		return err
@@ -253,6 +342,11 @@ func cloneConfig(c model.Config) model.Config {
 
 func (s *Store) ConfigPath() string {
 	return s.path
+}
+
+// ClustersPath returns the clusters file's path, shown in Settings beside the config path.
+func (s *Store) ClustersPath() string {
+	return s.clustersPath()
 }
 
 func (s *Store) UpdateDBFunctions(fn model.DBFunctions) error {
@@ -359,7 +453,7 @@ func (s *Store) UpdateTargets(t model.TargetSelection) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.cfg.Targets = t
-	return s.save()
+	return s.saveClusters()
 }
 
 // SetUpdateSeenVersion records the latest release version the update popup last showed, so it
@@ -436,7 +530,7 @@ func (s *Store) AddCluster(in model.ClusterInput) (model.Cluster, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.cfg.Clusters = append(s.cfg.Clusters, c)
-	if err := s.save(); err != nil {
+	if err := s.saveClusters(); err != nil {
 		return model.Cluster{}, err
 	}
 	return c, nil
@@ -463,7 +557,7 @@ func (s *Store) UpdateCluster(id string, in model.ClusterInput) (model.Cluster, 
 			ConnectUser: in.ConnectUser,
 			Password:    in.Password,
 		}
-		if err := s.save(); err != nil {
+		if err := s.saveClusters(); err != nil {
 			return model.Cluster{}, err
 		}
 		return s.cfg.Clusters[i], nil
@@ -477,7 +571,7 @@ func (s *Store) DeleteCluster(id string) error {
 	for i, c := range s.cfg.Clusters {
 		if c.ID == id {
 			s.cfg.Clusters = append(s.cfg.Clusters[:i], s.cfg.Clusters[i+1:]...)
-			return s.save()
+			return s.saveClusters()
 		}
 	}
 	return fmt.Errorf("cluster not found: %s", id)
@@ -542,7 +636,7 @@ func (s *Store) AddCategory(in model.CategoryInput) (model.Category, error) {
 	}
 	c := model.Category{ID: id, Label: label, Color: normalizeColor(in.Color), Confirm: in.Confirm}
 	s.cfg.Categories = append(s.cfg.Categories, c)
-	if err := s.save(); err != nil {
+	if err := s.saveClusters(); err != nil {
 		return model.Category{}, err
 	}
 	return c, nil
@@ -560,7 +654,7 @@ func (s *Store) UpdateCategory(id string, in model.CategoryInput) (model.Categor
 			continue
 		}
 		s.cfg.Categories[i] = model.Category{ID: id, Label: label, Color: normalizeColor(in.Color), Confirm: in.Confirm}
-		if err := s.save(); err != nil {
+		if err := s.saveClusters(); err != nil {
 			return model.Category{}, err
 		}
 		return s.cfg.Categories[i], nil
@@ -579,7 +673,7 @@ func (s *Store) DeleteCategory(id string) error {
 	for i, c := range s.cfg.Categories {
 		if c.ID == id {
 			s.cfg.Categories = append(s.cfg.Categories[:i], s.cfg.Categories[i+1:]...)
-			return s.save()
+			return s.saveClusters()
 		}
 	}
 	return fmt.Errorf("group not found: %s", id)
@@ -644,7 +738,7 @@ func (s *Store) SaveClustersAndCategories(clusters []model.Cluster, categories [
 	defer s.mu.Unlock()
 	s.cfg.Categories = cats
 	s.cfg.Clusters = out
-	return s.save()
+	return s.saveClusters()
 }
 
 // slugify turns a label into a lowercase [a-z0-9_] id.

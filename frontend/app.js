@@ -502,6 +502,8 @@ async function loadConfig() {
       defaultTemplates = await app.GetDefaultTemplates?.().catch(() => null);
     }
     document.getElementById('config-path').textContent = await app.GetConfigPath();
+    // Optional call: an un-regenerated binding would throw and take the whole config load with it.
+    document.getElementById('clusters-path').textContent = (await app.GetClustersPath?.()) || '';
     setThemeButtons(state?.ui?.theme || 'system');
     applyTheme(state?.ui?.theme || 'system');
     setCommentViewButtons(state?.ui?.commentDefaultView || 'fields');
@@ -4277,9 +4279,13 @@ document.getElementById('btn-test-clusters').addEventListener('click', testAllCl
 document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
 document.getElementById('btn-discard-settings')?.addEventListener('click', discardSettings);
 
-document.getElementById('btn-copy-config-path')?.addEventListener('click', (ev) => {
-  copyWithFeedback(ev.currentTarget, document.getElementById('config-path').textContent || '');
-});
+// Keyed by id rather than a `.config-path-copy` selector: that class is reused as a generic
+// icon-button elsewhere.
+for (const [btnId, pathId] of [['btn-copy-config-path', 'config-path'], ['btn-copy-clusters-path', 'clusters-path']]) {
+  document.getElementById(btnId)?.addEventListener('click', (ev) => {
+    copyWithFeedback(ev.currentTarget, document.getElementById(pathId).textContent || '');
+  });
+}
 
 document.getElementById('btn-toggle-clusters')?.addEventListener('click', (ev) => {
   const btn = ev.currentTarget;

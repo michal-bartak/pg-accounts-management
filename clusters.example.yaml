@@ -1,0 +1,46 @@
+# DbAccounts example cluster inventory — copy structure only; the app creates its own file on
+# first launch, next to config.yaml.
+#
+# This file holds what is specific to your site: which clusters exist, how they are grouped, and
+# which of them the Operations page last had selected. Everything else — call templates,
+# introspection queries, comment fields, UI preferences — lives in config.yaml, which is safe to
+# share with colleagues. This one is not: it may contain per-cluster passwords in clear text, and
+# the app writes it with owner-only permissions (mode 0600).
+
+version: 1
+# Cluster groups. color = base hex (shades derived); confirm = require the
+# production-style confirm popup before running against that group's clusters.
+# Edit these in-app under Settings → Cluster groups.
+categories:
+  - id: production
+    label: Production
+    color: "#e8a838"
+    confirm: true
+  - id: uat
+    label: UAT
+    color: "#6eb5ff"
+    confirm: false
+clusters: []
+# Cluster fields: alias, host, port, database, category (a group id above), sslmode,
+# connect_user, password. connect_user and password are optional:
+#   - connect_user: blank → PGUSER env → OS login user (like psql).
+#   - password: optional plain-text password (this file is private, written mode 0600).
+#     When set it is used directly; when blank the app falls back to PGPASSWORD → ~/.pgpass.
+# Example:
+# clusters:
+#   - id: 00000000-0000-0000-0000-000000000000
+#     alias: prod-main
+#     host: db.example.com
+#     port: 5432
+#     database: postgres
+#     category: production
+#     sslmode: require
+#     connect_user: admin
+#     password: "s3cret"   # optional; omit to use PGPASSWORD / ~/.pgpass
+
+# targets: the last Operations-page target selection, remembered across restarts. Managed by
+# the app (updated whenever you toggle a group/cluster checkbox). Omit or leave empty for the
+# default "all groups selected".
+# targets:
+#   category_ids: [production, uat]
+#   cluster_ids: [prod_eu_1]

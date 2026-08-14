@@ -578,20 +578,6 @@ export namespace model {
 	        this.label = source["label"];
 	    }
 	}
-	export class TargetSelection {
-	    categoryIds: string[];
-	    clusterIds: string[];
-	
-	    static createFrom(source: any = {}) {
-	        return new TargetSelection(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.categoryIds = source["categoryIds"];
-	        this.clusterIds = source["clusterIds"];
-	    }
-	}
 	export class SearchColumn {
 	    label: string;
 	    template: string;
@@ -778,10 +764,25 @@ export namespace model {
 		    return a;
 		}
 	}
+	export class TargetSelection {
+	    categoryIds: string[];
+	    clusterIds: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new TargetSelection(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.categoryIds = source["categoryIds"];
+	        this.clusterIds = source["clusterIds"];
+	    }
+	}
 	export class Config {
 	    version: number;
 	    categories: Category[];
 	    clusters: Cluster[];
+	    targets: TargetSelection;
 	    dbFunctions: DBFunctions;
 	    dbReads: DBReads;
 	    batch: BatchSettings;
@@ -789,7 +790,6 @@ export namespace model {
 	    parentRoles: string[];
 	    commentFields: CommentField[];
 	    searchColumns: SearchColumn[];
-	    targets: TargetSelection;
 	    windowWidth?: number;
 	    windowHeight?: number;
 	    updateSeenVersion?: string;
@@ -803,6 +803,7 @@ export namespace model {
 	        this.version = source["version"];
 	        this.categories = this.convertValues(source["categories"], Category);
 	        this.clusters = this.convertValues(source["clusters"], Cluster);
+	        this.targets = this.convertValues(source["targets"], TargetSelection);
 	        this.dbFunctions = this.convertValues(source["dbFunctions"], DBFunctions);
 	        this.dbReads = this.convertValues(source["dbReads"], DBReads);
 	        this.batch = this.convertValues(source["batch"], BatchSettings);
@@ -810,7 +811,6 @@ export namespace model {
 	        this.parentRoles = source["parentRoles"];
 	        this.commentFields = this.convertValues(source["commentFields"], CommentField);
 	        this.searchColumns = this.convertValues(source["searchColumns"], SearchColumn);
-	        this.targets = this.convertValues(source["targets"], TargetSelection);
 	        this.windowWidth = source["windowWidth"];
 	        this.windowHeight = source["windowHeight"];
 	        this.updateSeenVersion = source["updateSeenVersion"];

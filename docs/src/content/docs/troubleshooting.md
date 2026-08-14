@@ -62,12 +62,12 @@ sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0
 
 ## Where is my configuration?
 
-| OS | Path |
-|----|------|
-| macOS | `~/Library/Application Support/DbAccounts/config.yaml` |
-| Linux | `~/.config/dbaccounts/config.yaml` |
-| Windows | `%AppData%\DbAccounts\config.yaml` |
+| OS | Directory |
+|----|-----------|
+| macOS | `~/Library/Application Support/DbAccounts/` |
+| Linux | `~/.config/dbaccounts/` |
+| Windows | `%AppData%\DbAccounts\` |
 
-The file holds clusters, groups, and templates. It also holds the optional per-cluster
-password, in clear text, when you set one — see
+`config.yaml` holds templates and app settings. `clusters.yaml` holds clusters, groups and the
+target selection — and the optional per-cluster password, in clear text, when you set one; see
 [Clusters](/pg-accounts-management/configuration/clusters/).

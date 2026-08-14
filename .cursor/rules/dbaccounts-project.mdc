@@ -25,17 +25,22 @@ Cross-platform **PostgreSQL role maintenance** desktop app: manage clusters, bat
 - pgx v5, yaml.v3, google/uuid
 - Bindings: `frontend/wailsjs/` — **auto-generated** by Wails; do not hand-edit; regenerate via `wails dev` / `wails build`
 
-## Config file
+## Config files
 
-| OS | Path |
-|----|------|
-| macOS | `~/Library/Application Support/DbAccounts/config.yaml` |
-| Linux | `~/.config/dbaccounts/config.yaml` |
-| Windows | `%AppData%\DbAccounts\config.yaml` |
+Two files in one directory:
 
-Example template: [`config.example.yaml`](config.example.yaml). Implemented in `internal/config/` (`paths.go`, `store.go`).
+| OS | Directory |
+|----|-----------|
+| macOS | `~/Library/Application Support/DbAccounts/` |
+| Linux | `~/.config/dbaccounts/` |
+| Windows | `%AppData%\DbAccounts\` |
 
-**YAML keys:** `version`, `categories`, `clusters`, `db_functions.<op>.call`, `db_functions.<op>.execution`, `batch.max_concurrency` (default 5), `ui.theme`, `ui.password_gen` (role-form random password generator: `length` clamped `[6,128]`/default 10, class toggles `lowercase/uppercase/digits/symbols`, `exclude_similar`; at least one class stays on — Settings → Password generator, persisted via `SaveUISettings`/`UISettings.PasswordGen`), `parent_roles` (preconfigured role parents — bare identifiers, offered as pick-list choices in the Assign-parents dialog, whose Role names field takes a comma-separated list; Create-role uses the same `parent_roles` placeholder as grant/revoke). Legacy `name`/`params` migrated on load.
+`config.yaml` = app configuration; `clusters.yaml` = `categories`, `clusters`, `targets`. Example
+templates: [`config.example.yaml`](config.example.yaml),
+[`clusters.example.yaml`](clusters.example.yaml). Implemented in `internal/config/` (`paths.go`,
+`store.go`); the split is the `yaml:"-"` on `model.Config`'s embedded `model.ClusterSet`.
+
+**YAML keys:** `version`, `categories`/`clusters`/`targets` (clusters.yaml), `db_functions.<op>.call`, `db_functions.<op>.execution`, `batch.max_concurrency` (default 5), `ui.theme`, `ui.password_gen` (role-form random password generator: `length` clamped `[6,128]`/default 10, class toggles `lowercase/uppercase/digits/symbols`, `exclude_similar`; at least one class stays on — Settings → Password generator, persisted via `SaveUISettings`/`UISettings.PasswordGen`), `parent_roles` (preconfigured role parents — bare identifiers, offered as pick-list choices in the Assign-parents dialog, whose Role names field takes a comma-separated list; Create-role uses the same `parent_roles` placeholder as grant/revoke). Legacy `name`/`params` migrated on load.
 
 ## Wails API (`app.go` → `window.go.main.App`)
 

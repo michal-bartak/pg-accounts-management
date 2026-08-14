@@ -6,6 +6,14 @@ import (
 	"runtime"
 )
 
+const (
+	// configFileName holds the app configuration: templates, comment fields, UI preferences.
+	configFileName = "config.yaml"
+	// clustersFileName holds the cluster inventory, its groups, and the target selection.
+	// It sits next to config.yaml; Store derives its path from the main one.
+	clustersFileName = "clusters.yaml"
+)
+
 func ConfigDir() (string, error) {
 	var base string
 	switch runtime.GOOS {
@@ -43,5 +51,5 @@ func ConfigPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "config.yaml"), nil
+	return filepath.Join(dir, configFileName), nil
 }
