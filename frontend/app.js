@@ -796,14 +796,14 @@ let fnDialogMode = 'write';
 /** In-memory edits for comment fields, staged until "Save settings". */
 /** @type {Array<{key:string, label:string}>} */
 let commentFieldsDraft = [];
-/** In-memory edits for preconfigured parent groups, staged until "Save settings". */
+/** In-memory edits for preconfigured role parents, staged until "Save settings". */
 /** @type {Array<string>} */
 let parentRolesDraft = [];
 /** In-memory edits for the Find-role result columns, staged until "Save settings". */
 /** @type {Array<{label:string, template:string}>} */
 let searchColumnsDraft = [];
 
-// --- Shared draggable list editor (comment fields, parent groups, search columns) ---
+// --- Shared draggable list editor (comment fields, role parents, search columns) ---
 
 /** One reorderable row: a drag handle, caller-supplied cells, and a remove button. */
 function listRowHtml(idx, innerHtml) {
@@ -860,7 +860,7 @@ function wireListEditor(containerId, getDraft, rerender) {
   });
 }
 
-// The three Settings list editors (comment fields, parent groups, Find-role columns) are the
+// The three Settings list editors (comment fields, role parents, Find-role columns) are the
 // same widget over different row shapes: seed a draft from saved config, paint rows, edit in
 // place, reorder/remove/add. They used to be three render/paint pairs plus three input
 // listeners, three wireListEditor calls and three Add buttons — all near-identical, so a fix
@@ -1520,7 +1520,7 @@ function depsSortRows(rows) {
 }
 
 /** A cluster's label: the filled, group-coloured per-cluster chip used in Present on and the
- *  privilege rows (there is no separate alias text or group badge in this popup). */
+ *  parent rows (there is no separate alias text or group badge in this popup). */
 function depsClusterChip(r) {
   return scopeLabelsHtml([{ kind: 'cluster', cat: r.category, label: r.alias }]);
 }
@@ -1931,13 +1931,13 @@ async function onClusterAction(ev) {
   }
 }
 
-/** Preconfigured parent groups defined in Settings. */
+/** Preconfigured role parents defined in Settings. */
 function preconfiguredParentRoles() {
   return state?.parentRoles || [];
 }
 
 
-/** Create-role privilege universe = the clusters covered by the sidebar target selection. */
+/** Create-role parent universe = the clusters covered by the sidebar target selection. */
 /** Read the shared login input. Full name / email now live in the comment editor. */
 function roleIdentityInputs() {
   return {
@@ -2232,7 +2232,7 @@ async function saveSettings() {
   }
   try {
     // ONE atomic call: the backend validates everything before writing anything, so a rejected
-    // template can't leave the parent groups / comment fields already persisted. It also removes
+    // template can't leave the role parents / comment fields already persisted. It also removes
     // the old ordering constraint — templates are validated against the comment fields in this
     // same payload, so adding a field and using it as ${{key}} in one save just works.
     await app.SaveSettings({
@@ -2404,7 +2404,7 @@ function syncQHintLabels(root = document) {
 // ------------------------------------------------------------------
 
 let alterPassword = '';
-/** @type {{kind:string, key:string}|null} scope-dialog context; null = adding a new privilege */
+/** @type {{kind:string, key:string}|null} scope-dialog context; null = assigning new parents */
 let scopeDialogCtx = null;
 /** @type {Array<{text:string, ids:string[]}>} distinct comment values for the popup */
 let commentVersions = [];
@@ -2527,43 +2527,54 @@ function searchColumns() {
 
 /** One group's configured column values. A role's comment can differ per cluster, so each
  *  column reports the value from the first cluster in configured group-then-alias order (a
- *  stable pick — search results arrive in completion order) plus whether the clusters disagree. */
+ *  stable pick — search results arrive in completion order).
+ *
+ *  Disagreement between clusters is deliberately NOT flagged here: the popup is for finding a role,
+ *  and the reconciliation UI reports it once the role is loaded (the "Comments differ" banner and the
+ *  Comments dialog). A bare marker in a search row read as an unexplained artifact. */
 function searchCellValues(group, cols) {
   const rows = (group.clusters || []).slice().sort(byGroupThenAlias);
   return cols.map((col) => {
-    const distinct = [];
     for (const m of rows) {
       const v = renderSearchTemplate(col.template, m.comment);
-      if (v && !distinct.includes(v)) distinct.push(v);
+      if (v) return v;
     }
-    return { text: distinct[0] || '', varies: distinct.length > 1 };
+    return '';
   });
 }
 
 // Column widths are pure CSS: the results container owns the tracks and every row/header subgrids
 // into them (see .alter-results in styles.css), so the browser sizes each column to its widest cell
-// across all rows. This replaced ~165 lines that measured text with canvas measureText against
-// fonts read from throwaway DOM probes, plus a two-pass render to reserve the chip column.
-const SEARCH_COL_MAX_CH = 30; // a column stops growing here; past it the cell ellipsizes
+// across all rows and shares the free space among them. This replaced ~165 lines that measured text
+// with canvas measureText against fonts read from throwaway DOM probes, plus a two-pass render to
+// reserve the chip column.
+const SEARCH_COL_MIN_CH = 4; // a squeezed column keeps a readable stub instead of collapsing away
 const SEARCH_LOGIN_MAX_CH = 40; // rolenames go to 63 chars; longer ones ellipsize with a title
 const SEARCH_BADGE_MIN_CH = 8; // reserved for the cluster chips, so a wide column can't starve them
 
 /** The `grid-template-columns` for the results container: the rolename, one track per configured
  *  column, then the cluster chips.
  *
- *  `fit-content(<cap>)` is the whole trick — "as wide as the content needs, up to <cap>". That is
- *  what the measuring code was hand-computing, except the browser does it against the real laid-out
- *  text instead of a canvas approximation (`ch` is the width of "0", which under-measures
- *  proportional text by ~20%). The cap stops a long ${comment} column from pushing the chips off
- *  screen; `.alter-cell` ellipsizes whatever exceeds it.
+ *  Configured columns are `minmax(<floor>, auto)` — deliberately NOT `fit-content(<cap>)`. A cap
+ *  made a long value (a raw `${comment}` especially) ellipsize while hundreds of px sat unused in
+ *  the chips track. With an `auto` maximum the browser hands each column an equal share of the free
+ *  space, freezes the ones that reach their content width, and redistributes what they didn't need
+ *  — so a lone column takes the whole row, several columns share it, and short ones are never
+ *  starved by a long neighbour. `.alter-cell` still ellipsizes, but only once the space genuinely
+ *  isn't there. The floor keeps a squeezed column from collapsing to nothing.
  *
- *  The trailing `auto` maximum absorbs leftover width, so the chips stay flush right without the
- *  second measure pass that used to pin that track. */
+ *  The chips close the row and must stay flush right, which decides their max:
+ *  - with configured columns, `max-content` — the columns are the flexible tracks, so the chips take
+ *    exactly what they need and the leftover goes to the columns.
+ *  - with none, `auto` — nothing else can absorb the leftover, so the chips track must, or it would
+ *    end short of the container's right edge.
+ *  Their `8ch` floor is what lets them shrink (and wrap) under real pressure rather than forcing a
+ *  horizontal scrollbar and crushing the rolename. */
 function searchGridTemplate(colCount) {
   return [
     `fit-content(${SEARCH_LOGIN_MAX_CH}ch)`,
-    ...Array.from({ length: colCount }, () => `fit-content(${SEARCH_COL_MAX_CH}ch)`),
-    `minmax(${SEARCH_BADGE_MIN_CH}ch, auto)`,
+    ...Array.from({ length: colCount }, () => `minmax(${SEARCH_COL_MIN_CH}ch, auto)`),
+    `minmax(${SEARCH_BADGE_MIN_CH}ch, ${colCount ? 'max-content' : 'auto'})`,
   ].join(' ');
 }
 
@@ -2590,15 +2601,12 @@ function renderAlterResults() {
       .map((g, gi) => {
         const labels = scopeLabelsHtml(describeScope(new Set(g.clusters.map((m) => m.clusterId))));
         const extra = cells[gi]
-          .map((cell, i) => {
-            const varies = cell.varies
-              ? ' <span class="alter-cell-varies" title="Differs across clusters">≠</span>'
-              : '';
+          .map((text) => {
             // Unconditional: a flexible column ellipsizes by design, and any column gets squeezed
             // below its content once the window is narrow enough, so there is no reliable way to
             // predict which values stay fully visible.
-            const title = cell.text ? ` title="${escapeAttr(cell.text)}"` : '';
-            return `<span class="alter-cell"${title}>${escapeHtml(cell.text)}${varies}</span>`;
+            const title = text ? ` title="${escapeAttr(text)}"` : '';
+            return `<span class="alter-cell"${title}>${escapeHtml(text)}</span>`;
           })
           .join('');
         const loginTitle = ` title="${escapeAttr(g.loginName)}"`;
@@ -3138,7 +3146,7 @@ function renderAlterDetail() {
       editHead += `
     <div class="alter-section">
       <div class="section-label">Comment</div>
-      <div class="alter-add-priv">
+      <div class="alter-add-row">
         <button type="button" class="small btn-two-line${staged ? ' is-added' : ''}" id="btn-alter-comments">Comments differ across clusters<br>view / edit per cluster</button>
       </div>
     </div>`;
@@ -3148,10 +3156,10 @@ function renderAlterDetail() {
   const existing = allPrivileges();
   const existingSet = new Set(existing);
   const newRoles = [...alterAdd.keys()].filter((r) => !existingSet.has(r));
-  const privRows = existing
+  const parentRows = existing
     .concat(newRoles)
     .map((r) => scopeRowHtml('priv', r, r, clusterIdsWith(r), alterAdd.get(r) || new Set(), alterRevoke.get(r) || new Set()));
-  const privHtml = privRows.length ? privRows.join('') : '<p class="hint">No privileges.</p>';
+  const parentHtml = parentRows.length ? parentRows.join('') : '<p class="hint">No role parents.</p>';
 
   const attrRows = ROLE_ATTRIBUTES.map((a) =>
     scopeRowHtml('attr', a.key, a.label, clusterIdsWithAttr(a.key), alterAttrAdd.get(a.key) || new Set(), alterAttrRemove.get(a.key) || new Set())
@@ -3172,10 +3180,10 @@ function renderAlterDetail() {
   root.innerHTML = `
     ${editHead}
     <div class="alter-section">
-      <div class="section-label">Privileges ${hintBadge('Each privilege shows the clusters/groups it is granted on. Use ✎ to add or remove clusters, × to revoke everywhere.')}</div>
-      <div class="scope-rows" id="alter-privs">${privHtml}</div>
-      <div class="alter-add-priv">
-        <button type="button" class="list-add" id="btn-alter-add">Add privilege…</button>
+      <div class="section-label">Role Parents ${hintBadge('Each parent shows the clusters/groups it is granted on. Use ✎ to add or remove clusters, × to revoke everywhere.')}</div>
+      <div class="scope-rows" id="alter-parents">${parentHtml}</div>
+      <div class="alter-add-row">
+        <button type="button" class="list-add" id="btn-alter-add">Assign parents…</button>
       </div>
     </div>
 
@@ -3187,7 +3195,7 @@ function renderAlterDetail() {
     <div class="alter-section">
       <div class="section-label">Settings ${hintBadge('Role GUCs (ALTER ROLE … SET/RESET). Use ✎ to set on chosen clusters, × to reset everywhere it has that value.')}</div>
       <div class="scope-rows" id="alter-configs">${cfgHtml}</div>
-      <div class="alter-add-priv">
+      <div class="alter-add-row">
         <button type="button" class="list-add" id="btn-alter-add-config">Add setting…</button>
       </div>
     </div>
@@ -3276,7 +3284,7 @@ function setMinus(a, b) {
 }
 
 // --- Shared scope-set primitives ---------------------------------------------------------
-// Every "grant / enable / set on clusters" section (privileges, attributes, role settings)
+// Every "grant / enable / set on clusters" section (role parents, attributes, role settings)
 // stages its edits as a pending add-set and a pending remove-set of clusterIds against the
 // current DB state (`cur`). These two primitives are the single source of truth for how a
 // dialog selection turns into those sets, so the three sections behave identically.
@@ -3285,7 +3293,7 @@ function setMinus(a, b) {
  * Additive apply (the "Add …" popups). Extend `add` to cover every `desired` cluster and
  * cancel any pending removal there, WITHOUT touching clusters outside `desired`. A cluster
  * that already has the item in the DB (`cur`) needs no pending grant, so it is dropped from
- * `add`. This is what "Add privilege" / "Add setting" must do — they only ever EXTEND
+ * `add`. This is what "Assign parents" / "Add setting" must do — they only ever EXTEND
  * coverage; selecting cluster D for an item that already lives on A/B/C must leave A/B/C
  * untouched (a full desired-vs-current diff would instead revoke every unpicked cluster).
  * Mutates `add` and `rev` in place.
@@ -3308,7 +3316,7 @@ function scopeDiff(cur, desired) {
 }
 
 /**
- * One row for a privilege or attribute: name on the left, scope labels on the right,
+ * One row for a role parent or attribute: name on the left, scope labels on the right,
  * then actions. kind is 'priv' or 'attr'. curSet = current clusters; addSet = pending
  * grants/enables; revSet = pending revokes/disables.
  */
@@ -3376,9 +3384,9 @@ function configRowHtml(name, value) {
   return scopeRowHtml('config', key, `${name} = ${value}`, cur, add, rev);
 }
 
-// --- Scope dialog (add a new privilege, or extend a privilege/attribute) ---
+// --- Scope dialog (assign new role parents, or extend a parent/attribute) ---
 
-/** ctx: null → new privilege; {kind:'priv',key} → edit privilege; {kind:'attr',key} → edit attribute. */
+/** ctx: null → assign new parents; {kind:'priv',key} → edit one parent; {kind:'attr',key} → edit attribute. */
 function openScopeDialog(ctx) {
   scopeDialogCtx = ctx || null;
   clearInlineError(document.getElementById('scope-error'));
@@ -3397,7 +3405,7 @@ function openScopeDialog(ctx) {
   document.getElementById('scope-preconfigured')?.classList.add('hidden');
 
   if (!ctx) {
-    title.textContent = 'Add privilege';
+    title.textContent = 'Assign parents';
     roleLabel.classList.remove('hidden');
     roleInput.value = '';
     renderScopePreconfigured();
@@ -3438,7 +3446,8 @@ function openScopeDialog(ctx) {
   else if (ctx.kind === 'config') document.getElementById('scope-cvalue').focus();
 }
 
-/** Preconfigured-group checkboxes shown when adding a new privilege. */
+/** Preconfigured role-parent chips shown when assigning new parents. The picker carries no caption
+ *  of its own — the "Role names" label above it, and its ? hint, cover both ways of choosing. */
 function renderScopePreconfigured() {
   const box = document.getElementById('scope-preconfigured');
   if (!box) return;
@@ -3449,7 +3458,6 @@ function renderScopePreconfigured() {
     return;
   }
   box.innerHTML =
-    '<span class="picker-label">Add preconfigured:</span>' +
     roles
       .map(
         (r) =>
@@ -3538,12 +3546,31 @@ function refreshScopeGroupChecks() {
 }
 
 /**
- * "Add privilege": additively grant one or more privilege roles on the `desired` clusters,
- * merging with current grants and any pending edits. See scopeMergeAdd for the semantics.
- * @param {string[]} roles privilege/parent-role names to grant
+ * Split the Assign-parents input into role names: comma-separated, each trimmed, blanks dropped
+ * (so "a,,b," and "a, b" both give two names), duplicates collapsed. Comma is the parent-list
+ * delimiter everywhere in the app (ROLE_NAME_RE excludes it, ops send `parentRoles: 'a,b'`), so a
+ * single name can never contain one — which is why splitting here does not narrow what is accepted.
+ * @param {string} value raw field value
+ * @returns {{roles: string[], invalid: string|null}} `invalid` is the first name that isn't legal
+ */
+function parseRoleNameList(value) {
+  const roles = [];
+  for (const part of String(value ?? '').split(',')) {
+    const name = part.trim();
+    if (!name) continue;
+    if (!ROLE_NAME_RE.test(name)) return { roles, invalid: name };
+    if (!roles.includes(name)) roles.push(name);
+  }
+  return { roles, invalid: null };
+}
+
+/**
+ * "Assign parents": additively grant one or more parent roles on the `desired` clusters, merging
+ * with current grants and any pending edits. See scopeMergeAdd for the semantics.
+ * @param {string[]} roles parent-role names to grant
  * @param {Set<string>} desired clusterIds picked in the dialog
  */
-function addPrivilegeScope(roles, desired) {
+function addParentScope(roles, desired) {
   for (const key of roles) {
     const add = new Set(alterAdd.get(key) || []);
     const rev = new Set(alterRevoke.get(key) || []);
@@ -3574,32 +3601,28 @@ function confirmScopeDialog() {
     return;
   }
 
-  // New privilege: one or more roles at once (typed name + any picked preconfigured groups).
+  // Assign parents: any number at once — a comma-separated list typed in the field, and/or chips.
   if (!ctx) {
-    const roles = [];
-    const typed = document.getElementById('scope-role').value.trim();
     const scopeErr = document.getElementById('scope-error');
-    if (typed) {
-      if (!ROLE_NAME_RE.test(typed)) {
-        showInlineError(scopeErr, 'Invalid role name (no commas)');
-        return;
-      }
-      roles.push(typed);
+    const { roles, invalid } = parseRoleNameList(document.getElementById('scope-role').value);
+    if (invalid) {
+      showInlineError(scopeErr, `Invalid role name: ${invalid}`);
+      return;
     }
     for (const chip of document.querySelectorAll('#scope-preconfigured .pick-chip.active')) {
       if (!roles.includes(chip.dataset.role)) roles.push(chip.dataset.role);
     }
     if (!roles.length) {
-      showInlineError(scopeErr, 'Enter a role name or pick at least one preconfigured group');
+      showInlineError(scopeErr, 'Enter at least one role name or pick a preconfigured one');
       return;
     }
-    addPrivilegeScope(roles, desired);
+    addParentScope(roles, desired);
     closeModal('scope-dialog');
     renderAlterDetail();
     return;
   }
 
-  // Edit an existing privilege/attribute (single key): desired becomes the exact target set.
+  // Edit an existing parent/attribute (single key): desired becomes the exact target set.
   const key = ctx.key;
   const isAttr = ctx.kind === 'attr';
   const addMap = isAttr ? alterAttrAdd : alterAdd;
@@ -3643,7 +3666,7 @@ function confirmConfigScope(ctx, desired) {
  * Pure core of the settings scope editor (mutates alterConfigSet/alterConfigReset). Adding a
  * setting (isNew) is additive — it SETs the `desired` clusters via the shared scopeMergeAdd and
  * never RESETs a cluster just because it already carries the value elsewhere (the same additive
- * rule as "Add privilege"). Editing a row (isNew=false) also RESETs the clusters that leave the
+ * rule as "Assign parents"). Editing a row (isNew=false) also RESETs the clusters that leave the
  * row's original value (origValue). A cluster set to this value has any other pending value for
  * the same setting name cleared, since a role GUC holds one value per name.
  */
@@ -4751,7 +4774,7 @@ document.getElementById('db-reads-editor')?.addEventListener('click', (ev) => {
   if (row) openTemplateDialog('read', row.dataset.readKey);
 });
 
-// Settings list editors (comment fields, parent groups, Find-role columns): in-place edit,
+// Settings list editors (comment fields, role parents, Find-role columns): in-place edit,
 // drag-to-reorder, remove, add. One wiring loop over LIST_EDITORS — see that table for what
 // differs between the three.
 for (const spec of LIST_EDITORS) {

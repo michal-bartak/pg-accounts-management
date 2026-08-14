@@ -1,23 +1,23 @@
 ---
-title: Altering privileges
-description: Parent-role memberships, granted and revoked per cluster
+title: Altering role parents
+description: Role parents, granted and revoked per cluster
 ---
 
-**Privileges** are the role's parent-role memberships. Each parent is one row: the name on the
+**Role Parents** are the roles this role is a member of. Each parent is one row: the name on the
 left, [scope labels](/pg-accounts-management/usage/) on the right showing where it's granted.
 
 <figure class="shot">
 <div class="light-only">
 
-![Privileges section](../../../assets/usage/privileges-rows-light.png)
+![Role Parents section](../../../assets/usage/privileges-rows-light.png)
 
 </div>
 <div class="dark-only">
 
-![Privileges section](../../../assets/usage/privileges-rows-dark.png)
+![Role Parents section](../../../assets/usage/privileges-rows-dark.png)
 
 </div>
-<figcaption>Privileges section — rows with scope labels and the three row actions</figcaption>
+<figcaption>Role Parents section — rows with scope labels and the three row actions</figcaption>
 </figure>
 
 ## Row actions
@@ -52,24 +52,28 @@ Pending changes are visible before you save, through the shared
 [scope-label convention](/pg-accounts-management/usage/): a pending grant is prefixed with
 **`+`**, a pending revoke turns **red and struck through**.
 
-## Adding a privilege
+## Assigning parents
 
-**Add privilege…** introduces a new membership on any mix of groups and clusters. Names from
-[Preconfigured parent groups](/pg-accounts-management/configuration/parent-roles/) appear as
-chips, and you can pick several at once.
+**Assign parents…** grants new memberships on any mix of groups and clusters. Any role can be a
+parent, and you can add several at once, two ways that combine freely:
+
+- **Type the names** in *Role names*, separated by commas — `gr_devs_ro, app_ro`. Spacing around a
+  comma doesn't matter, and repeats are collapsed.
+- **Pick the chips** from
+  [Preconfigured role parents](/pg-accounts-management/configuration/parent-roles/).
 
 <figure class="shot">
 <div class="light-only">
 
-![Add privilege dialog](../../../assets/usage/add-privilege-light.png)
+![Assign parents dialog](../../../assets/usage/add-privilege-light.png)
 
 </div>
 <div class="dark-only">
 
-![Add privilege dialog](../../../assets/usage/add-privilege-dark.png)
+![Assign parents dialog](../../../assets/usage/add-privilege-dark.png)
 
 </div>
-<figcaption>Add privilege dialog — parent chips, free-text name, and cluster selection</figcaption>
+<figcaption>Assign parents dialog — typed names, parent chips, and cluster selection</figcaption>
 </figure>
 
 On **Save changes** these become `grant_parents` and `revoke_parents` operations, folded into

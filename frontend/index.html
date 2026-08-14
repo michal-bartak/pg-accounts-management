@@ -185,9 +185,9 @@
         </div>
 
         <div class="settings-group">
-          <span class="section-label">Preconfigured parent groups <button type="button" class="q-hint" data-hint="Role names offered as pick-list choices when granting privileges in Create role and Alter role. Drag the handle to reorder.">?</button></span>
+          <span class="section-label">Preconfigured role parents <button type="button" class="q-hint" data-hint="Role names offered as pick-list choices when assigning role parents in Create role and Alter role. Any role can be a parent. Drag the handle to reorder.">?</button></span>
           <div id="parent-roles-editor" class="list-editor"></div>
-          <button type="button" class="list-add" id="btn-add-parent-role">Add group…</button>
+          <button type="button" class="list-add" id="btn-add-parent-role">Add parent…</button>
         </div>
 
         <div class="settings-group">
@@ -299,8 +299,8 @@
 
   <dialog id="scope-dialog">
     <form method="dialog" id="scope-form" autocapitalize="none">
-      <h2 id="scope-dialog-title">Add privilege</h2>
-      <label id="scope-role-label">Role name
+      <h2 id="scope-dialog-title">Assign parents</h2>
+      <label id="scope-role-label"><span class="field-label-row">Role names <button type="button" class="q-hint" data-hint="Enter comma separated role names and/or pick from predefined ones.">?</button></span>
         <input name="role" id="scope-role" autocapitalize="none" autocomplete="off" spellcheck="false" />
       </label>
       <div id="scope-preconfigured" class="scope-preconfigured hidden"></div>

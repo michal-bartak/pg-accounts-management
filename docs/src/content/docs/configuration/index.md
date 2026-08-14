@@ -6,7 +6,7 @@ description: Where each setting lives and how staged editing works
 Configuration lives on two tabs:
 
 - **Clusters** — the clusters you connect to and the groups they belong to.
-- **Settings** — everything else: comment fields, call templates, parent groups, the
+- **Settings** — everything else: comment fields, call templates, role parents, the
   password generator, and general preferences.
 
 Both tabs are **staged**. Adds, edits, and deletes change an on-screen draft; nothing is
@@ -34,7 +34,7 @@ while there are unsaved changes.
 | [Clusters](/pg-accounts-management/configuration/clusters/) | Connection details, credentials, groups |
 | [Comment fields](/pg-accounts-management/configuration/comment-fields/) | JSON keys shown as labelled inputs |
 | [Call templates](/pg-accounts-management/configuration/call-templates/) | The SQL behind every read and write |
-| [Parent groups](/pg-accounts-management/configuration/parent-roles/) | Role names offered as quick picks |
+| [Preconfigured role parents](/pg-accounts-management/configuration/parent-roles/) | Role names offered as quick picks |
 | [Password generator](/pg-accounts-management/configuration/password-generator/) | Length and character classes |
 | [General](/pg-accounts-management/configuration/general/) | Appearance, concurrency, update check |
 

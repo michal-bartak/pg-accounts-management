@@ -24,7 +24,7 @@ var (
 	tokenRE = regexp.MustCompile(TokenPattern)
 	// identRE is THE definition of a bare SQL identifier for the whole app — letters, digits and
 	// underscore, not starting with a digit. Placeholder names, role-name literals, preconfigured
-	// parent groups and comment-field keys are all the same shape, and used to be four separate
+	// role parents and comment-field keys are all the same shape, and used to be four separate
 	// copies of this pattern across three packages. Reachable elsewhere via IsIdentifier.
 	identRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 	// ARRAY['gr_a', 'gr_b'] || ${parent_roles}
@@ -143,7 +143,7 @@ func HasMalformedPlaceholder(s string) bool {
 }
 
 // IsIdentifier reports whether s is a bare SQL identifier: letters, digits and underscore, not
-// starting with a digit. This is the shared rule behind preconfigured parent groups, comment-field
+// starting with a digit. This is the shared rule behind preconfigured role parents, comment-field
 // keys, placeholder names and role-name literals — one definition rather than a copy per package.
 func IsIdentifier(s string) bool {
 	return identRE.MatchString(s)
@@ -364,7 +364,7 @@ func preprocessArrayOrNull(call string, args map[string]string, operation string
 }
 
 // splitList splits a comma-separated value into trimmed, non-empty items — lets a single
-// parent_roles placeholder carry several preconfigured parent groups at once.
+// parent_roles placeholder carry several preconfigured role parents at once.
 func splitList(v string) []string {
 	var out []string
 	for _, part := range strings.Split(v, ",") {

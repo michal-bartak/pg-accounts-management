@@ -11,7 +11,7 @@ func TestValidateParentRoles(t *testing.T) {
 		t.Fatalf("trim/dedupe failed: %v", got)
 	}
 	if _, err := validateParentRoles([]string{"bad-name"}); err == nil {
-		t.Fatal("expected error for non-identifier parent group")
+		t.Fatal("expected error for non-identifier role parent")
 	}
 }
 

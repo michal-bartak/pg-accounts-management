@@ -325,9 +325,39 @@ test('buildAlterClusterOps: presence-add create_role carries the granted parents
   assert.equal(r.grant, 'gr_new');
 });
 
-// addPrivilegeScope: "Add privilege" is additive — it must never revoke where the privilege
-// already lives. Regression for the bug where adding P1 to cluster D revoked it from A/B/C.
-test('addPrivilegeScope: adding an existing privilege to a new cluster grants D and revokes nothing', () => {
+// The Assign-parents field takes a comma-separated LIST (the label is plural and its ? hint says
+// so). Comma is the parent-list delimiter app-wide, so splitting on it cannot narrow what a single
+// name may contain — ROLE_NAME_RE already excludes commas.
+test('parseRoleNameList: comma-separated, trimmed, blanks dropped, duplicates collapsed', () => {
+  const r = evalJSON(`({
+    list: parseRoleNameList('gr_devs_ro, app_ro'),
+    messy: parseRoleNameList('  a , b ,, a ,'),
+    single: parseRoleNameList('app_ro'),
+    blank: parseRoleNameList('   '),
+    empty: parseRoleNameList(''),
+    spacey: parseRoleNameList('Mixed Case Role'),
+    nul: parseRoleNameList('ok,ba\\u0000d'),
+  })`);
+  assert.deepEqual(r.list, { roles: ['gr_devs_ro', 'app_ro'], invalid: null });
+  // Trimmed, the blank between the two commas skipped, the trailing comma ignored, 'a' not repeated.
+  assert.deepEqual(r.messy, { roles: ['a', 'b'], invalid: null });
+  assert.deepEqual(r.single, { roles: ['app_ro'], invalid: null });
+  // No name at all is not an error here — confirmScopeDialog reports it, since picking a chip alone
+  // is a valid way to assign a parent.
+  assert.deepEqual(r.blank, { roles: [], invalid: null });
+  assert.deepEqual(r.empty, { roles: [], invalid: null });
+  // A role name may contain spaces and case (the backend double-quotes identifiers), so this is one
+  // name, not three — only a comma splits.
+  assert.deepEqual(r.spacey, { roles: ['Mixed Case Role'], invalid: null });
+  // NUL is the only thing left that a split part can fail on; the valid names before it are kept so
+  // the message can name the offender.
+  assert.equal(r.nul.invalid, 'ba d');
+  assert.deepEqual(r.nul.roles, ['ok']);
+});
+
+// addParentScope: "Assign parents" is additive — it must never revoke where the parent already
+// lives. Regression for the bug where adding P1 to cluster D revoked it from A/B/C.
+test('addParentScope: assigning an existing parent to a new cluster grants D and revokes nothing', () => {
   const r = evalJSON(`(() => {
     alterDetails = [
       { clusterId:'A', exists:true, parents:['P1'], attributes:{}, settings:{}, comment:'' },
@@ -336,7 +366,7 @@ test('addPrivilegeScope: adding an existing privilege to a new cluster grants D 
       { clusterId:'D', exists:true, parents:[],     attributes:{}, settings:{}, comment:'' },
     ];
     alterAdd = new Map(); alterRevoke = new Map();
-    addPrivilegeScope(['P1'], new Set(['D']));
+    addParentScope(['P1'], new Set(['D']));
     return { add:[...(alterAdd.get('P1')||[])].sort(), rev:[...(alterRevoke.get('P1')||[])].sort() };
   })()`);
   assert.deepEqual(r.add, ['D']); // only D newly granted
@@ -344,7 +374,7 @@ test('addPrivilegeScope: adding an existing privilege to a new cluster grants D 
 });
 
 // Adding a cluster that had a pending revoke cancels that revoke (grant wins), still no over-revoke.
-test('addPrivilegeScope: granting a cluster clears its pending revoke and merges with prior adds', () => {
+test('addParentScope: granting a cluster clears its pending revoke and merges with prior adds', () => {
   const r = evalJSON(`(() => {
     alterDetails = [
       { clusterId:'A', exists:true, parents:['P1'], attributes:{}, settings:{}, comment:'' },
@@ -353,14 +383,14 @@ test('addPrivilegeScope: granting a cluster clears its pending revoke and merges
     ];
     alterAdd = new Map([['P1', new Set(['B'])]]);
     alterRevoke = new Map([['P1', new Set(['A'])]]);
-    addPrivilegeScope(['P1'], new Set(['A','C']));
+    addParentScope(['P1'], new Set(['A','C']));
     return { add:[...(alterAdd.get('P1')||[])].sort(), rev:[...(alterRevoke.get('P1')||[])].sort() };
   })()`);
   assert.deepEqual(r.add, ['B', 'C']); // prior add B kept; C newly granted; A already present so not re-added
   assert.deepEqual(r.rev, []);         // pending revoke of A cancelled by granting A
 });
 
-// Shared primitives used by all three sections (privileges, attributes, settings).
+// Shared primitives used by all three sections (role parents, attributes, settings).
 test('scopeMergeAdd: additive — extends add over desired, cancels revoke there, never touches others', () => {
   const r = evalJSON(`(() => {
     const add = new Set(['x']), rev = new Set(['a','z']);
@@ -1077,7 +1107,7 @@ test('searchTemplateError: guides ${full_name} to ${{full_name}}', () => {
   assert.match(r[7], /Empty/);
 });
 
-test('searchCellValues: stable pick in configured order, flagged when clusters disagree', () => {
+test('searchCellValues: stable pick in configured order, disagreement not flagged', () => {
   const r = evalJSON(`(() => {
     state = { categories: [{ id:'prod', label:'Production' }, { id:'uat', label:'UAT' }] };
     const cols = [{ label:'Name', template:'\${{full_name}}' }, { label:'Mail', template:'\${{e_mail}}' }];
@@ -1090,12 +1120,26 @@ test('searchCellValues: stable pick in configured order, flagged when clusters d
       { clusterId:'p1', alias:'prod-1', category:'prod', comment:'{"full_name":"Ann"}' },
       { clusterId:'u1', alias:'uat-1',  category:'uat',  comment:'{"full_name":"Ann"}' },
     ]};
-    return { varying: searchCellValues(group, cols), same: searchCellValues(consistent, cols) };
+    // Each column is searched on its own, so a row can mix clusters: the name only exists on
+    // prod-1, the mail only on uat-1. Documented in docs/…/configuration/role-details.md.
+    const split = { loginName:'cid', clusters: [
+      { clusterId:'u1', alias:'uat-1',  category:'uat',  comment:'{"e_mail":"cid@example.com"}' },
+      { clusterId:'p1', alias:'prod-1', category:'prod', comment:'{"full_name":"Cid C"}' },
+    ]};
+    return {
+      varying: searchCellValues(group, cols),
+      same: searchCellValues(consistent, cols),
+      split: searchCellValues(split, cols),
+    };
   })()`);
-  // prod-1 sorts first (configured group order), so its value is the one shown.
-  assert.deepEqual(r.varying[0], { text: 'Bob B', varies: true });
-  assert.deepEqual(r.varying[1], { text: '', varies: false }); // no e_mail anywhere
-  assert.deepEqual(r.same[0], { text: 'Ann', varies: false }); // equal values are not "varying"
+  // prod-1 sorts first (configured group order), so its value is the one shown — and a differing
+  // value on uat-1 changes nothing about the cell: the search row carries no "differs" marker, since
+  // reconciliation belongs to the loaded role (Comments banner / dialog), not to finding one.
+  assert.deepEqual(r.varying, ['Bob B', '']); // second column: no e_mail anywhere
+  assert.deepEqual(r.same, ['Ann', '']);
+  // A cluster with nothing for a column is SKIPPED, not rendered empty — so the Mail column falls
+  // through prod-1 to uat-1, and the two columns of one row report different clusters.
+  assert.deepEqual(r.split, ['Cid C', 'cid@example.com']);
 });
 
 test('searchColumns: an empty list means role name only (no default fallback)', () => {
@@ -1115,23 +1159,27 @@ test('searchColumns: an empty list means role name only (no default fallback)', 
 });
 
 // Column widths are CSS's job now (the container's tracks + subgrid on rows/header), so what is
-// left to test is the track LIST: one per configured column, capped, between a rolename track and
-// the chips track. The sizing itself is the browser's and is verified in a real engine instead.
-test('searchGridTemplate: rolename + one capped track per column + the chips track', () => {
+// left to test is the track LIST: one flexible track per configured column, between a rolename track
+// and the chips track. The sizing itself is the browser's and is verified in a real engine instead.
+test('searchGridTemplate: rolename + one flexible track per column + the chips track', () => {
   const r = evalJSON(`({
     none: searchGridTemplate(0),
     one: searchGridTemplate(1),
     three: searchGridTemplate(3),
   })`);
-  // No configured columns: rolename + chips only.
+  // No configured columns: rolename + chips only, and the chips' `auto` max absorbs the leftover
+  // width itself — there is no other track that could, and they must stay flush right.
   assert.equal(r.none, 'fit-content(40ch) minmax(8ch, auto)');
-  // fit-content(<cap>) = "as wide as the content needs, up to the cap" — the browser measures the
-  // real text, which is what replaced the canvas approximation.
-  assert.equal(r.one, 'fit-content(40ch) fit-content(30ch) minmax(8ch, auto)');
-  assert.equal(r.three, 'fit-content(40ch) fit-content(30ch) fit-content(30ch) fit-content(30ch) minmax(8ch, auto)');
-  // The chips close the row with a reserved minimum, and their `auto` max absorbs leftover width so
-  // they stay flush right without a second measure pass.
-  for (const t of [r.none, r.one, r.three]) assert.match(t, /minmax\(8ch, auto\)$/);
+  // With columns, each one is minmax(4ch, auto): the `auto` max takes a share of the free space, so
+  // a long value grows into it instead of ellipsizing against a fixed cap.
+  assert.equal(r.one, 'fit-content(40ch) minmax(4ch, auto) minmax(8ch, max-content)');
+  assert.equal(
+    r.three,
+    'fit-content(40ch) minmax(4ch, auto) minmax(4ch, auto) minmax(4ch, auto) minmax(8ch, max-content)',
+  );
+  // The columns are then the only flexible tracks, so the chips take exactly their content width and
+  // stop competing for the slack — but keep the 8ch floor so they can still shrink under pressure.
+  for (const t of [r.one, r.three]) assert.match(t, /minmax\(8ch, max-content\)$/);
 });
 
 test('search-columns dirty check matches what the backend stores', () => {

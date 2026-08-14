@@ -4,7 +4,7 @@ description: The role flags, enabled or disabled per cluster
 ---
 
 **Attributes** are PostgreSQL's role flags. They use the same rows and the same per-cluster
-editor as [privileges](/pg-accounts-management/usage/privileges/).
+editor as [role parents](/pg-accounts-management/usage/parent-roles/).
 
 <figure class="shot">
 <div class="light-only">
@@ -35,7 +35,7 @@ looks neutral; only a **pending** change is marked, using the shared
 [scope-label convention](/pg-accounts-management/usage/) — a pending enable is prefixed with
 **`+`**, a pending disable turns **red and struck through**.
 
-The row actions match [privileges](/pg-accounts-management/usage/privileges/):
+The row actions match [role parents](/pg-accounts-management/usage/parent-roles/):
 
 | Button | Effect |
 |--------|--------|

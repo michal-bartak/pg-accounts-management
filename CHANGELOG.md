@@ -16,6 +16,8 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **"Privileges" is now "Role Parents"** — the role-form section, its dialog (*Assign parents…*) and the Settings list (*Preconfigured role parents*) are named for what they hold: any role can be a parent, not just a group.
+- **Assign several parents by typing** — the Assign-parents dialog takes a comma-separated list of role names, mixable with the preconfigured chips; it previously accepted only one typed name.
 - **Denser UI** — text, controls, table rows and spacing render about 12% smaller, so noticeably more fits on screen.
 - **System requirements are now stated explicitly**: macOS 12+, Windows 10/11 with WebView2, or Linux with WebKitGTK 2.38+. Windows 7/8/8.1 cannot run the app at all (they have not been able to since before the first release — the Go toolchain builds Windows 10+ binaries only). On an older macOS or Linux the Find-role columns stop lining up, as they now use CSS subgrid. The macOS installer previously claimed to support 10.13, which the app has never actually run on.
 - **Breaking: comment keys in templates now use double braces** — `${{full_name}}`. Single braces are reserved for built-ins (`${loginname}`, `${comment}`, `${parent_roles}`, …), so a comment key named `comment` or `loginname` is finally reachable. Update any custom `create_role` / `set_comment` template that referenced a comment key in single braces.

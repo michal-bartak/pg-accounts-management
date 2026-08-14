@@ -14,7 +14,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// A preconfigured parent group and a comment-field key are both bounded to a bare SQL identifier,
+// A preconfigured role parent and a comment-field key are both bounded to a bare SQL identifier,
 // matching what the grant path accepts (unquoted role names). The rule lives in calltemplate —
 // the package that actually embeds these values in SQL — rather than in a copy of the pattern here.
 var isIdentifier = calltemplate.IsIdentifier
@@ -677,7 +677,7 @@ func validateParentRoles(roles []string) ([]string, error) {
 			continue
 		}
 		if !isIdentifier(r) {
-			return nil, fmt.Errorf("invalid parent group %q: use letters, digits, underscore", r)
+			return nil, fmt.Errorf("invalid role parent %q: use letters, digits, underscore", r)
 		}
 		if seen[r] {
 			continue

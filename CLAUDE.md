@@ -74,11 +74,20 @@ into prose, it goes stale.
   (a **one-liner** only — see the search-status decision below)
   — plus a red button flash. Run/batch outcomes stay in the **run-status chip** (unchanged); rare
   clipboard failures log to the console.
-- **Preconfigured parent groups** (`Config.ParentRoles`, YAML `parent_roles`) are a
+- **Preconfigured role parents** (`Config.ParentRoles`, YAML `parent_roles`) are a
   Settings-managed list of bare-identifier role names, saved via `SaveParentRoles`
   (`Store.UpdateParentRoles` validates identifier syntax, dedupes). They are offered as
   pick-list choices (toggle **chips**) in both the Create-role and Alter-role
-  Add-privilege dialogs, several at once. Create-role uses the **same `${parent_roles}`
+  **Assign-parents** dialogs, several at once. **The UI wording is "role parents", never
+  "privileges" or "parent groups"** — any role can be a parent, so the old labels were wrong (the
+  Settings section is *Preconfigured role parents* / *Add parent…*, the role-form section is
+  *Role Parents* — title case, as the user specified — with *Assign parents…*, and the dialog is
+  *Assign parents* with a *Role names* field). Only the labels changed: the YAML/JSON contract
+  (`parent_roles`, `parentRoles`, `grant_parents`) is untouched, so don't "fix" it to match.
+  The dialog's *Role names* field takes a **comma-separated list** (`parseRoleNameList`: split on
+  `,`, trim, drop blanks, dedupe; the only rejection left is a NUL, since `ROLE_NAME_RE` excludes
+  commas by design) which merges with the picked chips, then goes to `addParentScope`.
+  Create-role uses the **same `${parent_roles}`
   placeholder as grant/revoke** (there is no singular `${parent_role}`): statement mode → a
   double-quoted identifier list (`"a", "b"`), function mode → an inline `ARRAY['a', 'b']` literal
   (values verbatim, `'`-bearing values rejected; empty → `NULL`). The selected parents are published
@@ -153,16 +162,28 @@ into prose, it goes stale.
   `search_columns: []` means "rolename only" and must survive a restart — hence `Load` keys the
   default off `== nil` and `sanitizeSearchColumns` preserves nil-ness. The frontend `searchColumns()`
   therefore has **no default fallback** (unlike `commentFields()`), or an explicit empty list would
-  resurrect the default. `searchCellValues` picks each value from the first cluster in
-  `byGroupThenAlias` order (results arrive in completion order), flagging `≠` when clusters disagree.
+  resurrect the default. `searchCellValues` returns one **string** per column — the first non-empty
+  value in `byGroupThenAlias` order (results arrive in completion order). Clusters disagreeing about a
+  value is deliberately **not** flagged in a search row (a `≠` marker was tried and read as an
+  unexplained artifact): the popup is for finding a role, and reconciliation is reported once the role
+  is loaded, by the "Comments differ" banner and the Comments dialog.
   **Layout — CSS subgrid, no measuring.** Rows stay single-line clickable `<button>`s. The
   CONTAINER `#alter-results` owns the column tracks (`--search-cols`, set by
   `searchGridTemplate(colCount)`); the header (`.alter-result-head`) and every row set
   `grid-column: 1 / -1` + `grid-template-columns: subgrid`, so the browser sizes each column to its
   widest cell across all rows and they align for free. Tracks are
-  `fit-content(40ch)` (rolename), one `fit-content(30ch)` per configured column, then
-  `minmax(8ch, auto)` for the chips — `fit-content(<cap>)` means "as wide as the content needs, up
-  to the cap", and the trailing `auto` max soaks up leftover width so the chips stay flush right.
+  `fit-content(40ch)` (rolename), one **`minmax(4ch, auto)`** per configured column, then
+  `minmax(8ch, max-content)` for the chips. **The configured columns are the flexible tracks** —
+  their `auto` max takes an equal share of the free space, freezes at each column's content width
+  and redistributes what a column didn't need, so a lone column takes the whole row, several share
+  it, and a short column is never starved by a long neighbour. That is why the chips' max is
+  `max-content` **only when there is at least one column** (`searchGridTemplate` switches it):
+  the chips then take exactly their content and the slack goes to the columns, but with **no**
+  columns nothing else could absorb it, so the chips track keeps `auto` or it would stop short of
+  the right edge. Their `8ch` floor is deliberate — it lets the chips shrink (and wrap) under real
+  pressure instead of forcing a horizontal scrollbar and crushing the rolename. Don't put a
+  `fit-content(<cap>)` back on a column: a cap made a long value (a raw `${comment}` above all)
+  ellipsize while hundreds of px sat unused in the chips track.
   Two constraints, don't undo them: (1) a subgrid child's own border+padding **insets its tracks**,
   so `.alter-result-head`'s horizontal padding must stay `calc(0.7rem + 1px)` = the row's
   padding + border, or header and rows fall out of alignment; (2) the column gap lives on the
@@ -173,9 +194,8 @@ into prose, it goes stale.
   This **replaced ~165 lines** that measured text with canvas `measureText` against fonts read from
   throwaway DOM probes, plus a second render pass to pin the chip track. It is why the app requires
   **WebKit 16 / macOS 12+ / WebKitGTK 2.38+** (WebView2 is evergreen) — see the platform note in
-  [docs installation](docs/src/content/docs/installation.md). One deliberate behaviour change: a
-  column past its cap now ellipsizes rather than turning into `1fr` and absorbing free space; the
-  chips track takes the slack instead. `pg.ParseFullName` / `RoleMatch.FullName` /
+  [docs installation](docs/src/content/docs/installation.md). A column still ellipsizes — but only
+  once the free space is actually used up, not at a fixed cap. `pg.ParseFullName` / `RoleMatch.FullName` /
   `ClusterRoleDetail.FullName` were **removed** earlier with this feature — don't reintroduce a
   hardcoded key.
 - **One shared role form for Create and Alter.** Both modes render through
@@ -346,7 +366,7 @@ Config/clusters/groups: `GetConfig`, `GetConfigPath`, `GetDefaultTemplates` (the
 templates + introspection queries, so the Settings editor's **Default** button has no second copy
 of the SQL — see the DB-templates section), `ReloadConfig`, `AddCluster`,
 `UpdateCluster`, `DeleteCluster`, `AddCategory`, `UpdateCategory`, `DeleteCategory`,
-**`SaveSettings(SettingsPayload)`** (the whole Settings page in ONE atomic write — parent groups,
+**`SaveSettings(SettingsPayload)`** (the whole Settings page in ONE atomic write — role parents,
 comment fields, search columns, db_functions, db_reads, batch, ui; everything validates before
 anything is assigned, and command templates are validated against the comment fields *in the same
 payload*, so no call ordering is required). The per-section `SaveDBFunctions`, `SaveDBReads`,
@@ -480,17 +500,23 @@ out of step. Two rem values are hand-synced and must not drift:
 `th, td { padding: .55rem .75rem }` with the `1.5rem` in `depsColgroup`, and
 `.alter-result-head`'s `calc(0.7rem + 1px)` with the search-result row's border+padding.
 
-Four density tokens carry the parts a plain `rem` cannot:
+Three density tokens carry the parts a plain `rem` cannot:
 **`--hairline: 1.15px`** for every border (a flat `1px` is 1.75 device px at 175% display scaling,
 so the engine snaps it to 1 *or* 2 device px depending on the element's position and borders read
 patchy; 1.15px is 2.01 device px there — always 2 — and still rounds to 1px at 100%). Decoration
 strokes (checkbox tick, spinner, `.update-badge` ring) stay literal px.
-**`--ink-lift` / `--ink-lift-control`** correct optical centring: browsers centre the *line box*,
-which reserves descender depth and diacritic headroom, so visible ink lands low — measured off
-painted pixels at 0.042em on a chip and 0.086em on a full-height button. Applied as asymmetric
-padding. Uppercase pills are deliberately excluded (0.03em, sub-pixel). **`--checkbox-lift`** nudges
+**`--ink-lift`** corrects optical centring: browsers centre the *line box*, which reserves descender
+depth and diacritic headroom, so the cap band can land off centre. How far off depends **only on the
+font size**, via `(fontBoxAscent - fontBoxDescent - capHeight) / 2` — measured against painted
+pixels, 0.455px at `--fs-sm` (= the 0.042em token), 0.30px at `--fs-xs`, and **0.06px at
+`--fs-base`, i.e. nothing**. So it is applied as asymmetric padding to the small-font elements only
+(`button.small`, `.ph-chip`, `.pick-chip`); **full-height buttons take no lift** and stay symmetric
+like `.tab`/`.seg-btn`. `min-height` is not a factor — a button centres its line box in its content
+box and splits the slack evenly, so an earlier `--ink-lift-control: 0.086em` on buttons was an
+overcorrection that pushed labels ~1px above centre; it was removed, don't reintroduce it.
+Uppercase pills are deliberately excluded (0.03em, sub-pixel). **`--checkbox-lift`** nudges
 the Target-selection checkbox, which reads low against its group chip even though both boxes centre
-on the same device row. All four are single values — retune, don't sweep.
+on the same device row. All three are single values — retune, don't sweep.
 
 **`.section-label` is the ONE small-uppercase section label** (Settings groups, Settings meta, the
 role form's sections, About), sized by `--fs-section`. It replaced five near-identical rules that
@@ -539,9 +565,9 @@ toolbar hosts the right-aligned **Cluster groups** button (`btn-manage-groups` �
 Save button, so it lives here rather than Settings). Settings is organised into
 divider-separated **`.settings-group`** sections (small uppercase `.settings-group-label`,
 same look as the role form): **General** (Appearance theme + Max concurrency), **Preconfigured
-parent groups**, **Comments** (Comment fields + Preferred comment view), **Role Details** (search
+role parents**, **Comments** (Comment fields + Preferred comment view), **Role Details** (search
 result columns), and **DB command
-templates**. Parent groups, Comment fields and Find-role columns are drag-orderable add/remove
+templates**. Role parents, Comment fields and Find-role columns are drag-orderable add/remove
 **list editors** — all three are ONE widget, described by the **`LIST_EDITORS`** table (id, add
 button, focus target, draft get/set, `seed` from saved config, `blank` row, `row` markup, `edit`
 handler) and driven by `renderListEditor`/`seedListEditor`/`renderListEditors` plus a single
@@ -578,7 +604,7 @@ would overflow) so `overflow:hidden` panels never clip it. The badges carry **no
 keyboard-focusable they open on an explicit **Enter/Space** press (toggle) and close on
 blur/Escape — **not** on plain focus (which used to flash the hint while tabbing past).
 Delegated `mouseover` + `keydown` handlers drive it, so JS-rendered badges (e.g. the
-Alter-role sections) work without per-element wiring. Used on Privileges/Attributes/Settings
+Alter-role sections) work without per-element wiring. Used on Role Parents/Attributes/Settings
 (Alter role), and the Cluster-groups / Find-role / Comments dialogs.
 
 **Shared UI conventions (solve once, apply everywhere — don't re-patch per popup).**
@@ -598,7 +624,7 @@ keyboard — keeps the ring and their place in the tab order. Note the mechanism
 **not** rely on the `close` event (some engines don't fire it for a programmatic `.close()`) nor on
 a focus event (the restore can happen without one). A `<form method="dialog">` submit still closes
 natively, bypassing the helper. Settings list editors focus the new row's
-input after an Add (parent-group `.pr-value`, comment-field `.cf-key`). Focus indicators are
+input after an Add (role-parent `.pr-value`, comment-field `.cf-key`). Focus indicators are
 **keyboard-only** (`:focus-visible`) and **inset** (border-colour + `inset` box-shadow; a
 light ring on primary-filled controls where a primary ring would vanish) so scroll containers
 / `overflow:hidden` never clip them — one rule in `styles.css` covers text fields, buttons and
@@ -631,7 +657,7 @@ The header is a `.brand` row (accent dot + smaller title + version chip + round 
   deleted `renderDetailErrors`) is gone, and with it the alias-printed-twice duplication;
   `stripClusterPrefix` drops the `connect to <alias>: ` that `pg.Connect` adds when the message
   renders in a table that already has a Cluster column.
-- **Privileges** (parent roles) and **Attributes** (superuser/createrole/createdb/
+- **Role Parents** (`#alter-parents`) and **Attributes** (superuser/createrole/createdb/
   inherit/login/replication/bypassrls) render one-per-row: name left, **scope labels**
   right. Completeness is judged **per group**: all selected clusters of a group matched
   → one **outlined** (bordered, transparent) uppercase group label — matching the bordered

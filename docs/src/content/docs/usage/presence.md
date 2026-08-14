@@ -45,7 +45,7 @@ you searched. Tick to add, untick to drop.
 <figcaption>Presence picker — the clusters in scope, with the role's current presence ticked</figcaption>
 </figure>
 
-- **Adding** a cluster brings the whole form to bear on it: privileges, attributes, settings,
+- **Adding** a cluster brings the whole form to bear on it: role parents, attributes, settings,
   and the comment all target it too. A `CREATE ROLE` is prepended to that cluster's transaction
   on Save. Whether creation is staged automatically is a
   [general setting](/pg-accounts-management/configuration/general/).

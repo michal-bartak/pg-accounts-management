@@ -35,7 +35,7 @@ Cross-platform **PostgreSQL role maintenance** desktop app: manage clusters, bat
 
 Example template: [`config.example.yaml`](config.example.yaml). Implemented in `internal/config/` (`paths.go`, `store.go`).
 
-**YAML keys:** `version`, `categories`, `clusters`, `db_functions.<op>.call`, `db_functions.<op>.execution`, `batch.max_concurrency` (default 5), `ui.theme`, `ui.password_gen` (role-form random password generator: `length` clamped `[6,128]`/default 10, class toggles `lowercase/uppercase/digits/symbols`, `exclude_similar`; at least one class stays on — Settings → Password generator, persisted via `SaveUISettings`/`UISettings.PasswordGen`), `parent_roles` (preconfigured parent groups — bare identifiers, offered as pick-list choices when granting privileges; Create-role uses the same `parent_roles` placeholder as grant/revoke). Legacy `name`/`params` migrated on load.
+**YAML keys:** `version`, `categories`, `clusters`, `db_functions.<op>.call`, `db_functions.<op>.execution`, `batch.max_concurrency` (default 5), `ui.theme`, `ui.password_gen` (role-form random password generator: `length` clamped `[6,128]`/default 10, class toggles `lowercase/uppercase/digits/symbols`, `exclude_similar`; at least one class stays on — Settings → Password generator, persisted via `SaveUISettings`/`UISettings.PasswordGen`), `parent_roles` (preconfigured role parents — bare identifiers, offered as pick-list choices in the Assign-parents dialog, whose Role names field takes a comma-separated list; Create-role uses the same `parent_roles` placeholder as grant/revoke). Legacy `name`/`params` migrated on load.
 
 ## Wails API (`app.go` → `window.go.main.App`)
 
@@ -43,7 +43,7 @@ Example template: [`config.example.yaml`](config.example.yaml). Implemented in `
 - `AddCluster`, `UpdateCluster`, `DeleteCluster` (per-item; kept but unused by the UI now)
 - `SaveClusters(ClustersConfig)` — staged Clusters editor: replaces the whole clusters+categories
   set atomically via `Store.SaveClustersAndCategories` (validate + UUID/slug ids + referential integrity)
-- `SaveSettings(SettingsPayload)` — the whole Settings page in ONE atomic write (parent groups,
+- `SaveSettings(SettingsPayload)` — the whole Settings page in ONE atomic write (role parents,
   comment fields, search columns, db_functions, db_reads, batch, ui). Everything validates before
   anything is assigned, and templates are validated against the comment fields in the same payload.
   The per-section `SaveDBFunctions`/`SaveDBReads`/`SaveBatchSettings`/`SaveUISettings`/
@@ -144,13 +144,16 @@ bug, since it stays full-size while everything around it shrinks. **No icon carr
 size glyphs in rem. Hand-synced rem pairs that must not drift:
 `th, td { padding: .55rem .75rem }` ↔ the `1.5rem` in `depsColgroup`; `.alter-result-head`'s
 `calc(0.7rem + 1px)` ↔ the search-result row's border+padding.
-Four tokens carry what rem cannot: **`--hairline: 1.15px`** for all borders (a flat `1px` is 1.75
+Three tokens carry what rem cannot: **`--hairline: 1.15px`** for all borders (a flat `1px` is 1.75
 device px at 175% scaling and snaps to 1 *or* 2 depending on position, so borders read patchy;
 1.15px is always 2 there and still 1px at 100%) — decoration strokes stay literal px;
-**`--ink-lift` / `--ink-lift-control`** correct optical centring (browsers centre the line box, so
-ink lands low — 0.042em on chips, 0.086em on full-height buttons, measured from painted pixels;
-uppercase pills excluded); **`--checkbox-lift`** for the Target-selection checkbox. Retune the
-token, never sweep the rules. **`.section-label`** is the one small-uppercase section label
+**`--ink-lift`** corrects optical centring (browsers centre the line box, so the cap band can land
+off centre by `(fontBoxAscent - fontBoxDescent - capHeight) / 2` — measured 0.455px at `--fs-sm`
+= the 0.042em token, but only 0.06px at `--fs-base`, so it goes on the small-font elements
+(`button.small`, `.ph-chip`, `.pick-chip`) and **full-height buttons stay symmetric** like
+`.tab`/`.seg-btn`; `min-height` is not a factor, and the removed `--ink-lift-control: 0.086em`
+overcorrected buttons by ~1px — don't reintroduce it; uppercase pills excluded);
+**`--checkbox-lift`** for the Target-selection checkbox. Retune the token, never sweep the rules. **`.section-label`** is the one small-uppercase section label
 (sized by `--fs-section`), replacing five drifted near-duplicates.
 
 **App-shell layout:** `body` is a flex column with `overflow:hidden` (no whole-page
@@ -195,7 +198,9 @@ title + version chip + `ⓘ #btn-about`) opens `#about-dialog` (`GetAppVersion`;
 **Alter role** (search-then-edit): clicking the **Alter role** op-tab opens a search
 dialog (no separate "Find user" button) that searches the *selected*
 clusters (name + `COMMENT ON ROLE`), grouped by login; picking one opens a single
-consolidated form. Privileges (`pg_auth_members`) and attributes (superuser, createrole,
+consolidated form. Role Parents (`pg_auth_members`; labelled "Role Parents", never "Privileges" —
+the *Assign parents…* button opens the scope dialog, whose *Role names* field takes a
+comma-separated list via `parseRoleNameList`) and attributes (superuser, createrole,
 createdb, inherit, login, replication, bypassrls) list one-per-row with **scope labels**
 judged per group (outlined/bordered group label when all selected clusters of a group match
 — matching Target selection's group boxes — else filled per-cluster labels; coloured by
@@ -223,10 +228,14 @@ helpers. **Find-role result columns are configured too**, never a hardcoded comm
 → **Role Details** list editor / `searchColumnsDraft`) is rendered frontend-side by
 `renderSearchTemplate` over `RoleMatch.Comment` — same two namespaces as the call templates:
 `${{<key>}}` = any JSON comment key, and the closed bare set's only member `${comment}` =
-the raw comment, unresolved → `''`, result whitespace-collapsed; `searchCellValues` flags `≠` when
-clusters disagree. Layout: **CSS subgrid**. The container `#alter-results` owns the tracks
+the raw comment, unresolved → `''`, result whitespace-collapsed; `searchCellValues` returns one string
+per column (first non-empty in `byGroupThenAlias` order) and does **not** flag clusters disagreeing —
+that is reported after the role loads, by the "Comments differ" banner and the Comments dialog. Layout: **CSS subgrid**. The container `#alter-results` owns the tracks
 (`--search-cols` from `searchGridTemplate(colCount)`: `fit-content(40ch)` rolename, one
-`fit-content(30ch)` per column, `minmax(8ch, auto)` chips); the header and every row are
+`minmax(4ch, auto)` per column, `minmax(8ch, max-content)` chips — the columns are the flexible
+tracks, sharing the free space and freezing at their content width, so a long value grows into the
+row instead of ellipsizing at a cap; with **no** columns the chips track keeps `auto` since nothing
+else can absorb the slack and they must stay flush right); the header and every row are
 `grid-column: 1 / -1` + `grid-template-columns: subgrid`, so the browser does the sizing. A subgrid
 child's border+padding insets its tracks, so `.alter-result-head` must keep
 `padding: 0 calc(0.7rem + 1px)` to match the row; the column gap lives on the container and is

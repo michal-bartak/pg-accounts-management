@@ -194,8 +194,8 @@ ui:
 #   category_ids: [production, uat]
 #   cluster_ids: [prod_eu_1]
 
-# parent_roles: preconfigured parent groups offered as pick-list choices when granting
-# privileges (Create role / Alter role). Bare identifiers; several can be granted at once.
+# parent_roles: preconfigured role parents offered as pick-list choices when assigning role
+# parents (Create role / Alter role). Bare identifiers; several can be assigned at once.
 parent_roles:
   - gr_devs_ro
   - gr_reporting

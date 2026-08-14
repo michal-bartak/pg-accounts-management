@@ -62,14 +62,14 @@ one form per cluster.
 ![Alter role form](../../../assets/usage/alter-form-dark.png)
 
 </div>
-<figcaption>Alter role — Present on, comment, privileges and attributes in one form</figcaption>
+<figcaption>Alter role — Present on, comment, role parents and attributes in one form</figcaption>
 </figure>
 
 The clusters selected at search time become the role's working scope. To bring another cluster
 into play, re-select targets and search again.
 
 From here you can edit the [comment](/pg-accounts-management/usage/comments/),
-[privileges](/pg-accounts-management/usage/privileges/),
+[role parents](/pg-accounts-management/usage/parent-roles/),
 [attributes](/pg-accounts-management/usage/attributes/),
 [settings](/pg-accounts-management/usage/role-settings/),
 [password](/pg-accounts-management/usage/password/), and

@@ -232,8 +232,8 @@ type Config struct {
 	DBReads     DBReads       `yaml:"db_reads" json:"dbReads"`
 	Batch       BatchSettings `yaml:"batch" json:"batch"`
 	UI          UISettings    `yaml:"ui" json:"ui"`
-	// ParentRoles are preconfigured parent groups offered as pick-list choices when
-	// granting privileges (Create role / Alter role), instead of typing role names.
+	// ParentRoles are preconfigured role parents offered as pick-list choices when assigning
+	// role parents (Create role / Alter role), instead of typing role names.
 	ParentRoles []string `yaml:"parent_roles,omitempty" json:"parentRoles"`
 	// CommentFields are the JSON keys the app surfaces as labeled inputs when a role
 	// comment holds JSON (Create role / Alter role). Ordered; keys not listed here are

@@ -82,8 +82,13 @@ The two forms are independent, so a comment that carries its own `comment` key i
 - Surrounding whitespace is collapsed, so `${{first_name}} ${{last_name}}` shows `Ada` — not
   `Ada ` — for a role with no last name.
 - Values that aren't strings render typed: `42`, `true`, `["a","b"]`.
-- When a role's comment **differs between clusters**, the column shows the value from the first
-  cluster in group order and marks it `≠`. Hover the row to see which clusters it exists on.
+- When a role's comment **differs between clusters**, each column shows the first value it finds,
+  looking through the clusters the role was found on in cluster-group order, then alias.
+- That search **skips** a cluster whose comment has nothing for the column, rather than showing the
+  column empty — so the value you see can come from further down the list, and because each column
+  searches on its own, two columns in one row can come from different clusters. Neither is marked
+  here: open the role and the comment editor reports the differences, with the Comments dialog to
+  reconcile the versions.
 
 ## Layout
 
