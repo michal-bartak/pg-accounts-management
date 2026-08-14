@@ -2555,26 +2555,27 @@ const SEARCH_BADGE_MIN_CH = 8; // reserved for the cluster chips, so a wide colu
 /** The `grid-template-columns` for the results container: the rolename, one track per configured
  *  column, then the cluster chips.
  *
- *  Configured columns are `minmax(<floor>, auto)` — deliberately NOT `fit-content(<cap>)`. A cap
- *  made a long value (a raw `${comment}` especially) ellipsize while hundreds of px sat unused in
- *  the chips track. With an `auto` maximum the browser hands each column an equal share of the free
- *  space, freezes the ones that reach their content width, and redistributes what they didn't need
- *  — so a lone column takes the whole row, several columns share it, and short ones are never
- *  starved by a long neighbour. `.alter-cell` still ellipsizes, but only once the space genuinely
- *  isn't there. The floor keeps a squeezed column from collapsing to nothing.
+ *  Configured columns are `minmax(<floor>, max-content)`. Two failure modes were measured, and that
+ *  exact pair of keywords is what avoids both:
+ *  - `fit-content(<cap>)` made a long value (a raw `${comment}` above all) ellipsize at the cap
+ *    while hundreds of px sat unused further right. Hence no cap — a column may grow to its content.
+ *  - an `auto` maximum ALSO stretches a column past its content, because grid's last sizing step
+ *    hands the remaining free space to every auto-max track. With short values that padded each
+ *    column by ~240px, so "Michal Bartak" and the email beside it sat a quarter of a row apart.
+ *    `max-content` stops a column exactly at its text, and the columns read as a table again.
+ *  `.alter-cell` still ellipsizes, but only once the space genuinely isn't there; the floor keeps a
+ *  squeezed column from collapsing to nothing.
  *
- *  The chips close the row and must stay flush right, which decides their max:
- *  - with configured columns, `max-content` — the columns are the flexible tracks, so the chips take
- *    exactly what they need and the leftover goes to the columns.
- *  - with none, `auto` — nothing else can absorb the leftover, so the chips track must, or it would
- *    end short of the container's right edge.
- *  Their `8ch` floor is what lets them shrink (and wrap) under real pressure rather than forcing a
+ *  That leaves the CHIPS track as the flexible one (`auto`), always. It is last and
+ *  `justify-self: end`, so handing it the leftover both keeps the chips flush against the right edge
+ *  and parks the slack in the one place it reads as deliberate — between the last value and the
+ *  chips. Its `8ch` floor lets it shrink (and wrap) under real pressure rather than forcing a
  *  horizontal scrollbar and crushing the rolename. */
 function searchGridTemplate(colCount) {
   return [
     `fit-content(${SEARCH_LOGIN_MAX_CH}ch)`,
-    ...Array.from({ length: colCount }, () => `minmax(${SEARCH_COL_MIN_CH}ch, auto)`),
-    `minmax(${SEARCH_BADGE_MIN_CH}ch, ${colCount ? 'max-content' : 'auto'})`,
+    ...Array.from({ length: colCount }, () => `minmax(${SEARCH_COL_MIN_CH}ch, max-content)`),
+    `minmax(${SEARCH_BADGE_MIN_CH}ch, auto)`,
   ].join(' ');
 }
 

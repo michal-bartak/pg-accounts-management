@@ -1167,19 +1167,19 @@ test('searchGridTemplate: rolename + one flexible track per column + the chips t
     one: searchGridTemplate(1),
     three: searchGridTemplate(3),
   })`);
-  // No configured columns: rolename + chips only, and the chips' `auto` max absorbs the leftover
-  // width itself — there is no other track that could, and they must stay flush right.
+  // No configured columns: rolename + chips only.
   assert.equal(r.none, 'fit-content(40ch) minmax(8ch, auto)');
-  // With columns, each one is minmax(4ch, auto): the `auto` max takes a share of the free space, so
-  // a long value grows into it instead of ellipsizing against a fixed cap.
-  assert.equal(r.one, 'fit-content(40ch) minmax(4ch, auto) minmax(8ch, max-content)');
+  // Each column is minmax(4ch, max-content): no cap, so a long value grows to its content instead of
+  // ellipsizing early — but no `auto` max either, or grid's stretch step would pad every column with
+  // a share of the leftover and push the next column far from the previous one's text.
+  assert.equal(r.one, 'fit-content(40ch) minmax(4ch, max-content) minmax(8ch, auto)');
   assert.equal(
     r.three,
-    'fit-content(40ch) minmax(4ch, auto) minmax(4ch, auto) minmax(4ch, auto) minmax(8ch, max-content)',
+    'fit-content(40ch) minmax(4ch, max-content) minmax(4ch, max-content) minmax(4ch, max-content) minmax(8ch, auto)',
   );
-  // The columns are then the only flexible tracks, so the chips take exactly their content width and
-  // stop competing for the slack — but keep the 8ch floor so they can still shrink under pressure.
-  for (const t of [r.one, r.three]) assert.match(t, /minmax\(8ch, max-content\)$/);
+  // The chips track is the flexible one in every case: it is last and end-aligned, so it holds the
+  // leftover width, keeping the chips flush right and the slack in one deliberate-looking place.
+  for (const t of [r.none, r.one, r.three]) assert.match(t, /minmax\(8ch, auto\)$/);
 });
 
 test('search-columns dirty check matches what the backend stores', () => {

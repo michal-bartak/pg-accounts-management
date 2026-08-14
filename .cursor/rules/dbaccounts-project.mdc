@@ -232,10 +232,10 @@ the raw comment, unresolved → `''`, result whitespace-collapsed; `searchCellVa
 per column (first non-empty in `byGroupThenAlias` order) and does **not** flag clusters disagreeing —
 that is reported after the role loads, by the "Comments differ" banner and the Comments dialog. Layout: **CSS subgrid**. The container `#alter-results` owns the tracks
 (`--search-cols` from `searchGridTemplate(colCount)`: `fit-content(40ch)` rolename, one
-`minmax(4ch, auto)` per column, `minmax(8ch, max-content)` chips — the columns are the flexible
-tracks, sharing the free space and freezing at their content width, so a long value grows into the
-row instead of ellipsizing at a cap; with **no** columns the chips track keeps `auto` since nothing
-else can absorb the slack and they must stay flush right); the header and every row are
+`minmax(4ch, max-content)` per column, `minmax(8ch, auto)` chips — a column's max is neither a
+`fit-content` cap (which ellipsized long values while space sat unused) nor `auto` (which stretched
+every column past its content and pushed the next one ~240px away); the chips track is the only
+flexible one, and being last + `justify-self: end` it holds the slack and stays flush right); the header and every row are
 `grid-column: 1 / -1` + `grid-template-columns: subgrid`, so the browser does the sizing. A subgrid
 child's border+padding insets its tracks, so `.alter-result-head` must keep
 `padding: 0 calc(0.7rem + 1px)` to match the row; the column gap lives on the container and is

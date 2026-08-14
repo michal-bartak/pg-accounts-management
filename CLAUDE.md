@@ -172,18 +172,17 @@ into prose, it goes stale.
   `searchGridTemplate(colCount)`); the header (`.alter-result-head`) and every row set
   `grid-column: 1 / -1` + `grid-template-columns: subgrid`, so the browser sizes each column to its
   widest cell across all rows and they align for free. Tracks are
-  `fit-content(40ch)` (rolename), one **`minmax(4ch, auto)`** per configured column, then
-  `minmax(8ch, max-content)` for the chips. **The configured columns are the flexible tracks** —
-  their `auto` max takes an equal share of the free space, freezes at each column's content width
-  and redistributes what a column didn't need, so a lone column takes the whole row, several share
-  it, and a short column is never starved by a long neighbour. That is why the chips' max is
-  `max-content` **only when there is at least one column** (`searchGridTemplate` switches it):
-  the chips then take exactly their content and the slack goes to the columns, but with **no**
-  columns nothing else could absorb it, so the chips track keeps `auto` or it would stop short of
-  the right edge. Their `8ch` floor is deliberate — it lets the chips shrink (and wrap) under real
-  pressure instead of forcing a horizontal scrollbar and crushing the rolename. Don't put a
-  `fit-content(<cap>)` back on a column: a cap made a long value (a raw `${comment}` above all)
-  ellipsize while hundreds of px sat unused in the chips track.
+  `fit-content(40ch)` (rolename), one **`minmax(4ch, max-content)`** per configured column, then
+  `minmax(8ch, auto)` for the chips. **The chips track is the only flexible one**, and both halves of
+  that are measured decisions — a column's max must be neither `fit-content(<cap>)` nor `auto`:
+  a **cap** made a long value (a raw `${comment}` above all) ellipsize while hundreds of px sat
+  unused further right; an **`auto`** max stretched every column past its content, because grid's
+  final step hands leftover space to each auto-max track — with short values that padded each column
+  by ~240px, so a name and the email beside it sat a quarter of a row apart. `max-content` stops a
+  column at its text, so the values read as a table and the slack collects in the chips track, which
+  is last and `justify-self: end` — the chips stay flush right and the gap lands in the one place it
+  looks deliberate. The chips' `8ch` floor lets them shrink (and wrap) under real pressure instead of
+  forcing a horizontal scrollbar and crushing the rolename.
   Two constraints, don't undo them: (1) a subgrid child's own border+padding **insets its tracks**,
   so `.alter-result-head`'s horizontal padding must stay `calc(0.7rem + 1px)` = the row's
   padding + border, or header and rows fall out of alignment; (2) the column gap lives on the

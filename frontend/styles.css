@@ -1212,10 +1212,11 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   font-size: var(--fs-base);
 }
 .alter-result-head .alter-cell { font-weight: 500; color: var(--muted); }
-/* Last grid track, so justify-self keeps the chips flush right. Which side absorbs leftover width is
-   decided by searchGridTemplate: the configured columns when there are any, this track's `auto` max
-   when there are none. `margin-left:auto` covers the flex contexts that reuse this class (e.g. the
-   Present-on block, which overrides it). */
+/* Last grid track, so justify-self keeps the chips flush right — and it is deliberately the ONLY
+   track that absorbs leftover width (see searchGridTemplate): the configured columns stop at their
+   content, so the slack collects here, between the last value and the chips, instead of being
+   spread through the row. `margin-left:auto` covers the flex contexts that reuse this class (e.g.
+   the Present-on block, which overrides it). */
 .alter-cluster-badges {
   margin-left: auto;
   justify-self: end;
