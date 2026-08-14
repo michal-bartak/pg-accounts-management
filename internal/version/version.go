@@ -15,7 +15,7 @@ var (
 	// Repo is the canonical GitHub repository URL. Release builds inject the actual git
 	// remote (Makefile -ldflags); the default keeps `go run` / `wails dev` working. Any
 	// remote form (https, git@, trailing .git) is normalized by normalizeRepo.
-	Repo = "https://github.com/michal-bartak/pg-accounts-management"
+	Repo = "https://github.com/michal-bartak/pgcowboy"
 )
 
 // Info is exposed to the UI and tooling.

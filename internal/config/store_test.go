@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/michalbartak/dbaccounts/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/model"
 )
 
 // Both savers write atomically (temp file + rename) and leave no stray temp files behind, and the

@@ -26,7 +26,7 @@ The comment editor sits under the login name, with a **Fields ↔ Raw** toggle.
 
 - **Fields** — one labelled input per JSON key. It edits values only; it never adds or removes
   keys. Which keys get friendly labels comes from
-  [Comment fields](/pg-accounts-management/configuration/comment-fields/), and any other key in
+  [Comment fields](/pgcowboy/configuration/comment-fields/), and any other key in
   the comment still appears, labelled by its raw key.
 - **Raw** — the whole comment as free text. Use it to add or remove keys, to write plain text,
   or to edit a value that Fields shows read-only.

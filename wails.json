@@ -1,18 +1,18 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "DbAccounts",
-  "outputfilename": "DbAccounts",
+  "name": "pgCowboy",
+  "outputfilename": "pgCowboy",
   "frontend:install": "",
   "frontend:build": "",
   "frontend:dev:watcher": "",
   "frontend:dev:serverUrl": "",
   "author": {
-    "name": "DbAccounts",
+    "name": "pgCowboy",
     "email": ""
   },
   "info": {
-    "companyName": "DbAccounts",
-    "productName": "DbAccounts",
+    "companyName": "pgCowboy",
+    "productName": "pgCowboy",
     "productVersion": "1.0.0",
     "copyright": "Copyright 2026",
     "comments": "PostgreSQL role maintenance across clusters"

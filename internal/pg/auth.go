@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/michalbartak/dbaccounts/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/model"
 )
 
 func ResolveUser(cluster model.Cluster, auth model.AuthContext) (string, error) {

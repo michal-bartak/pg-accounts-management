@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/michalbartak/dbaccounts/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/model"
 )
 
 // The bare ${…} namespace is a closed set of built-ins; ${{…}} is always a configured comment

@@ -1,6 +1,6 @@
 ---
 title: Building from source
-description: Build and run DbAccounts locally
+description: Build and run pgCowboy locally
 ---
 
 ## Prerequisites
@@ -13,8 +13,8 @@ description: Build and run DbAccounts locally
 ## Clone and run
 
 ```bash
-git clone https://github.com/michal-bartak/pg-accounts-management.git
-cd pg-accounts-management
+git clone https://github.com/michal-bartak/pgcowboy.git
+cd pgcowboy
 go mod tidy
 
 # Development window with live reload:
@@ -28,9 +28,9 @@ under `dist/`:
 
 | Host | Artifact | Extra tooling |
 |------|----------|---------------|
-| macOS | `DbAccounts-v*-macos-<arch>.dmg` | none (`hdiutil`; Pillow only to draw the DMG background) |
-| Windows | `DbAccounts-v*-windows-amd64.msi` | [WiX Toolset](https://wixtoolset.org/) v3 — `choco install wixtoolset` |
-| Linux | `DbAccounts-v*-linux-amd64.deb` and `.rpm` | `sudo apt install rpm ruby-dev && sudo gem install fpm` |
+| macOS | `pgCowboy-v*-macos-<arch>.dmg` | none (`hdiutil`; Pillow only to draw the DMG background) |
+| Windows | `pgCowboy-v*-windows-amd64.msi` | [WiX Toolset](https://wixtoolset.org/) v3 — `choco install wixtoolset` |
+| Linux | `pgCowboy-v*-linux-amd64.deb` and `.rpm` | `sudo apt install rpm ruby-dev && sudo gem install fpm` |
 
 ```bash
 go install github.com/wailsapp/wails/v2/cmd/wails@latest
@@ -70,7 +70,7 @@ site under `docs/`. To preview them offline:
 
 ```bash
 make docs-install   # one-time: install the docs dependencies
-make docs-dev       # live-reload dev server (http://localhost:4321/pg-accounts-management)
+make docs-dev       # live-reload dev server (http://localhost:4321/pgcowboy)
 # or:
 make docs-build     # static build into docs/dist/
 make docs-preview   # serve the built site locally

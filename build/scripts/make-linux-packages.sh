@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # Build Linux .deb and .rpm packages from the binary in build/bin, using fpm.
 #
-#   OUTPUT=DbAccounts VERSION=0.3.0 ARCH_LABEL=amd64 build/scripts/make-linux-packages.sh
+#   OUTPUT=pgCowboy VERSION=0.3.0 ARCH_LABEL=amd64 build/scripts/make-linux-packages.sh
 #
 # Installs: /usr/bin/<OUTPUT>, a .desktop entry and an icon. Runtime dependencies name
 # the WebKit build the binary is linked against (webkit2gtk 4.1 — see the Makefile's
 # webkit2_41 tag). Run from the repo root; writes both packages under dist/.
 set -euo pipefail
 
-OUTPUT="${OUTPUT:-DbAccounts}"
+OUTPUT="${OUTPUT:-pgCowboy}"
 VERSION="${VERSION:-$(tr -d ' \n\r' < VERSION)}"
 ARCH_LABEL="${ARCH_LABEL:-amd64}"
 DIST="${DIST:-dist}"
 
-PKGNAME="dbaccounts"
+PKGNAME="pgcowboy"
 DESCRIPTION="Maintain PostgreSQL roles across many clusters"
-URL="https://github.com/michal-bartak/pg-accounts-management"
+URL="https://github.com/michal-bartak/pgcowboy"
 # Package metadata is public; override MAINTAINER to put a real address in the packages.
 MAINTAINER="${MAINTAINER:-Michal Bartak <michal-bartak@users.noreply.github.com>}"
 
@@ -31,10 +31,10 @@ mkdir -p "$DIST"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-cp build/linux/dbaccounts.desktop "$work/$PKGNAME.desktop"
+cp build/linux/pgcowboy.desktop "$work/$PKGNAME.desktop"
 
 # Icon: a correctly sized hicolor entry when we can resize, else the full-size PNG in
-# /usr/share/pixmaps (both resolve Icon=dbaccounts from the .desktop file).
+# /usr/share/pixmaps (both resolve Icon=pgcowboy from the .desktop file).
 icon_src="build/appicon.png"
 if python3 -c 'import PIL' >/dev/null 2>&1; then
   ICON_OUT="$work/$PKGNAME.png" ICON_SRC="$icon_src" python3 - <<'PY'

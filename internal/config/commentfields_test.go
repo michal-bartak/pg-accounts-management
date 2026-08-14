@@ -3,7 +3,7 @@ package config
 import (
 	"testing"
 
-	"github.com/michalbartak/dbaccounts/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/model"
 )
 
 func TestValidateCommentFields(t *testing.T) {

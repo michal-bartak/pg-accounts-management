@@ -4690,7 +4690,7 @@ function renderUpdateBadge() {
   if (!btn || !badge) return;
   const available = !!updateState?.updateAvailable;
   badge.hidden = !available;
-  btn.title = available ? `Update available — v${updateState.latestVersion}` : 'About DbAccounts';
+  btn.title = available ? `Update available — v${updateState.latestVersion}` : 'About pgCowboy';
 }
 
 /** Render the About "Version" status line from the latest check result. */
@@ -4712,7 +4712,7 @@ function renderAboutUpdate(res, error) {
 function showUpdateDialog(res) {
   const msg = document.getElementById('update-message');
   if (msg) {
-    msg.textContent = `DbAccounts v${res.latestVersion} is available — you have v${res.currentVersion}.`;
+    msg.textContent = `pgCowboy v${res.latestVersion} is available — you have v${res.currentVersion}.`;
   }
   const link = document.getElementById('update-release-link');
   if (link) link.dataset.url = res.releaseURL || '';

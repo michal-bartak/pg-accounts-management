@@ -1,4 +1,4 @@
-# DbAccounts example config — copy structure only; app creates its own file on first launch.
+# pgCowboy example config — copy structure only; app creates its own file on first launch.
 #
 # Clusters, cluster groups and the target selection live in clusters.yaml beside this file —
 # see clusters.example.yaml.

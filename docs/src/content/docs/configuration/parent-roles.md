@@ -42,4 +42,4 @@ Any role can be a parent — the name is about what the role *does here*, not wh
 </figure>
 
 Selected parents feed the `${parent_roles}` placeholder in both the `create_role` and
-`grant_parents` [call templates](/pg-accounts-management/configuration/call-templates/).
+`grant_parents` [call templates](/pgcowboy/configuration/call-templates/).

@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/michalbartak/dbaccounts/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/model"
 )
 
 func tmpStore(t *testing.T) *Store {

@@ -10,7 +10,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
 
-	"github.com/michalbartak/dbaccounts/internal/version"
+	"github.com/michal-bartak/pgcowboy/internal/version"
 )
 
 //go:embed all:frontend
@@ -54,7 +54,7 @@ func main() {
 	}
 
 	err = wails.Run(&options.App{
-		Title:     "DbAccounts " + version.Get().Version,
+		Title:     "pgCowboy " + version.Get().Version,
 		Width:     width,
 		Height:    height,
 		MinWidth:  minWinW,

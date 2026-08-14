@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/michalbartak/dbaccounts/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/model"
 )
 
 // goodSettings is a payload that validates cleanly, as the baseline for the rejection cases.

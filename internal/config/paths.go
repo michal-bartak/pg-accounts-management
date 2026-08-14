@@ -22,7 +22,7 @@ func ConfigDir() (string, error) {
 		if err != nil {
 			return "", err
 		}
-		base = filepath.Join(home, "Library", "Application Support", "DbAccounts")
+		base = filepath.Join(home, "Library", "Application Support", "pgCowboy")
 	case "windows":
 		appData := os.Getenv("APPDATA")
 		if appData == "" {
@@ -32,13 +32,13 @@ func ConfigDir() (string, error) {
 			}
 			appData = home
 		}
-		base = filepath.Join(appData, "DbAccounts")
+		base = filepath.Join(appData, "pgCowboy")
 	default:
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return "", err
 		}
-		base = filepath.Join(home, ".config", "dbaccounts")
+		base = filepath.Join(home, ".config", "pgcowboy")
 	}
 	if err := os.MkdirAll(base, 0o700); err != nil {
 		return "", err

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to DbAccounts. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
+All notable changes to pgCowboy. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 > **Feeds releases:** the section matching `VERSION` is extracted by
@@ -9,6 +9,10 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 > See [RELEASING.md](RELEASING.md).
 
 ## [Unreleased]
+
+### Changed
+
+- **Renamed to pgCowboy** — the app, its bundle, install location and configuration directory all change name. Settings are not migrated: copy `config.yaml` and `clusters.yaml` from the old `DbAccounts` directory to the new `pgCowboy` one to keep your clusters and saved passwords ([paths](https://michal-bartak.github.io/pgcowboy/installation/#upgrading-from-dbaccounts)). On macOS and Linux, remove the old app or package by hand; the Windows installer replaces it automatically.
 
 ## [1.0.0] - 2026-08-14
 
@@ -78,4 +82,4 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 First tagged release: cluster config, target selection, and create/remove roles via SQL call
 templates. Earlier history:
-[git tags](https://github.com/michal-bartak/pg-accounts-management/tags).
+[git tags](https://github.com/michal-bartak/pgcowboy/tags).

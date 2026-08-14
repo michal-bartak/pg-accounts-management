@@ -7,8 +7,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/michalbartak/dbaccounts/internal/calltemplate"
-	"github.com/michalbartak/dbaccounts/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/calltemplate"
+	"github.com/michal-bartak/pgcowboy/internal/model"
 )
 
 // fakeQuerier records Exec'd SQL; Query is only reached by function-mode ops (not tested here).

@@ -5,7 +5,7 @@ import (
 	osuser "os/user"
 	"testing"
 
-	"github.com/michalbartak/dbaccounts/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/model"
 )
 
 func TestResolvePassword_fromClusterWinsOverEnvAndAuth(t *testing.T) {

@@ -1,9 +1,9 @@
-# CLAUDE.md — DbAccounts
+# CLAUDE.md — pgCowboy
 
 AI/agent guide for this repo. Human docs: [README.md](README.md) (features/usage),
 [sql/README.md](sql/README.md) (call-template DSL), [RELEASING.md](RELEASING.md).
 A parallel Cursor rules file lives at
-[.cursor/rules/dbaccounts-project.mdc](.cursor/rules/dbaccounts-project.mdc); keep the
+[.cursor/rules/pgcowboy-project.mdc](.cursor/rules/pgcowboy-project.mdc); keep the
 two consistent when documenting architecture changes.
 
 ## What this is
@@ -12,7 +12,7 @@ Cross-platform desktop app (**Wails v2** + embedded WebView, vanilla HTML/CSS/JS
 frontend, **pgx/v5** backend) for maintaining **PostgreSQL roles across many
 clusters**. Real DDL/privilege changes are performed by **user-defined SQL call
 templates** run against each cluster — the app does not hardcode DDL. Module:
-`github.com/michalbartak/dbaccounts`. Current version: read [VERSION](VERSION) — don't copy it
+`github.com/michal-bartak/pgcowboy`. Current version: read [VERSION](VERSION) — don't copy it
 into prose, it goes stale.
 
 ## Product decisions (don't regress)
@@ -21,8 +21,8 @@ into prose, it goes stale.
   **`config.yaml`** = app configuration (templates, reads, parent roles, comment fields, search
   columns, batch, ui, window size, seen version); **`clusters.yaml`** = `categories`, `clusters`,
   `targets`. The directory resolution is unchanged and hand-rolled per OS (macOS
-  `~/Library/Application Support/DbAccounts`, Linux `~/.config/dbaccounts`, Windows
-  `%APPDATA%\DbAccounts`) — **`os.UserConfigDir` is deliberately not used**, and there is no
+  `~/Library/Application Support/pgCowboy`, Linux `~/.config/pgcowboy`, Windows
+  `%APPDATA%\pgCowboy`) — **`os.UserConfigDir` is deliberately not used**, and there is no
   env/XDG override.
   **The split is one tag, not a copy of the field list**: `model.Config` embeds
   **`model.ClusterSet`** (Categories/Clusters/Targets) anonymously with **`yaml:"-"`**, and
@@ -790,7 +790,7 @@ internal/version/         App version + git-remote-derived RepoURL/DocsURL (ldfl
 frontend/                 Vanilla JS UI (app.js via backend())
 build/scripts/            Installer recipes: make-dmg.sh, make-msi.ps1, make-linux-packages.sh
 build/windows/installer/  WiX v3 source (product.wxs, License.rtf) — hand-written, committed
-build/linux/              dbaccounts.desktop (installed by the deb/rpm)
+build/linux/              pgcowboy.desktop (installed by the deb/rpm)
 sql/README.md             Docs for the user's PostgreSQL functions / templates
 ```
 
@@ -815,7 +815,7 @@ test → config cycle). Test SQL via `calltemplate` alone or with `commands`.
 export PATH="/opt/homebrew/bin:$HOME/go/bin:$PATH"
 go build ./... && go test ./... -count=1   # or: make test-vet
 wails dev            # dev window (regenerates frontend/wailsjs/)
-make package         # build/bin/DbAccounts.app + the host OS installer in dist/
+make package         # build/bin/pgCowboy.app + the host OS installer in dist/
 ```
 
 - Run `go test ./... -count=1`, `node --check frontend/app.js`, and `node --test frontend/app.test.mjs`
@@ -877,15 +877,15 @@ Releases ship **native installers only** — `.dmg` (macOS), `.msi` (Windows), `
 platform from [build/scripts/](build/scripts/), and
 [.github/workflows/release.yml](.github/workflows/release.yml) runs the **same** scripts via
 `make package-ci`, so a local package matches a released one — fix packaging bugs in the script,
-never in the YAML. Artifact names are `DbAccounts-v<VERSION>-<macos|windows|linux>-<arch>.<ext>`;
+never in the YAML. Artifact names are `pgCowboy-v<VERSION>-<macos|windows|linux>-<arch>.<ext>`;
 `PLATFORM=darwin/universal` (passed to `wails build`, last element = the arch label) builds the
 universal macOS bundle CI releases. `internal/update` only reads a release's `tag_name`, so
 renaming artifacts never breaks the update check.
 
 - **MSI** ([build/windows/installer/product.wxs](build/windows/installer/product.wxs), WiX v3
-  compiled by `make-msi.ps1`): per-machine into `C:\Program Files\DbAccounts`, Start-menu
+  compiled by `make-msi.ps1`): per-machine into `C:\Program Files\pgCowboy`, Start-menu
   shortcut, `MajorUpgrade` in-place upgrades, install path remembered under
-  `HKLM\Software\MichalBartak\DbAccounts`. The **`UpgradeCode` GUID must never change** or
+  `HKLM\Software\MichalBartak\pgCowboy`. The **`UpgradeCode` GUID must never change** or
   upgrades turn into parallel installs. UI banner/dialog bitmaps are generated from
   `build/appicon.png` at package time; `build/windows/icon.ico` is committed (the rest of
   `build/windows/` is Wails-generated and gitignored — note the negation block in
@@ -894,8 +894,8 @@ renaming artifacts never breaks the update check.
   re-signs, then stages the app + an `/Applications` symlink + a background image. Both the
   background (needs Pillow) and the Finder-scripted window layout degrade to a warning rather
   than failing the build.
-- **deb/rpm** (`make-linux-packages.sh`, fpm): package `dbaccounts` installs
-  `/usr/bin/DbAccounts`, [build/linux/dbaccounts.desktop](build/linux/dbaccounts.desktop) and an
+- **deb/rpm** (`make-linux-packages.sh`, fpm): package `pgcowboy` installs
+  `/usr/bin/pgCowboy`, [build/linux/pgcowboy.desktop](build/linux/pgcowboy.desktop) and an
   icon. Runtime deps name the WebKit the binary is linked against
   (`libwebkit2gtk-4.1-0` / `webkit2gtk4.1`) — keep them in step with the Makefile's
   `webkit2_41` build tag.

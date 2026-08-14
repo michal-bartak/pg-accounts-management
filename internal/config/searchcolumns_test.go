@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/michalbartak/dbaccounts/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/model"
 )
 
 func TestValidateSearchColumns(t *testing.T) {

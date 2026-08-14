@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/michalbartak/dbaccounts/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/model"
 )
 
 // apiBase is the GitHub REST API root; overridable in tests.
@@ -45,7 +45,7 @@ func Check(ctx context.Context, currentVersion, repoURL string) (model.UpdateInf
 		return info, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "DbAccounts")
+	req.Header.Set("User-Agent", "pgCowboy")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

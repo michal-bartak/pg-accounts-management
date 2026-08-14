@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/michalbartak/dbaccounts/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/model"
 )
 
 // The two files carry disjoint halves of the config: cluster inventory never reaches config.yaml,

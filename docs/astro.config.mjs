@@ -2,31 +2,31 @@ import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
 import starlightThemeRapide from 'starlight-theme-rapide';
 
-// GitHub Pages: served at https://michal-bartak.github.io/pg-accounts-management/
+// GitHub Pages: served at https://michal-bartak.github.io/pgcowboy/
 // (base matches the repo name). Update both if the repo is renamed.
 export default defineConfig({
   site: 'https://michal-bartak.github.io',
-  base: '/pg-accounts-management',
+  base: '/pgcowboy',
   // Pages that moved when the docs were split into Usage / Configuration sections.
   redirects: {
-    '/call-templates': '/pg-accounts-management/configuration/call-templates/',
+    '/call-templates': '/pgcowboy/configuration/call-templates/',
     // Renamed when "Privileges" became "Role parents" in the UI. NOTE the destination carries the
     // `base` and the key does not: Astro prefixes the route it matches but emits the destination
     // verbatim, so a base-less destination sends GitHub Pages to a 404.
-    '/usage/privileges': '/pg-accounts-management/usage/parent-roles/',
+    '/usage/privileges': '/pgcowboy/usage/parent-roles/',
   },
   integrations: [
     starlight({
-      title: 'DbAccounts',
+      title: 'pgCowboy',
       description: 'Maintain PostgreSQL roles across many clusters from one desktop app',
       plugins: [starlightThemeRapide()],
       favicon: '/appicon.png',
       logo: {
         src: './src/assets/appicon.png',
-        alt: 'DbAccounts',
+        alt: 'pgCowboy',
         replacesTitle: false,
       },
-      social: { github: 'https://github.com/michal-bartak/pg-accounts-management' },
+      social: { github: 'https://github.com/michal-bartak/pgcowboy' },
       customCss: ['./src/styles/custom.css'],
       // Click a screenshot in the docs body to view it full-size in a lightbox.
       // Runs on first load and after every Starlight client-side navigation.

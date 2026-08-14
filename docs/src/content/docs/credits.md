@@ -22,4 +22,4 @@ Released under the MIT License. © 2026 Michal Bartak.
 
 ## Source
 
-[github.com/michal-bartak/pg-accounts-management](https://github.com/michal-bartak/pg-accounts-management)
+[github.com/michal-bartak/pgcowboy](https://github.com/michal-bartak/pgcowboy)

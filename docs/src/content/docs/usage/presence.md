@@ -19,7 +19,7 @@ The **Present on** block, just under the login name, shows which clusters the ro
 <figcaption>Present on — existing clusters, a pending addition prefixed with +, a pending removal in red strikethrough</figcaption>
 </figure>
 
-It uses the shared [scope labels](/pg-accounts-management/usage/):
+It uses the shared [scope labels](/pgcowboy/usage/):
 
 - Plain label — the role exists there now.
 - Leading **`+`**, same colour — a pending addition.
@@ -28,7 +28,7 @@ It uses the shared [scope labels](/pg-accounts-management/usage/):
 ## Editing presence
 
 The <svg class="doc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg> **edit** button opens a picker listing the role's
-[scope](/pg-accounts-management/usage/) — the clusters that Target selection resolved to when
+[scope](/pgcowboy/usage/) — the clusters that Target selection resolved to when
 you searched. Tick to add, untick to drop.
 
 <figure class="shot">
@@ -48,7 +48,7 @@ you searched. Tick to add, untick to drop.
 - **Adding** a cluster brings the whole form to bear on it: role parents, attributes, settings,
   and the comment all target it too. A `CREATE ROLE` is prepended to that cluster's transaction
   on Save. Whether creation is staged automatically is a
-  [general setting](/pg-accounts-management/configuration/general/).
+  [general setting](/pgcowboy/configuration/general/).
 - **Dropping** a cluster records a `DROP ROLE` for that cluster alone, pre-flighted by the
   [dependency check](#dependency-check-before-a-drop) when you Save.
 
@@ -90,7 +90,7 @@ Clusters are grouped into three sections, in this order — and inside each by g
 
 Everything in the last two sections is set to **Skip** and left out of the run entirely. That is
 the default. Switch a cluster to **Try anyway** to drop it regardless: PostgreSQL then decides, and
-the outcome shows in the [command log](/pg-accounts-management/usage/command-log/) like any other
+the outcome shows in the [command log](/pgcowboy/usage/command-log/) like any other
 run.
 
 If you go and clear the dependencies while the popup is open — reassigning ownership or dropping
@@ -100,6 +100,6 @@ applies.
 
 Every cluster runs the same query, so the magnifier next to the popup's title shows it once. The
 check itself is the configurable `role_dependencies`
-[read query](/pg-accounts-management/configuration/call-templates/); its default reads
+[read query](/pgcowboy/configuration/call-templates/); its default reads
 `pg_shdepend`, which describes the objects of the database the app connects to plus cluster-wide
 ones — anything owned in another database on the same cluster is listed but not named.

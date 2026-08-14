@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/michalbartak/dbaccounts/internal/commands"
-	"github.com/michalbartak/dbaccounts/internal/config"
-	"github.com/michalbartak/dbaccounts/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/commands"
+	"github.com/michal-bartak/pgcowboy/internal/config"
+	"github.com/michal-bartak/pgcowboy/internal/model"
 )
 
 func testStore(t *testing.T) *config.Store {

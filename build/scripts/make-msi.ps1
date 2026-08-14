@@ -11,7 +11,7 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$Output    = "DbAccounts",
+  [string]$Output    = "pgCowboy",
   [string]$Version   = "",
   [string]$ArchLabel = "amd64",
   [string]$DistDir   = "dist"

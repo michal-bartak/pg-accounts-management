@@ -100,12 +100,12 @@ Both are staged only. Nothing reaches a database until you Save.
 2. **Save changes** (or **Create role**) builds an ordered list of operations **per cluster**.
 3. Each cluster's list runs as **one transaction** on its own connection — commit on success,
    roll back on the first error. Clusters never interfere with each other.
-4. Progress and results appear in the [command log](/pg-accounts-management/usage/command-log/).
+4. Progress and results appear in the [command log](/pgcowboy/usage/command-log/).
 
 Runs that touch a group flagged **require confirmation** stop at a dialog first. Removing a
 role always asks.
 
 ## Where to go next
 
-- [Finding a role](/pg-accounts-management/usage/find-role/) — the search that starts every alter.
-- [Creating a role](/pg-accounts-management/usage/creating-roles/) — the other entry point.
+- [Finding a role](/pgcowboy/usage/find-role/) — the search that starts every alter.
+- [Creating a role](/pgcowboy/usage/creating-roles/) — the other entry point.

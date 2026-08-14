@@ -23,9 +23,9 @@ func TestInfo_String(t *testing.T) {
 func TestRepoAndDocsURLDerivation(t *testing.T) {
 	cases := []struct{ repo, wantRepo, wantDocs string }{
 		{
-			"https://github.com/michal-bartak/pg-accounts-management",
-			"https://github.com/michal-bartak/pg-accounts-management",
-			"https://michal-bartak.github.io/pg-accounts-management/",
+			"https://github.com/michal-bartak/pgcowboy",
+			"https://github.com/michal-bartak/pgcowboy",
+			"https://michal-bartak.github.io/pgcowboy/",
 		},
 		{"git@github.com:acme/widgets.git", "https://github.com/acme/widgets", "https://acme.github.io/widgets/"},
 		{"https://github.com/o/r.git/", "https://github.com/o/r", "https://o.github.io/r/"},

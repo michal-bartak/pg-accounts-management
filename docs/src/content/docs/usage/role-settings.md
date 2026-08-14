@@ -6,7 +6,7 @@ description: Role-level GUCs, which can hold a different value per cluster
 **Settings** are role-level configuration parameters (`GUC`s) — `statement_timeout`,
 `log_statement`, `search_path`, and so on. They're read from the role's stored configuration
 and use the same rows and per-cluster editor as
-[role parents](/pg-accounts-management/usage/parent-roles/).
+[role parents](/pgcowboy/usage/parent-roles/).
 
 <figure class="shot">
 <div class="light-only">

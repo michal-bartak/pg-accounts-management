@@ -28,11 +28,11 @@ Altering starts with a search, so you never act on a mistyped name.
 - Only the **selected** clusters, queried in parallel.
 - The term matches the **role name** and its `COMMENT ON ROLE`, so you can find a person by
   name or email if the comment holds it.
-- Results are grouped by login name, with [scope labels](/pg-accounts-management/usage/)
+- Results are grouped by login name, with [scope labels](/pgcowboy/usage/)
   showing where each one exists.
 - Next to each role name sit the columns you configured in **Settings → Role Details** — built from
   the role's comment, so you can show a full name assembled from two keys, an email, or the raw
-  comment. See [Role Details](/pg-accounts-management/configuration/role-details/).
+  comment. See [Role Details](/pgcowboy/configuration/role-details/).
 - An unreachable cluster is reported but doesn't stop the search.
 
 ## When a cluster can't be searched
@@ -68,9 +68,9 @@ one form per cluster.
 The clusters selected at search time become the role's working scope. To bring another cluster
 into play, re-select targets and search again.
 
-From here you can edit the [comment](/pg-accounts-management/usage/comments/),
-[role parents](/pg-accounts-management/usage/parent-roles/),
-[attributes](/pg-accounts-management/usage/attributes/),
-[settings](/pg-accounts-management/usage/role-settings/),
-[password](/pg-accounts-management/usage/password/), and
-[where the role exists](/pg-accounts-management/usage/presence/).
+From here you can edit the [comment](/pgcowboy/usage/comments/),
+[role parents](/pgcowboy/usage/parent-roles/),
+[attributes](/pgcowboy/usage/attributes/),
+[settings](/pgcowboy/usage/role-settings/),
+[password](/pgcowboy/usage/password/), and
+[where the role exists](/pgcowboy/usage/presence/).

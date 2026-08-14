@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/michalbartak/dbaccounts/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/model"
 )
 
 func TestDefaultDBReads_contract(t *testing.T) {

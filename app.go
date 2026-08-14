@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/michalbartak/dbaccounts/internal/batch"
-	"github.com/michalbartak/dbaccounts/internal/config"
-	"github.com/michalbartak/dbaccounts/internal/model"
-	"github.com/michalbartak/dbaccounts/internal/pg"
-	"github.com/michalbartak/dbaccounts/internal/update"
-	"github.com/michalbartak/dbaccounts/internal/version"
+	"github.com/michal-bartak/pgcowboy/internal/batch"
+	"github.com/michal-bartak/pgcowboy/internal/config"
+	"github.com/michal-bartak/pgcowboy/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/pg"
+	"github.com/michal-bartak/pgcowboy/internal/update"
+	"github.com/michal-bartak/pgcowboy/internal/version"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 

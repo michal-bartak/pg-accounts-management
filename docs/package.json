@@ -1,5 +1,5 @@
 {
-  "name": "dbaccounts-docs",
+  "name": "pgcowboy-docs",
   "type": "module",
   "scripts": {
     "shots": "node scripts/screenshots.mjs",

@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/michalbartak/dbaccounts/internal/calltemplate"
-	"github.com/michalbartak/dbaccounts/internal/config"
-	"github.com/michalbartak/dbaccounts/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/calltemplate"
+	"github.com/michal-bartak/pgcowboy/internal/config"
+	"github.com/michal-bartak/pgcowboy/internal/model"
 )
 
 func testConfig() model.Config {

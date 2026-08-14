@@ -1,11 +1,11 @@
 [Desktop Entry]
 Type=Application
-Name=DbAccounts
+Name=pgCowboy
 GenericName=PostgreSQL role manager
 Comment=Maintain PostgreSQL roles across many clusters
-Exec=/usr/bin/DbAccounts
-Icon=dbaccounts
+Exec=/usr/bin/pgCowboy
+Icon=pgcowboy
 Categories=Development;Database;
 Keywords=postgres;postgresql;database;roles;
-StartupWMClass=DbAccounts
+StartupWMClass=pgCowboy
 Terminal=false

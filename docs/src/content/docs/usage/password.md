@@ -36,7 +36,7 @@ accident while editing something else.
 ## Generate
 
 **Generate** builds a password from your
-[password generator settings](/pg-accounts-management/configuration/password-generator/) —
+[password generator settings](/pgcowboy/configuration/password-generator/) —
 length, character classes, and whether look-alike characters are excluded — using the
 platform's cryptographic random source. Press it again for a different one.
 
@@ -45,11 +45,11 @@ Copy the password before you save. The app never displays it again.
 ## Where it applies
 
 On **Save changes** the password is set on **every cluster in
-[scope](/pg-accounts-management/usage/) where the role exists** — the clusters the form
+[scope](/pgcowboy/usage/) where the role exists** — the clusters the form
 covers, not your whole cluster list — as part of that cluster's transaction. It runs through
 the `change_password`
-[call template](/pg-accounts-management/configuration/call-templates/), which is
+[call template](/pgcowboy/configuration/call-templates/), which is
 `ALTER ROLE … PASSWORD …` by default.
 
 Passwords are not stored in the app's configuration, and they are not shown in the
-[command log](/pg-accounts-management/usage/command-log/).
+[command log](/pgcowboy/usage/command-log/).

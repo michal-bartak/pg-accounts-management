@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/michalbartak/dbaccounts/internal/commands"
-	"github.com/michalbartak/dbaccounts/internal/config"
-	"github.com/michalbartak/dbaccounts/internal/model"
-	"github.com/michalbartak/dbaccounts/internal/pg"
+	"github.com/michal-bartak/pgcowboy/internal/commands"
+	"github.com/michal-bartak/pgcowboy/internal/config"
+	"github.com/michal-bartak/pgcowboy/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/pg"
 )
 
 type Runner struct {

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/michalbartak/dbaccounts/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/model"
 )
 
 func TestMigrateOne_brokenCreateRoleName(t *testing.T) {

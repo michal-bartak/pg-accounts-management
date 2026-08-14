@@ -31,12 +31,12 @@ while there are unsaved changes.
 
 | Section | What it controls |
 |---------|------------------|
-| [Clusters](/pg-accounts-management/configuration/clusters/) | Connection details, credentials, groups |
-| [Comment fields](/pg-accounts-management/configuration/comment-fields/) | JSON keys shown as labelled inputs |
-| [Call templates](/pg-accounts-management/configuration/call-templates/) | The SQL behind every read and write |
-| [Preconfigured role parents](/pg-accounts-management/configuration/parent-roles/) | Role names offered as quick picks |
-| [Password generator](/pg-accounts-management/configuration/password-generator/) | Length and character classes |
-| [General](/pg-accounts-management/configuration/general/) | Appearance, concurrency, update check |
+| [Clusters](/pgcowboy/configuration/clusters/) | Connection details, credentials, groups |
+| [Comment fields](/pgcowboy/configuration/comment-fields/) | JSON keys shown as labelled inputs |
+| [Call templates](/pgcowboy/configuration/call-templates/) | The SQL behind every read and write |
+| [Preconfigured role parents](/pgcowboy/configuration/parent-roles/) | Role names offered as quick picks |
+| [Password generator](/pgcowboy/configuration/password-generator/) | Length and character classes |
+| [General](/pgcowboy/configuration/general/) | Appearance, concurrency, update check |
 
 ## Configuration files
 
@@ -44,9 +44,9 @@ Two YAML files sit side by side, both written with owner-only permissions:
 
 | OS | Directory |
 |----|-----------|
-| macOS | `~/Library/Application Support/DbAccounts/` |
-| Linux | `~/.config/dbaccounts/` |
-| Windows | `%AppData%\DbAccounts\` |
+| macOS | `~/Library/Application Support/pgCowboy/` |
+| Linux | `~/.config/pgcowboy/` |
+| Windows | `%AppData%\pgCowboy\` |
 
 - **`config.yaml`** — call templates, introspection queries, role parents, comment fields, search
   columns and UI preferences. Not site-specific, so it is the one you can share with colleagues.
@@ -54,7 +54,7 @@ Two YAML files sit side by side, both written with owner-only permissions:
   the file that may hold per-cluster passwords in clear text.
 
 You can edit either by hand while the app is closed. See
-[`config.example.yaml`](https://github.com/michal-bartak/pg-accounts-management/blob/main/config.example.yaml)
+[`config.example.yaml`](https://github.com/michal-bartak/pgcowboy/blob/main/config.example.yaml)
 and
-[`clusters.example.yaml`](https://github.com/michal-bartak/pg-accounts-management/blob/main/clusters.example.yaml)
+[`clusters.example.yaml`](https://github.com/michal-bartak/pgcowboy/blob/main/clusters.example.yaml)
 for commented references.

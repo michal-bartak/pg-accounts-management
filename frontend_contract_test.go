@@ -8,8 +8,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/michalbartak/dbaccounts/internal/calltemplate"
-	"github.com/michalbartak/dbaccounts/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/calltemplate"
+	"github.com/michal-bartak/pgcowboy/internal/model"
 )
 
 // The Settings editor lists the operations from two tables in frontend/app.js (DB_FUNCTIONS,

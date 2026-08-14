@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Build a macOS .dmg installer from the app bundle in build/bin.
 #
-#   OUTPUT=DbAccounts VERSION=0.3.0 ARCH_LABEL=arm64 build/scripts/make-dmg.sh
+#   OUTPUT=pgCowboy VERSION=0.3.0 ARCH_LABEL=arm64 build/scripts/make-dmg.sh
 #
 # Steps: rebuild the app icon as a full multi-size .icns, ad-hoc re-sign the bundle,
 # then stage <app> + an /Applications symlink into a compressed DMG with a drag-here
 # background. Run from the repo root; writes dist/<OUTPUT>-v<VERSION>-macos-<ARCH>.dmg.
 set -euo pipefail
 
-OUTPUT="${OUTPUT:-DbAccounts}"
+OUTPUT="${OUTPUT:-pgCowboy}"
 VERSION="${VERSION:-$(tr -d ' \n\r' < VERSION)}"
 ARCH_LABEL="${ARCH_LABEL:-$(uname -m)}"
 DIST="${DIST:-dist}"

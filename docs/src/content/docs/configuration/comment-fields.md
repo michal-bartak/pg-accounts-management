@@ -37,17 +37,17 @@ Rules:
 
 Each configured key also becomes a placeholder — `${{full_name}}`, `${{e_mail}}`, … — usable in
 the `create_role` and `set_comment`
-[call templates](/pg-accounts-management/configuration/call-templates/).
+[call templates](/pgcowboy/configuration/call-templates/).
 
 ## Preferred comment view
 
 Sets which mode a **new or empty** comment opens in — **Fields** or **Raw**. Comments that
 already have content detect their own mode: JSON opens in Fields, anything else in Raw.
 
-See [Altering the comment](/pg-accounts-management/usage/comments/) for the editor itself.
+See [Altering the comment](/pgcowboy/usage/comments/) for the editor itself.
 
 ## Where else these keys appear
 
 Beyond the role form, a comment key can be shown in the role search results — see
-[Role Details](/pg-accounts-management/configuration/role-details/). That list is not limited to the
+[Role Details](/pgcowboy/configuration/role-details/). That list is not limited to the
 keys configured here: it can address **any** key in the comment.

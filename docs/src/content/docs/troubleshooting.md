@@ -23,13 +23,13 @@ The app resolves credentials like `psql`:
 
 If you rely on `~/.pgpass`, check that it matches the host/port/database/user and has `0600`
 permissions. To try a one-off password without changing your environment, use **Test
-connection** inside the [cluster editor](/pg-accounts-management/configuration/clusters/).
+connection** inside the [cluster editor](/pgcowboy/configuration/clusters/).
 
 ## A change fails on one cluster
 
 Each cluster's operations run as a single transaction: if one statement fails, that cluster
 is **rolled back** and its error names the failing operation. Other clusters are unaffected.
-Open the [command log](/pg-accounts-management/usage/command-log/) and use the view button on
+Open the [command log](/pgcowboy/usage/command-log/) and use the view button on
 a row to see the exact SQL that ran, then fix
 the cause (a missing parent role, insufficient privilege, an existing role) and Save again.
 Your pending edits are kept because a failed run doesn't touch the form.
@@ -41,7 +41,7 @@ The connecting user needs enough privilege to run the operation. Two options:
 - Connect as a user that has the privilege.
 - Point the relevant template (write) or introspection query (read) at a wrapper
   function/view that runs with higher privilege, so a low-privilege connection can act
-  through it. See [Call templates](/pg-accounts-management/configuration/call-templates/).
+  through it. See [Call templates](/pgcowboy/configuration/call-templates/).
 
 ## macOS won't open the app
 
@@ -49,7 +49,7 @@ CI builds aren't signed. Right-click the app → **Open** → **Open**, or clear
 flag:
 
 ```bash
-xattr -dr com.apple.quarantine /path/to/DbAccounts.app
+xattr -dr com.apple.quarantine /path/to/pgCowboy.app
 ```
 
 ## Linux app won't start
@@ -64,10 +64,10 @@ sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0
 
 | OS | Directory |
 |----|-----------|
-| macOS | `~/Library/Application Support/DbAccounts/` |
-| Linux | `~/.config/dbaccounts/` |
-| Windows | `%AppData%\DbAccounts\` |
+| macOS | `~/Library/Application Support/pgCowboy/` |
+| Linux | `~/.config/pgcowboy/` |
+| Windows | `%AppData%\pgCowboy\` |
 
 `config.yaml` holds templates and app settings. `clusters.yaml` holds clusters, groups and the
 target selection — and the optional per-cluster password, in clear text, when you set one; see
-[Clusters](/pg-accounts-management/configuration/clusters/).
+[Clusters](/pgcowboy/configuration/clusters/).

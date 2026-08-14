@@ -9,8 +9,8 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/michalbartak/dbaccounts/internal/calltemplate"
-	"github.com/michalbartak/dbaccounts/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/calltemplate"
+	"github.com/michal-bartak/pgcowboy/internal/model"
 	"gopkg.in/yaml.v3"
 )
 

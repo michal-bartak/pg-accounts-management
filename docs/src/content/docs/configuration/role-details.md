@@ -42,13 +42,13 @@ A template is display text — never SQL — and it supports exactly two placeho
 | `${comment}` | the whole comment, verbatim |
 
 `${{<key>}}` reaches **any** key in the comment, whether or not it is listed under
-[Comment fields](/pg-accounts-management/configuration/comment-fields/) — that list only decides
+[Comment fields](/pgcowboy/configuration/comment-fields/) — that list only decides
 which keys get labelled inputs in the role form.
 
 `${comment}` is the one to use for **plain-text** comments, which have no keys to address.
 
 Anything else is refused when you save, including the
-[call-template](/pg-accounts-management/configuration/call-templates/) names `${loginname}` and
+[call-template](/pgcowboy/configuration/call-templates/) names `${loginname}` and
 `${parent_roles}`. Those belong to templates that build SQL; a display column has no use for them.
 
 ### Combining keys

@@ -1,6 +1,6 @@
 ---
 title: Call templates
-description: How DbAccounts turns form input into the SQL it runs
+description: How pgCowboy turns form input into the SQL it runs
 ---
 
 Every change the app makes runs through a **call template** — a short piece of SQL with
@@ -72,7 +72,7 @@ opens the full syntax reference.
 - **`${name}`** — a **built-in**, from the closed set the operation offers (the table above).
   Anything else in single braces is rejected when you save.
 - **`${{key}}`** — a **comment field** you configured under
-  [Comment fields](/pg-accounts-management/configuration/comment-fields/), in `create_role` and
+  [Comment fields](/pgcowboy/configuration/comment-fields/), in `create_role` and
   `set_comment` only.
 
 Keeping them apart is what lets a comment key named like a built-in still be used: `${comment}` is
@@ -88,7 +88,7 @@ The app knows the kind of each field, so you don't quote them yourself:
   `ARRAY['a', 'b']` literal (values verbatim, an empty selection → `NULL`).
 - **`new_password`**, **`comment`**, **`config_value`** → escaped string literals.
 - **Comment fields** — one `${{key}}` placeholder per key configured under
-  [Comment fields](/pg-accounts-management/configuration/comment-fields/) (e.g. `${{full_name}}`,
+  [Comment fields](/pgcowboy/configuration/comment-fields/) (e.g. `${{full_name}}`,
   `${{e_mail}}`), available in **`create_role`** and **`set_comment`**.
   The value comes from the role's JSON comment and is embedded by type: string → quoted literal,
   number/boolean → bare literal, array/object → JSON text, and an empty/`null`/missing value →
@@ -138,4 +138,4 @@ is rejected.
 rows are shown per cluster before anything is dropped.
 
 Full syntax, the field whitelist, YAML examples, and common mistakes are in the repository's
-[`sql/README.md`](https://github.com/michal-bartak/pg-accounts-management/blob/main/sql/README.md).
+[`sql/README.md`](https://github.com/michal-bartak/pgcowboy/blob/main/sql/README.md).

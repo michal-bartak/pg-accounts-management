@@ -180,18 +180,18 @@ jobs:
 
             ${{ steps.changelog.outputs.notes }}
 
-            📖 [CHANGELOG.md](https://github.com/michal-bartak/pg-accounts-management/blob/main/CHANGELOG.md) - all changes
+            📖 [CHANGELOG.md](https://github.com/michal-bartak/pgcowboy/blob/main/CHANGELOG.md) - all changes
 
             ### Installing
 
-            - **macOS** — open `DbAccounts-${{ needs.prepare.outputs.tag }}-macos-universal.dmg` and drag **DbAccounts** to Applications. The build is unsigned, so Gatekeeper blocks the first launch; clear the quarantine flag once:
+            - **macOS** — open `pgCowboy-${{ needs.prepare.outputs.tag }}-macos-universal.dmg` and drag **pgCowboy** to Applications. The build is unsigned, so Gatekeeper blocks the first launch; clear the quarantine flag once:
               ```
-              xattr -dr com.apple.quarantine /Applications/DbAccounts.app
+              xattr -dr com.apple.quarantine /Applications/pgCowboy.app
               ```
               Downloading with `curl -LJO <url>` instead of a browser avoids the flag entirely.
-            - **Windows** — run `DbAccounts-${{ needs.prepare.outputs.tag }}-windows-amd64.msi`. SmartScreen may warn about the unsigned installer: **More info → Run anyway**.
-            - **Linux (Debian/Ubuntu)** — `sudo apt install ./DbAccounts-${{ needs.prepare.outputs.tag }}-linux-amd64.deb`
-            - **Linux (Fedora/RHEL)** — `sudo dnf install ./DbAccounts-${{ needs.prepare.outputs.tag }}-linux-amd64.rpm`
+            - **Windows** — run `pgCowboy-${{ needs.prepare.outputs.tag }}-windows-amd64.msi`. SmartScreen may warn about the unsigned installer: **More info → Run anyway**.
+            - **Linux (Debian/Ubuntu)** — `sudo apt install ./pgCowboy-${{ needs.prepare.outputs.tag }}-linux-amd64.deb`
+            - **Linux (Fedora/RHEL)** — `sudo dnf install ./pgCowboy-${{ needs.prepare.outputs.tag }}-linux-amd64.rpm`
 
-            See the [installation guide](https://michal-bartak.github.io/pg-accounts-management/installation/) for upgrade and uninstall notes.
+            See the [installation guide](https://michal-bartak.github.io/pgcowboy/installation/) for upgrade and uninstall notes.
           files: dist/*

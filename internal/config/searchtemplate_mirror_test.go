@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/michalbartak/dbaccounts/internal/calltemplate"
+	"github.com/michal-bartak/pgcowboy/internal/calltemplate"
 )
 
 // A search-column template is rendered by the FRONTEND (it is display text over the role comment,

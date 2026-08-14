@@ -4,7 +4,7 @@ description: Role parents, granted and revoked per cluster
 ---
 
 **Role Parents** are the roles this role is a member of. Each parent is one row: the name on the
-left, [scope labels](/pg-accounts-management/usage/) on the right showing where it's granted.
+left, [scope labels](/pgcowboy/usage/) on the right showing where it's granted.
 
 <figure class="shot">
 <div class="light-only">
@@ -49,7 +49,7 @@ revoke. The app works out the difference from what's there now.
 </figure>
 
 Pending changes are visible before you save, through the shared
-[scope-label convention](/pg-accounts-management/usage/): a pending grant is prefixed with
+[scope-label convention](/pgcowboy/usage/): a pending grant is prefixed with
 **`+`**, a pending revoke turns **red and struck through**.
 
 ## Assigning parents
@@ -60,7 +60,7 @@ parent, and you can add several at once, two ways that combine freely:
 - **Type the names** in *Role names*, separated by commas — `gr_devs_ro, app_ro`. Spacing around a
   comma doesn't matter, and repeats are collapsed.
 - **Pick the chips** from
-  [Preconfigured role parents](/pg-accounts-management/configuration/parent-roles/).
+  [Preconfigured role parents](/pgcowboy/configuration/parent-roles/).
 
 <figure class="shot">
 <div class="light-only">

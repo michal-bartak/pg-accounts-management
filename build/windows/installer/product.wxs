@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  WiX v3 source for the DbAccounts MSI installer.
+  WiX v3 source for the pgCowboy MSI installer.
 
   Compiled by build/scripts/make-msi.ps1 (candle + light), which supplies every
   $(var.*) below. UpgradeCode must stay stable forever — changing it breaks
@@ -8,21 +8,21 @@
 -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Product Id="*"
-           Name="DbAccounts"
+           Name="pgCowboy"
            Language="1033"
            Version="$(var.Version)"
            Manufacturer="Michal Bartak"
            UpgradeCode="{7B2A5C41-3E96-4D0B-9F17-C8D5A2E64B33}">
 
     <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
-    <MajorUpgrade DowngradeErrorMessage="A newer version of DbAccounts is already installed." />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of pgCowboy is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
     <!-- Pre-populate the install dir from a previous installation so upgrades land in place -->
     <Property Id="INSTALLFOLDER">
       <RegistrySearch Id="PreviousInstallPath"
                       Root="HKLM"
-                      Key="Software\MichalBartak\DbAccounts"
+                      Key="Software\MichalBartak\pgCowboy"
                       Name="InstallPath"
                       Type="raw"
                       Win64="yes" />
@@ -30,7 +30,7 @@
 
     <Icon Id="AppIcon" SourceFile="$(var.IconPath)" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon" />
-    <Property Id="ARPHELPLINK" Value="https://github.com/michal-bartak/pg-accounts-management" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/michal-bartak/pgcowboy" />
 
     <!-- ── UI ─────────────────────────────────────────────── -->
     <!-- WIXUI_INSTALLDIR points at INSTALLFOLDER so the PathEdit shows the full default path -->
@@ -44,20 +44,20 @@
     <!-- ── Layout ─────────────────────────────────────────── -->
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFiles64Folder">
-        <Directory Id="INSTALLFOLDER" Name="DbAccounts" />
+        <Directory Id="INSTALLFOLDER" Name="pgCowboy" />
       </Directory>
       <Directory Id="ProgramMenuFolder">
-        <Directory Id="AppMenuFolder" Name="DbAccounts" />
+        <Directory Id="AppMenuFolder" Name="pgCowboy" />
       </Directory>
     </Directory>
 
     <ComponentGroup Id="MainFiles" Directory="INSTALLFOLDER">
       <Component Id="MainExe" Guid="*">
-        <File Id="DbAccountsExe" Source="$(var.ExePath)" KeyPath="yes" />
+        <File Id="pgCowboyExe" Source="$(var.ExePath)" KeyPath="yes" />
       </Component>
       <Component Id="InstallPathRegistry" Guid="*">
         <RegistryValue Root="HKLM"
-                       Key="Software\MichalBartak\DbAccounts"
+                       Key="Software\MichalBartak\pgCowboy"
                        Name="InstallPath"
                        Type="string"
                        Value="[INSTALLFOLDER]"
@@ -68,13 +68,13 @@
     <DirectoryRef Id="AppMenuFolder">
       <Component Id="StartMenuShortcut" Guid="*">
         <Shortcut Id="AppShortcut"
-                  Name="DbAccounts"
+                  Name="pgCowboy"
                   Description="Maintain PostgreSQL roles across many clusters"
-                  Target="[INSTALLFOLDER]DbAccounts.exe"
+                  Target="[INSTALLFOLDER]pgCowboy.exe"
                   WorkingDirectory="INSTALLFOLDER"
                   Icon="AppIcon" />
         <RemoveFolder Id="RemoveAppMenuFolder" On="uninstall" />
-        <RegistryValue Root="HKCU" Key="Software\MichalBartak\DbAccounts"
+        <RegistryValue Root="HKCU" Key="Software\MichalBartak\pgCowboy"
                        Name="installed" Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </DirectoryRef>

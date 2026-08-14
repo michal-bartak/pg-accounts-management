@@ -31,4 +31,4 @@ Controls the random password produced by **Generate** on the role form's passwor
 At least one class stays enabled — turn them all off and lowercase comes back on.
 
 Passwords are generated with the platform's cryptographic random source. See
-[Setting a password](/pg-accounts-management/usage/password/) for the field itself.
+[Setting a password](/pgcowboy/usage/password/) for the field itself.

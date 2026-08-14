@@ -1,4 +1,4 @@
-module github.com/michalbartak/dbaccounts
+module github.com/michal-bartak/pgcowboy
 
 go 1.25
 

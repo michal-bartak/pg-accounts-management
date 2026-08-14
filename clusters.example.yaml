@@ -1,4 +1,4 @@
-# DbAccounts example cluster inventory — copy structure only; the app creates its own file on
+# pgCowboy example cluster inventory — copy structure only; the app creates its own file on
 # first launch, next to config.yaml.
 #
 # This file holds what is specific to your site: which clusters exist, how they are grouped, and

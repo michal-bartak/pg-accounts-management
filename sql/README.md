@@ -1,6 +1,6 @@
 # PostgreSQL call templates
 
-DbAccounts runs role operations using a **call template** per operation in **Settings** or `config.yaml` under `db_functions.<operation>`.
+pgCowboy runs role operations using a **call template** per operation in **Settings** or `config.yaml` under `db_functions.<operation>`.
 
 Each operation has:
 

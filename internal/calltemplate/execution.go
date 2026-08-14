@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/michalbartak/dbaccounts/internal/model"
+	"github.com/michal-bartak/pgcowboy/internal/model"
 )
 
 var pgParamRE = regexp.MustCompile(`\$[0-9]+`)

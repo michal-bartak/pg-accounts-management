@@ -1,8 +1,8 @@
 .PHONY: version sync-wails-version ensure-wails test test-frontend test-vet build build-ci package package-ci clean dist docs-install docs-dev docs-build docs-preview docs-clean docs-lint docs-shots docs-shots-status
 
-APP := DbAccounts
+APP := pgCowboy
 VERSION := $(shell tr -d ' \n\r' < VERSION)
-VERSION_PKG := github.com/michalbartak/dbaccounts/internal/version
+VERSION_PKG := github.com/michal-bartak/pgcowboy/internal/version
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 # Repo URL from the git remote (any form); version.normalizeRepo canonicalizes it, and the
@@ -105,15 +105,15 @@ test-frontend:
 test-vet: test test-frontend
 	go vet ./...
 
-# Production app bundle (macOS: build/bin/DbAccounts.app). Requires Wails CLI.
+# Production app bundle (macOS: build/bin/pgCowboy.app). Requires Wails CLI.
 build: sync-wails-version test-vet ensure-wails
 	"$(WAILS)" build $(WAILS_BUILD_FLAGS) $(WAILS_PLATFORM_FLAG) -ldflags "$(LDFLAGS)"
-	@echo "Built DbAccounts $(VERSION) ($(GIT_COMMIT)) -> build/bin/"
+	@echo "Built pgCowboy $(VERSION) ($(GIT_COMMIT)) -> build/bin/"
 
 # CI build (no tests; test job gates release pipeline).
 build-ci: sync-wails-version ensure-wails
 	"$(WAILS)" build $(WAILS_BUILD_FLAGS) $(WAILS_PLATFORM_FLAG) -ldflags "$(LDFLAGS)"
-	@echo "Built DbAccounts $(VERSION) ($(GIT_COMMIT)) -> build/bin/"
+	@echo "Built pgCowboy $(VERSION) ($(GIT_COMMIT)) -> build/bin/"
 
 # Installer for distribution under dist/ (see package_dist above for prerequisites).
 package: build
@@ -137,7 +137,7 @@ $(DOCS_DIR)/node_modules:
 # Explicit one-time install target.
 docs-install: $(DOCS_DIR)/node_modules
 
-# Live-reload dev server at http://localhost:4321/pg-accounts-management
+# Live-reload dev server at http://localhost:4321/pgcowboy
 docs-dev: $(DOCS_DIR)/node_modules
 	cd $(DOCS_DIR) && npm run dev
 

@@ -31,8 +31,8 @@ func TestCompareVersions(t *testing.T) {
 }
 
 func TestOwnerRepo(t *testing.T) {
-	o, r, ok := ownerRepo("https://github.com/michal-bartak/pg-accounts-management")
-	if !ok || o != "michal-bartak" || r != "pg-accounts-management" {
+	o, r, ok := ownerRepo("https://github.com/michal-bartak/pgcowboy")
+	if !ok || o != "michal-bartak" || r != "pgcowboy" {
 		t.Fatalf("ownerRepo = %q/%q ok=%v", o, r, ok)
 	}
 	if _, _, ok := ownerRepo("https://example.com/x/y"); ok {
@@ -44,7 +44,7 @@ func TestOwnerRepo(t *testing.T) {
 func serve(t *testing.T, status int, body string) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/repos/michal-bartak/pg-accounts-management/releases/latest" {
+		if r.URL.Path != "/repos/michal-bartak/pgcowboy/releases/latest" {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -57,7 +57,7 @@ func serve(t *testing.T, status int, body string) {
 	t.Cleanup(func() { apiBase = old })
 }
 
-const repo = "https://github.com/michal-bartak/pg-accounts-management"
+const repo = "https://github.com/michal-bartak/pgcowboy"
 
 func TestCheck_UpdateAvailable(t *testing.T) {
 	serve(t, http.StatusOK, `{"tag_name":"v0.4.0","name":"0.4.0","html_url":"https://example/rel/0.4.0","body":"notes"}`)

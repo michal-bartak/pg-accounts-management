@@ -1,9 +1,9 @@
 ---
-title: DbAccounts
+title: pgCowboy
 description: Maintain PostgreSQL roles across many clusters from one desktop app
 ---
 
-DbAccounts is a desktop app for maintaining **PostgreSQL roles across many clusters**.
+pgCowboy is a desktop app for maintaining **PostgreSQL roles across many clusters**.
 You keep a list of clusters (grouped, for example, into Production and UAT), pick which
 ones to act on, and create or change a role on all of them from a single form. The role
 change is applied to each cluster in one transaction, and you see a per-cluster result.
@@ -24,12 +24,12 @@ function or view so a low-privilege connection can act through it.
 <figure class="shot">
 <div class="light-only">
 
-![DbAccounts — Alter role](../../assets/usage/alter-form-light.png)
+![pgCowboy — Alter role](../../assets/usage/alter-form-light.png)
 
 </div>
 <div class="dark-only">
 
-![DbAccounts — Alter role](../../assets/usage/alter-form-dark.png)
+![pgCowboy — Alter role](../../assets/usage/alter-form-dark.png)
 
 </div>
 <figcaption>Altering a role across Production and UAT from one form</figcaption>
@@ -65,8 +65,8 @@ function or view so a low-privilege connection can act through it.
 
 ## Where to go next
 
-- [Installation](/pg-accounts-management/installation/) — download a build or install from source.
-- [Usage](/pg-accounts-management/usage/) — target selection, scope labels, and how a change is applied.
-- [Configuration](/pg-accounts-management/configuration/) — clusters, comment fields, templates, preferences.
-- [Call templates](/pg-accounts-management/configuration/call-templates/) — how the editable SQL works.
-- [Troubleshooting](/pg-accounts-management/troubleshooting/) — connection and permission issues.
+- [Installation](/pgcowboy/installation/) — download a build or install from source.
+- [Usage](/pgcowboy/usage/) — target selection, scope labels, and how a change is applied.
+- [Configuration](/pgcowboy/configuration/) — clusters, comment fields, templates, preferences.
+- [Call templates](/pgcowboy/configuration/call-templates/) — how the editable SQL works.
+- [Troubleshooting](/pgcowboy/troubleshooting/) — connection and permission issues.

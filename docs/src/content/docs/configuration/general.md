@@ -33,7 +33,7 @@ In **Alter role**, when you add a target where the role doesn't exist yet:
 
 - **On** — the role creation is staged for that cluster automatically.
 - **Off** — the cluster is only brought into view. You can still add the role yourself from
-  the [Present on](/pg-accounts-management/usage/presence/) section.
+  the [Present on](/pgcowboy/usage/presence/) section.
 
 ## Check for updates on startup
 

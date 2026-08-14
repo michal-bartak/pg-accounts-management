@@ -1,9 +1,9 @@
 ---
-description: DbAccounts project context — architecture, conventions, and decisions for PostgreSQL role maintenance GUI
+description: pgCowboy project context — architecture, conventions, and decisions for PostgreSQL role maintenance GUI
 alwaysApply: true
 ---
 
-# DbAccounts — project knowledge
+# pgCowboy — project knowledge
 
 Cross-platform **PostgreSQL role maintenance** desktop app: manage clusters, batch-run role operations via **user-defined PostgreSQL functions** (not direct DDL in app).
 
@@ -20,7 +20,7 @@ Cross-platform **PostgreSQL role maintenance** desktop app: manage clusters, bat
 
 ## Stack (current)
 
-- Go module: `github.com/michalbartak/dbaccounts`
+- Go module: `github.com/michal-bartak/pgcowboy`
 - Wails **v2.12.0** (CLI may auto-bump `go.mod` on `wails dev`)
 - pgx v5, yaml.v3, google/uuid
 - Bindings: `frontend/wailsjs/` — **auto-generated** by Wails; do not hand-edit; regenerate via `wails dev` / `wails build`
@@ -31,9 +31,9 @@ Two files in one directory:
 
 | OS | Directory |
 |----|-----------|
-| macOS | `~/Library/Application Support/DbAccounts/` |
-| Linux | `~/.config/dbaccounts/` |
-| Windows | `%AppData%\DbAccounts\` |
+| macOS | `~/Library/Application Support/pgCowboy/` |
+| Linux | `~/.config/pgcowboy/` |
+| Windows | `%AppData%\pgCowboy\` |
 
 `config.yaml` = app configuration; `clusters.yaml` = `categories`, `clusters`, `targets`. Example
 templates: [`config.example.yaml`](config.example.yaml),
@@ -332,7 +332,7 @@ export PATH="/opt/homebrew/bin:$HOME/go/bin:$PATH"
 cd /Users/michalbartak/GitRepo/pg-accounts-management
 go mod tidy
 wails dev          # dev window + http://localhost:34115
-make package       # → build/bin/DbAccounts.app + dist/DbAccounts-v*-macos-*.dmg
+make package       # → build/bin/pgCowboy.app + dist/pgCowboy-v*-macos-*.dmg
 ```
 
 Go was installed via `brew install go` on this machine. Self-signed dev build warning on darwin is expected.
