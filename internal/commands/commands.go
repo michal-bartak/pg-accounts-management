@@ -2,9 +2,9 @@ package commands
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
+	"github.com/michalbartak/dbaccounts/internal/calltemplate"
 	"github.com/michalbartak/dbaccounts/internal/model"
 )
 
@@ -20,12 +20,11 @@ const (
 	OpResetConfig    = "reset_config"
 )
 
-// configNameRE validates a GUC name (optionally namespaced, e.g. auto_explain.log_min_duration).
-var configNameRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$`)
-
-// ValidConfigName reports whether name is an acceptable role GUC name.
+// ValidConfigName reports whether name is an acceptable role GUC name. Delegates to
+// calltemplate, which embeds the name unquoted and so owns the rule — validating it here against
+// a second copy of the pattern is how the two could have drifted apart.
 func ValidConfigName(name string) bool {
-	return configNameRE.MatchString(strings.TrimSpace(name))
+	return calltemplate.IsGUCName(name)
 }
 
 // allowedAttributeKeywords are the ALTER ROLE attribute keywords the app may emit.
@@ -40,12 +39,13 @@ var allowedAttributeKeywords = map[string]bool{
 }
 
 // commentFieldArgs copies the per-cluster comment-field values (JSON-encoded; see
-// model.CreateRoleParams.CommentFields) into a fresh args map that reserved placeholders are then
-// layered onto. A nil/empty input yields an empty (non-nil) map.
+// model.CreateRoleParams.CommentFields) into a fresh args map, under prefixed keys so a field keyed
+// like a built-in placeholder keeps its own entry. Built-in values are then layered on under their
+// bare names, in any order. A nil/empty input yields an empty (non-nil) map.
 func commentFieldArgs(fields map[string]string) map[string]string {
 	args := make(map[string]string, len(fields)+2)
 	for k, v := range fields {
-		args[k] = v
+		args[model.CommentArgKey(k)] = v
 	}
 	return args
 }
@@ -57,7 +57,6 @@ func BuildArgs(cfg model.Config, op model.OperationSpec) (model.DBFunction, map[
 			return model.DBFunction{}, nil, fmt.Errorf("create role parameters missing")
 		}
 		p := op.CreateRole
-		// Comment fields first, so a reserved placeholder always wins on a key collision.
 		args := commentFieldArgs(p.CommentFields)
 		args["loginname"] = p.LoginName
 		args["parent_roles"] = p.ParentRoles
@@ -196,17 +195,6 @@ func ValidateOperation(cfg model.Config, op model.OperationSpec) error {
 		return fmt.Errorf("unknown operation: %s", op.Operation)
 	}
 	return nil
-}
-
-// ValidateRequest validates a single-operation, cluster-targeted request.
-func ValidateRequest(cfg model.Config, req model.RunRequest) error {
-	if req.Operation == "" {
-		return fmt.Errorf("operation is required")
-	}
-	if len(req.CategoryIDs) == 0 && len(req.ClusterIDs) == 0 {
-		return fmt.Errorf("select at least one category or cluster")
-	}
-	return ValidateOperation(cfg, req.OperationSpec)
 }
 
 // ValidateRoleBatch validates a per-cluster batch request: at least one cluster, each with at

@@ -6,11 +6,11 @@ import (
 )
 
 func TestBuildQueryFromTemplate_arrayOrNullWithParent(t *testing.T) {
-	call := "admin_access.create_role(${loginname}, NULL, ${full_name}, ${e_mail}, ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_roles})"
+	call := "admin_access.create_role(${loginname}, NULL, ${{full_name}}, ${{e_mail}}, ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_roles})"
 	args := map[string]string{
 		"loginname":    "jdoe",
-		"full_name":    `"John Doe"`,
-		"e_mail":       `"j@example.com"`,
+		"cf:full_name": `"John Doe"`,
+		"cf:e_mail":    `"j@example.com"`,
 		"parent_roles": "gr_parent",
 	}
 

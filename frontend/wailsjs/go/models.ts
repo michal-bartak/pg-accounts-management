@@ -439,7 +439,6 @@ export namespace model {
 	    category: string;
 	    exists: boolean;
 	    comment: string;
-	    fullName: string;
 	    parents: string[];
 	    attributes: Record<string, boolean>;
 	    settings: Record<string, string>;
@@ -459,7 +458,6 @@ export namespace model {
 	        this.category = source["category"];
 	        this.exists = source["exists"];
 	        this.comment = source["comment"];
-	        this.fullName = source["fullName"];
 	        this.parents = source["parents"];
 	        this.attributes = source["attributes"];
 	        this.settings = source["settings"];
@@ -475,7 +473,6 @@ export namespace model {
 	    category: string;
 	    loginName: string;
 	    comment: string;
-	    fullName: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new RoleMatch(source);
@@ -489,7 +486,6 @@ export namespace model {
 	        this.category = source["category"];
 	        this.loginName = source["loginName"];
 	        this.comment = source["comment"];
-	        this.fullName = source["fullName"];
 	    }
 	}
 	export class ClusterRoleMatches {
@@ -594,6 +590,20 @@ export namespace model {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.categoryIds = source["categoryIds"];
 	        this.clusterIds = source["clusterIds"];
+	    }
+	}
+	export class SearchColumn {
+	    label: string;
+	    template: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SearchColumn(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.label = source["label"];
+	        this.template = source["template"];
 	    }
 	}
 	export class PasswordGen {
@@ -778,6 +788,7 @@ export namespace model {
 	    ui: UISettings;
 	    parentRoles: string[];
 	    commentFields: CommentField[];
+	    searchColumns: SearchColumn[];
 	    targets: TargetSelection;
 	    windowWidth?: number;
 	    windowHeight?: number;
@@ -798,6 +809,7 @@ export namespace model {
 	        this.ui = this.convertValues(source["ui"], UISettings);
 	        this.parentRoles = source["parentRoles"];
 	        this.commentFields = this.convertValues(source["commentFields"], CommentField);
+	        this.searchColumns = this.convertValues(source["searchColumns"], SearchColumn);
 	        this.targets = this.convertValues(source["targets"], TargetSelection);
 	        this.windowWidth = source["windowWidth"];
 	        this.windowHeight = source["windowHeight"];
@@ -827,6 +839,38 @@ export namespace model {
 	
 	
 	
+	export class DefaultTemplates {
+	    dbFunctions: DBFunctions;
+	    dbReads: DBReads;
+	
+	    static createFrom(source: any = {}) {
+	        return new DefaultTemplates(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.dbFunctions = this.convertValues(source["dbFunctions"], DBFunctions);
+	        this.dbReads = this.convertValues(source["dbReads"], DBReads);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	
 	
@@ -1036,6 +1080,49 @@ export namespace model {
 	
 	
 	
+	
+	export class SettingsPayload {
+	    parentRoles: string[];
+	    commentFields: CommentField[];
+	    searchColumns: SearchColumn[];
+	    dbFunctions: DBFunctions;
+	    dbReads: DBReads;
+	    batch: BatchSettings;
+	    ui: UISettings;
+	
+	    static createFrom(source: any = {}) {
+	        return new SettingsPayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.parentRoles = source["parentRoles"];
+	        this.commentFields = this.convertValues(source["commentFields"], CommentField);
+	        this.searchColumns = this.convertValues(source["searchColumns"], SearchColumn);
+	        this.dbFunctions = this.convertValues(source["dbFunctions"], DBFunctions);
+	        this.dbReads = this.convertValues(source["dbReads"], DBReads);
+	        this.batch = this.convertValues(source["batch"], BatchSettings);
+	        this.ui = this.convertValues(source["ui"], UISettings);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	export class TestConnectionRequest {
 	    clusterId: string;

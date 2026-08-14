@@ -10,6 +10,25 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Configurable search columns** — choose what shows next to the role name when searching, each column built from comment keys (`${{first_name}} ${{last_name}}`) or the raw comment.
+
+### Changed
+
+- **Denser UI** — text, controls, table rows and spacing render about 12% smaller, so noticeably more fits on screen.
+- **System requirements are now stated explicitly**: macOS 12+, Windows 10/11 with WebView2, or Linux with WebKitGTK 2.38+. Windows 7/8/8.1 cannot run the app at all (they have not been able to since before the first release — the Go toolchain builds Windows 10+ binaries only). On an older macOS or Linux the Find-role columns stop lining up, as they now use CSS subgrid. The macOS installer previously claimed to support 10.13, which the app has never actually run on.
+- **Breaking: comment keys in templates now use double braces** — `${{full_name}}`. Single braces are reserved for built-ins (`${loginname}`, `${comment}`, `${parent_roles}`, …), so a comment key named `comment` or `loginname` is finally reachable. Update any custom `create_role` / `set_comment` template that referenced a comment key in single braces.
+- Find-role results line up as a table, and no longer assume the comment has a `full_name` key.
+- An unknown `${name}` in a template is now reported instead of silently rendering empty.
+
+### Fixed
+
+- A comment field named like a built-in no longer corrupts what `set_comment` writes in function mode (the comment could be re-serialized, or an empty one stored as NULL).
+- Adding a comment field and using it in a call template in the same Settings save now works.
+- **Settings saves are all-or-nothing** — a rejected template or field no longer leaves the earlier sections of the page already written to the config file while the error is reported.
+- A comment containing `${` no longer fails the operation.
+
 ## [0.9.0] - 2026-08-12
 
 ### Added

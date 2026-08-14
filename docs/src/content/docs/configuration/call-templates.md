@@ -67,6 +67,17 @@ opens the full syntax reference.
 - **function** — the template is a function call. Values are passed as real bind parameters
   (`$1`, `$2`, …), which is the safest option when your DDL is wrapped in a function.
 
+## Two placeholder namespaces
+
+- **`${name}`** — a **built-in**, from the closed set the operation offers (the table above).
+  Anything else in single braces is rejected when you save.
+- **`${{key}}`** — a **comment field** you configured under
+  [Comment fields](/pg-accounts-management/configuration/comment-fields/), in `create_role` and
+  `set_comment` only.
+
+Keeping them apart is what lets a comment key named like a built-in still be used: `${comment}` is
+the whole comment, while `${{comment}}` is a JSON key called `comment`.
+
 ## How fields are embedded
 
 The app knows the kind of each field, so you don't quote them yourself:
@@ -76,12 +87,12 @@ The app knows the kind of each field, so you don't quote them yourself:
   comma-separated list of quoted identifiers (`"a", "b"`); in **function** mode an inline
   `ARRAY['a', 'b']` literal (values verbatim, an empty selection → `NULL`).
 - **`new_password`**, **`comment`**, **`config_value`** → escaped string literals.
-- **Comment fields** — one placeholder per key configured under
-  [Comment fields](/pg-accounts-management/configuration/comment-fields/) (e.g. `${full_name}`,
-  `${e_mail}`), available in **`create_role`** and **`set_comment`**.
+- **Comment fields** — one `${{key}}` placeholder per key configured under
+  [Comment fields](/pg-accounts-management/configuration/comment-fields/) (e.g. `${{full_name}}`,
+  `${{e_mail}}`), available in **`create_role`** and **`set_comment`**.
   The value comes from the role's JSON comment and is embedded by type: string → quoted literal,
   number/boolean → bare literal, array/object → JSON text, and an empty/`null`/missing value →
-  bare `NULL`.
+  bare `NULL`. A comment field cannot be used inside the `ARRAY[...] || ${...}` form.
 - **`config_name`** → a bare, validated GUC name (never quoted).
 - **`attributes`** → a space-separated keyword list, each keyword checked against a whitelist
   (`SUPERUSER`/`NOSUPERUSER`, `CREATEROLE`, `LOGIN`, `REPLICATION`, `BYPASSRLS`, …). All of a
@@ -94,12 +105,12 @@ Suppose role creation must go through a helper that also assigns fixed groups. S
 
 ```text
 admin_access.create_role(
-  ${loginname}, NULL, ${full_name}, ${e_mail},
+  ${loginname}, NULL, ${{full_name}}, ${{e_mail}},
   ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_roles}
 )
 ```
 
-- `${loginname}` is a bind; `${full_name}` / `${e_mail}` are comment-field placeholders (their
+- `${loginname}` is a bind; `${{full_name}}` / `${{e_mail}}` are comment-field placeholders (their
   values come from the role's comment, typed, `NULL` when empty/absent).
 - `NULL` is a plain SQL literal for an unused argument.
 - `ARRAY[...] || ${parent_roles}` appends the selected parent roles to a fixed set (it becomes

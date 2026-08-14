@@ -20,7 +20,6 @@ const (
 	fieldConfigName               // a role-GUC name, emitted unquoted (ALTER ROLE … SET work_mem = …)
 	fieldLiteral
 	fieldCommentValue // a configured comment field: JSON-encoded value → typed SQL (NULL / number / bool / literal)
-	fieldBind         // function mode only
 )
 
 // gucNameRE validates a role-GUC name (optionally namespaced, e.g. auto_explain.log_min_duration).
@@ -100,17 +99,25 @@ func validateCallTemplate(call, operation, execution string, commentFields []str
 		}
 	}
 
-	allowed := allowedPlaceholderNames(operation, commentFields)
-	if allowed == nil {
+	if allowedPlaceholderNames(operation) == nil {
 		return fmt.Errorf("unknown operation: %s", operation)
 	}
-	for _, m := range placeholderTokenRE.FindAllStringSubmatch(call, -1) {
-		ph, perr := parsePlaceholderToken(m[1], operation, commentFields)
+	// Checked on the template, before any substitution, so the scan below is exhaustive and no
+	// post-substitution "unresolved placeholder" guard is needed (one that would also trip on a
+	// *value* containing "${").
+	if leftoverPlaceholder(call) {
+		return fmt.Errorf("malformed placeholder: use ${name} for a built-in or ${{comment_key}} for a comment field, with braces balanced")
+	}
+	for _, tok := range scanTokens(call) {
+		ph, perr := parsePlaceholderToken(tok, operation)
 		if perr != nil {
 			return perr
 		}
-		if ph.kind == placeholderSimple && !allowed[ph.field] {
-			return fmt.Errorf("unknown placeholder ${%s} for operation %s", ph.field, operation)
+		if ph.kind != placeholderSimple {
+			continue // array_concat validated its own field during parse
+		}
+		if _, kerr := placeholderKindFor(operation, ph, commentFields); kerr != nil {
+			return kerr
 		}
 	}
 	return nil
@@ -127,7 +134,9 @@ func ValidateCallTemplateWithExecution(call, operation, execution string, commen
 	return validateCallTemplate(call, operation, execution, commentFields)
 }
 
-func allowedPlaceholderNames(operation string, commentFields []string) map[string]bool {
+// allowedPlaceholderNames is the closed bare-namespace set for an operation. Comment fields are
+// deliberately NOT merged in: they live in the ${{…}} namespace only.
+func allowedPlaceholderNames(operation string) map[string]bool {
 	out := AllowedPlaceholders(operation)
 	if out == nil {
 		return nil
@@ -135,13 +144,25 @@ func allowedPlaceholderNames(operation string, commentFields []string) map[strin
 	if operation == "remove_role" {
 		out["rolename"] = true
 	}
-	for f := range commentFieldSet(operation, commentFields) {
-		out[f] = true
-	}
 	return out
 }
 
-func placeholderKindForField(operation, field string, commentFields []string) (fieldKind, error) {
+// placeholderKindFor resolves how a placeholder is embedded/bound. It is the single source of
+// truth: both the emitted SQL shape and the bound value are derived from the kind it returns, so
+// they can no longer disagree on a name that exists in both namespaces.
+func placeholderKindFor(operation string, ph parsedPlaceholder, commentFields []string) (fieldKind, error) {
+	if ph.ns == nsCommentField {
+		if !opSupportsCommentFields(operation) {
+			return 0, fmt.Errorf(
+				"${{%s}}: comment-field placeholders are only available for create_role and set_comment, not %s",
+				ph.field, operation)
+		}
+		if !commentFieldSet(operation, commentFields)[ph.field] {
+			return 0, fmt.Errorf("${{%s}} is not a configured comment field (Settings → Comment fields)", ph.field)
+		}
+		return fieldCommentValue, nil
+	}
+	field := ph.field
 	if field == "rolename" {
 		field = "loginname"
 	}
@@ -171,9 +192,6 @@ func placeholderKindForField(operation, field string, commentFields []string) (f
 		case "comment":
 			return fieldLiteral, nil
 		}
-		if commentFieldSet(operation, commentFields)[field] {
-			return fieldCommentValue, nil
-		}
 	case "set_attribute":
 		switch field {
 		case "loginname":
@@ -192,9 +210,6 @@ func placeholderKindForField(operation, field string, commentFields []string) (f
 			// inline ARRAY['a','b'] literal (buildFunctionQuery special-cases fieldIdentifierList).
 			return fieldIdentifierList, nil
 		}
-		if commentFieldSet(operation, commentFields)[field] {
-			return fieldCommentValue, nil
-		}
 	case "set_config":
 		switch field {
 		case "loginname":
@@ -212,7 +227,22 @@ func placeholderKindForField(operation, field string, commentFields []string) (f
 			return fieldConfigName, nil
 		}
 	}
-	return fieldBind, nil
+	suffix := ""
+	if opSupportsCommentFields(operation) {
+		suffix = fmt.Sprintf("; use ${{%s}} for a configured comment field", ph.field)
+	}
+	return 0, fmt.Errorf("unknown placeholder ${%s} for operation %s%s", ph.field, operation, suffix)
+}
+
+// resolveValue looks a placeholder's value up in the namespace it was written in, so a comment
+// field keyed like a built-in (comment, loginname, …) reads its own value rather than the
+// built-in's.
+func resolveValue(args map[string]string, ph parsedPlaceholder) (string, bool) {
+	if ph.ns == nsCommentField {
+		v, ok := args[model.CommentArgKey(ph.field)]
+		return v, ok
+	}
+	return resolveArg(args, ph.field)
 }
 
 func resolveArg(args map[string]string, field string) (string, bool) {
@@ -286,7 +316,7 @@ func quoteSQLKeywordList(value string) (string, error) {
 		return "", fmt.Errorf("at least one keyword is required")
 	}
 	for _, kw := range kws {
-		if !roleLiteralRE.MatchString(kw) {
+		if !identRE.MatchString(kw) {
 			return "", fmt.Errorf("invalid keyword %q: use letters, digits, underscore", kw)
 		}
 	}
@@ -298,7 +328,7 @@ func quoteSQLKeywordList(value string) (string, error) {
 // double-quoted; validation is the injection guard.
 func validConfigName(name string) (string, error) {
 	name = strings.TrimSpace(name)
-	if !gucNameRE.MatchString(name) {
+	if !IsGUCName(name) {
 		return "", fmt.Errorf("invalid setting name: %q", name)
 	}
 	return name, nil
@@ -374,24 +404,20 @@ func commentFieldBindValue(raw string) any {
 func buildEmbedded(call string, args map[string]string, operation string, commentFields []string) (string, error) {
 	var b strings.Builder
 	last := 0
-	for _, loc := range placeholderTokenRE.FindAllStringSubmatchIndex(call, -1) {
-		b.WriteString(call[last:loc[0]])
-		inner := call[loc[2]:loc[3]]
-		ph, err := parsePlaceholderToken(inner, operation, commentFields)
+	for _, tok := range scanTokens(call) {
+		b.WriteString(call[last:tok.start])
+		ph, err := parsePlaceholderToken(tok, operation)
 		if err != nil {
 			return "", err
 		}
-		kind, err := placeholderKindForField(operation, ph.field, commentFields)
+		kind, err := placeholderKindFor(operation, ph, commentFields)
 		if err != nil {
 			return "", err
 		}
-		if kind == fieldBind {
-			return "", fmt.Errorf("${%s} cannot be used in statement/block mode for %s", ph.field, operation)
-		}
-		v, ok := resolveArg(args, ph.field)
+		v, ok := resolveValue(args, ph)
 		// A comment field is optional — an absent/empty value resolves to SQL NULL.
 		if !ok && kind != fieldCommentValue {
-			return "", fmt.Errorf("missing value for ${%s}", ph.field)
+			return "", fmt.Errorf("missing value for %s", ph.token())
 		}
 		switch kind {
 		case fieldCommentValue:
@@ -423,14 +449,10 @@ func buildEmbedded(call string, args map[string]string, operation string, commen
 		case fieldLiteral:
 			b.WriteString(quoteSQLLiteral(v))
 		}
-		last = loc[1]
+		last = tok.end
 	}
 	b.WriteString(call[last:])
-	out := b.String()
-	if strings.Contains(out, "${") {
-		return "", fmt.Errorf("call template has unresolved placeholders")
-	}
-	return out, nil
+	return b.String(), nil
 }
 
 func buildFunctionQuery(call string, args map[string]string, operation string, commentFields []string) (query string, values []any, err error) {
@@ -438,10 +460,9 @@ func buildFunctionQuery(call string, args map[string]string, operation string, c
 		return "", nil, err
 	}
 
-	cfSet := commentFieldSet(operation, commentFields)
 	n := 0
 	values = make([]any, 0, 8)
-	call, err = preprocessArrayOrNull(call, args, operation, &n, &values, commentFields)
+	call, err = preprocessArrayOrNull(call, args, operation, &n, &values)
 	if err != nil {
 		return "", nil, err
 	}
@@ -449,27 +470,29 @@ func buildFunctionQuery(call string, args map[string]string, operation string, c
 	var b strings.Builder
 	b.WriteString("SELECT ")
 	last := 0
-	for _, loc := range placeholderTokenRE.FindAllStringSubmatchIndex(call, -1) {
-		b.WriteString(call[last:loc[0]])
-		inner := call[loc[2]:loc[3]]
-		ph, perr := parsePlaceholderToken(inner, operation, commentFields)
+	for _, tok := range scanTokens(call) {
+		b.WriteString(call[last:tok.start])
+		ph, perr := parsePlaceholderToken(tok, operation)
 		if perr != nil {
 			return "", nil, perr
 		}
-		v, ok := resolveArg(args, ph.field)
-		// A comment field is optional — an absent value binds as SQL NULL.
-		if !ok && !cfSet[ph.field] {
-			return "", nil, fmt.Errorf("missing value for ${%s}", ph.field)
-		}
+		v, ok := resolveValue(args, ph)
 		switch ph.kind {
 		case placeholderArrayConcat:
+			if !ok {
+				return "", nil, fmt.Errorf("missing value for %s", ph.token())
+			}
 			n++
 			b.WriteString(fmt.Sprintf("$%d::text[]", n))
 			values = append(values, buildArrayConcatValue(v, ph.literals))
 		case placeholderSimple:
-			kind, kerr := placeholderKindForField(operation, ph.field, commentFields)
+			kind, kerr := placeholderKindFor(operation, ph, commentFields)
 			if kerr != nil {
 				return "", nil, kerr
+			}
+			// A comment field is optional — an absent value binds as SQL NULL.
+			if !ok && kind != fieldCommentValue {
+				return "", nil, fmt.Errorf("missing value for %s", ph.token())
 			}
 			if kind == fieldIdentifierList {
 				// parent_roles in function mode → inline ARRAY['a','b'] literal, not a bind.
@@ -482,18 +505,16 @@ func buildFunctionQuery(call string, args map[string]string, operation string, c
 			}
 			n++
 			b.WriteString(fmt.Sprintf("$%d", n))
-			if cfSet[ph.field] {
+			// Value AND shape both come from `kind`, so a comment field keyed like a built-in
+			// can no longer have its value decoded as the other namespace's.
+			if kind == fieldCommentValue {
 				values = append(values, commentFieldBindValue(v))
 			} else {
 				values = append(values, v)
 			}
 		}
-		last = loc[1]
+		last = tok.end
 	}
 	b.WriteString(call[last:])
-	query = b.String()
-	if strings.Contains(query, "${") {
-		return "", nil, fmt.Errorf("call template has unresolved placeholders")
-	}
-	return query, values, nil
+	return b.String(), values, nil
 }

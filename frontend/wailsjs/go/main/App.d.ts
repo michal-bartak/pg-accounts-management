@@ -18,6 +18,8 @@ export function GetConfig():Promise<model.Config>;
 
 export function GetConfigPath():Promise<string>;
 
+export function GetDefaultTemplates():Promise<model.DefaultTemplates>;
+
 export function GetPendingUpdate():Promise<model.UpdateInfo>;
 
 export function LoadRoleDependencies(arg1:model.RoleDependenciesRequest):Promise<Array<model.ClusterRoleDependencies>>;
@@ -27,8 +29,6 @@ export function LoadRoleDetails(arg1:model.RoleDetailsRequest):Promise<Array<mod
 export function PreviewTargets(arg1:model.RunRequest):Promise<Array<model.Cluster>>;
 
 export function ReloadConfig():Promise<model.Config>;
-
-export function RunOperation(arg1:model.RunRequest):Promise<Array<model.ClusterResult>>;
 
 export function RunRoleBatch(arg1:model.RoleBatchRequest):Promise<Array<model.ClusterResult>>;
 
@@ -43,6 +43,10 @@ export function SaveDBFunctions(arg1:model.DBFunctions):Promise<void>;
 export function SaveDBReads(arg1:model.DBReads):Promise<void>;
 
 export function SaveParentRoles(arg1:Array<string>):Promise<void>;
+
+export function SaveSearchColumns(arg1:Array<model.SearchColumn>):Promise<void>;
+
+export function SaveSettings(arg1:model.SettingsPayload):Promise<void>;
 
 export function SaveTargetSelection(arg1:model.TargetSelection):Promise<void>;
 

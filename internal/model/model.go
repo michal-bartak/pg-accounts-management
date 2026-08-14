@@ -96,6 +96,30 @@ type DBReads struct {
 	RoleDependencies DBRead `yaml:"role_dependencies" json:"roleDependencies"`
 }
 
+// SettingsPayload is everything the Settings page stages, saved in ONE atomic call. It used to
+// be seven separate bound methods invoked in sequence, each writing the config file: a rejection
+// partway through left the earlier ones persisted while the UI reported failure. It also forced
+// the caller to order the calls by hand, because the command templates are validated against the
+// configured comment fields — here both arrive together and validation sees the new set directly.
+type SettingsPayload struct {
+	ParentRoles   []string       `json:"parentRoles"`
+	CommentFields []CommentField `json:"commentFields"`
+	SearchColumns []SearchColumn `json:"searchColumns"`
+	DBFunctions   DBFunctions    `json:"dbFunctions"`
+	DBReads       DBReads        `json:"dbReads"`
+	Batch         BatchSettings  `json:"batch"`
+	UI            UISettings     `json:"ui"`
+}
+
+// DefaultTemplates carries the built-in call templates and introspection queries to the
+// frontend, so the Settings editor's "Default" button can revert a template without the SQL
+// being duplicated in app.js. Config-file shape is irrelevant here — this type is only ever
+// returned over the Wails bridge.
+type DefaultTemplates struct {
+	DBFunctions DBFunctions `json:"dbFunctions"`
+	DBReads     DBReads     `json:"dbReads"`
+}
+
 type BatchSettings struct {
 	MaxConcurrency int `yaml:"max_concurrency" json:"maxConcurrency"`
 }
@@ -215,6 +239,12 @@ type Config struct {
 	// comment holds JSON (Create role / Alter role). Ordered; keys not listed here are
 	// still shown generically. Defaults to full_name/e_mail.
 	CommentFields []CommentField `yaml:"comment_fields,omitempty" json:"commentFields"`
+	// SearchColumns are the extra columns shown next to the role name in the Find-role
+	// results, each built from a display template over the role's comment. Ordered. No
+	// omitempty: an explicitly empty list means "role name only" and must round-trip as
+	// `search_columns: []`, while an absent key (older config) still gets the default
+	// "Full name" column.
+	SearchColumns []SearchColumn `yaml:"search_columns" json:"searchColumns"`
 	// Targets is the last target selection on the Operations page (cluster groups and/or
 	// specific clusters), remembered across re-renders and restarts. Empty = "all groups".
 	Targets TargetSelection `yaml:"targets,omitempty" json:"targets"`
@@ -241,8 +271,27 @@ type CommentField struct {
 	Label string `yaml:"label" json:"label"`
 }
 
+// SearchColumn is one extra column in the Find-role results. Template is display-only text
+// (rendered by the frontend, never SQL): ${<key>} resolves to that key's value in the role's
+// JSON comment, and the reserved ${comment} to the raw comment. An unresolved key renders
+// empty. Label is the column header; blank is allowed.
+type SearchColumn struct {
+	Label    string `yaml:"label" json:"label"`
+	Template string `yaml:"template" json:"template"`
+}
+
+// CommentArgPrefix namespaces a comment field's value in an operation's args map. Without it a
+// field keyed like a built-in placeholder (comment, loginname, …) would share one map entry with
+// that built-in, so ${comment} and ${{comment}} could not both be resolved for the same call.
+// It is applied inside commands.BuildArgs — the Wails wire format (CreateRoleParams.CommentFields /
+// SetCommentParams.CommentFields) stays keyed by the bare key.
+const CommentArgPrefix = "cf:"
+
+// CommentArgKey is the args-map key holding the ${{key}} placeholder's value.
+func CommentArgKey(key string) string { return CommentArgPrefix + key }
+
 // CommentFieldKeys returns the configured comment-field keys in order. These are the placeholder
-// names (${<key>}) additionally offered to the create_role / set_comment call templates.
+// names (${{<key>}}) additionally offered to the create_role / set_comment call templates.
 func (c Config) CommentFieldKeys() []string {
 	keys := make([]string, 0, len(c.CommentFields))
 	for _, f := range c.CommentFields {
@@ -483,7 +532,6 @@ type RoleMatch struct {
 	Category  string `json:"category"`
 	LoginName string `json:"loginName"`
 	Comment   string `json:"comment"`
-	FullName  string `json:"fullName"`
 }
 
 // ClusterRoleMatches is one cluster's search outcome — its matches, or why it could not be
@@ -509,7 +557,6 @@ type ClusterRoleDetail struct {
 	Category   string            `json:"category"`
 	Exists     bool              `json:"exists"`
 	Comment    string            `json:"comment"`
-	FullName   string            `json:"fullName"`
 	Parents    []string          `json:"parents"`
 	Attributes map[string]bool   `json:"attributes"`
 	Settings   map[string]string `json:"settings"`

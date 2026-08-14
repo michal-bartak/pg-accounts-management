@@ -43,9 +43,17 @@ Example template: [`config.example.yaml`](config.example.yaml). Implemented in `
 - `AddCluster`, `UpdateCluster`, `DeleteCluster` (per-item; kept but unused by the UI now)
 - `SaveClusters(ClustersConfig)` — staged Clusters editor: replaces the whole clusters+categories
   set atomically via `Store.SaveClustersAndCategories` (validate + UUID/slug ids + referential integrity)
-- `SaveDBFunctions`, `SaveBatchSettings`, `SaveUISettings`, `SaveParentRoles`, `SaveTargetSelection`
+- `SaveSettings(SettingsPayload)` — the whole Settings page in ONE atomic write (parent groups,
+  comment fields, search columns, db_functions, db_reads, batch, ui). Everything validates before
+  anything is assigned, and templates are validated against the comment fields in the same payload.
+  The per-section `SaveDBFunctions`/`SaveDBReads`/`SaveBatchSettings`/`SaveUISettings`/
+  `SaveParentRoles`/`SaveCommentFields`/`SaveSearchColumns` remain but are unused by the UI.
+- `GetDefaultTemplates` — built-in call templates + read queries for the editor's Default button,
+  so `frontend/app.js` keeps no copy of the default SQL
+- `SaveTargetSelection`
 - `TestConnection`, `PreviewTargets`, `RunRoleBatch` (per-cluster transactional batch — the
-  create/update/remove path), `RunOperation` (legacy single-op, unused by the UI)
+  create/update/remove path, and the only write path; the legacy single-op `RunOperation`/
+  `batch.Run`/`pg.CallFunction`/`commands.ValidateRequest` were deleted)
 - **Introspection (reads, for Alter role):** `SearchRoles`, `LoadRoleDetails`,
   `LoadRoleDependencies` — scan the
   **selected** clusters concurrently (`internal/pg/introspect.go` + `batch.Runner`),
@@ -85,12 +93,12 @@ Config: `db_functions.<operation>.call` + optional `.execution` (`function` \| `
 
 | `operation` | Allowed `${...}` | Notes |
 |-------------|------------------|-------|
-| `create_role` | loginname, parent_roles, `${<comment field>}` (per `Config.CommentFields`) | `parent_roles`: statement → `"a", "b"`, function → inline `ARRAY['a','b']`; comment fields typed (string→literal, num/bool→bare, empty/absent→`NULL`); `ARRAY \|\|` requires `execution: function` |
+| `create_role` | loginname, parent_roles, `${{<comment field>}}` (per `Config.CommentFields`) | `parent_roles`: statement → `"a", "b"`, function → inline `ARRAY['a','b']`; comment fields typed (string→literal, num/bool→bare, empty/absent→`NULL`); `ARRAY \|\|` requires `execution: function` |
 | `remove_role` | loginname, rolename (alias) | `statement`: e.g. `DROP ROLE ${loginname}`; `block`: a complete anonymous block (`DO $tag$ … $tag$;`), run verbatim |
 | `grant_parents` | loginname, parent_roles | `statement`: `GRANT ${parent_roles} TO ${loginname}` — identifiers, not quoted |
 | `revoke_parents` | loginname, parent_roles | Default `statement`: `REVOKE ${parent_roles} FROM ${loginname}` |
 | `change_password` | loginname, new_password | |
-| `set_comment` | loginname, comment, `${<comment field>}` (per `Config.CommentFields`) | Default `statement`: `COMMENT ON ROLE ${loginname} IS ${comment}` — comment as escaped literal; comment fields typed (empty/absent→`NULL`) |
+| `set_comment` | loginname, comment, `${{<comment field>}}` (per `Config.CommentFields`) | Default `statement`: `COMMENT ON ROLE ${loginname} IS ${comment}` — comment as escaped literal; comment fields typed (empty/absent→`NULL`) |
 | `set_attribute` | loginname, attributes (alias: attribute) | Default `statement`: `ALTER ROLE ${loginname} WITH ${attributes}` — space-separated whitelisted keywords (SUPERUSER/NOSUPERUSER/…), embedded unquoted |
 | `set_config` | loginname, config_name, config_value | Default `statement`: `ALTER ROLE ${loginname} SET ${config_name} = ${config_value}` — `config_name` is a bare unquoted GUC name (`fieldConfigName`, `gucNameRE`-validated), value a literal. Role GUCs read from `pg_roles.rolconfig`. |
 | `reset_config` | loginname, config_name | Default `statement`: `ALTER ROLE ${loginname} RESET ${config_name}` |
@@ -103,14 +111,15 @@ Config: `db_functions.<operation>.call` + optional `.execution` (`function` \| `
 
 (parent_roles and the configured comment-field placeholders are unused by the vanilla default; a
 `function`-mode override can consume them, e.g.
-`admin_access.create_role(${loginname}, NULL, ${full_name}, ${e_mail}, ARRAY['grp'] || ${parent_roles})`).
+`admin_access.create_role(${loginname}, NULL, ${{full_name}}, ${{e_mail}}, ARRAY['grp'] || ${parent_roles})`).
 Loading an existing config never force-overwrites user templates; the `#fn-dialog` **Default**
 button reverts one template to the vanilla built-in.
 
 **Template processing:**
 
 - **Function mode:** `${field}` → `$n` text bind from form (`internal/commands` arg map).
-- **Statement/block:** `loginname`, `parent_roles`, `rolename` → double-quoted identifiers; `parent_roles` split on commas → `"a", "b"` (create_role/grant/revoke); `new_password`, `comment`, `config_value` → SQL string literals; **comment fields** (create_role/set_comment) → JSON-value-typed (string→literal, number/bool→bare, array/object→JSON literal, empty/`null`/absent→bare `NULL`), threaded in as variadic `commentFields ...string` from `Config.CommentFieldKeys()`.
+- **Two namespaces, never overlapping:** `${name}` = a built-in from the CLOSED per-op set; `${{name}}` = a configured comment field, always. One `tokenRE` matches both (inner classes exclude braces, so the bare branch can't swallow a double form); `parsedPlaceholder.ns` carries it and `placeholderKindFor` is the single source of truth for BOTH the SQL shape and the bound value — `buildFunctionQuery` previously took them from two disagreeing lookups, which corrupted `${comment}` on `set_comment` when a field was keyed `comment`. Comment-field values are namespaced in the args map via `model.CommentArgKey` (`cf:`) inside `commands.BuildArgs`; the Wails wire format is unchanged. Malformed `${…}` is rejected before substitution (`leftoverPlaceholder`). There is deliberately NO migration for the old single-brace form — the app is pre-release, so a stale template is simply rejected with a message naming the `${{…}}` form.
+- **Statement/block:** `loginname`, `parent_roles`, `rolename` → double-quoted identifiers; `parent_roles` split on commas → `"a", "b"` (create_role/grant/revoke); `new_password`, `comment`, `config_value` → SQL string literals; **comment fields** (`${{key}}`, create_role/set_comment) → JSON-value-typed (string→literal, number/bool→bare, array/object→JSON literal, empty/`null`/absent→bare `NULL`), threaded in as variadic `commentFields ...string` from `Config.CommentFieldKeys()`.
 - **Function mode `${parent_roles}`:** embedded inline as `ARRAY['a','b']` (verbatim single-quoted values via `renderRoleArrayVerbatim`; `'`-bearing values rejected; empty → `NULL`), NOT a `$n` bind — so wrapper functions receive a real `text[]`. The legacy `ARRAY[fixed] || ${parent_roles}` concat form still binds `$n::text[]` via `preprocessArrayOrNull`.
 - `ARRAY['a','b'] || ${field}` → fixed array literal + `|| NULL` if field empty, else `|| $n::text[]` with `[]string{value}` (processed before other placeholders).
 - `ARRAY[${field}, 'a', 'b']` → normalized to `ARRAY['a','b'] || ${field}` via `normalizeTemplate`.
@@ -124,6 +133,25 @@ Tabs: **Operations**, **Clusters**, **Settings**, with **Create role** + **Alter
 op-tabs right-aligned in the same bar (visible only while Operations is active). Prod/UAT
 badges in CSS. Per-cluster outcomes render in the **Status** panel (hidden until
 non-empty). Do not add a heavy frontend framework unless requested.
+
+**UI density is one knob:** `html { font-size: 87.5% }` (= 14px) in `frontend/styles.css`. Every
+content-sized value in the stylesheet is a `rem`, so that one declaration scales text, `--fs-*`,
+`--control-h`/`--control-pad-*`, padding, gaps, table row heights and the `ch`-based grid tracks
+together. Keep it that way: new CSS uses `rem` for anything content-sized, `px` only for hairline
+borders (`1px`), radii and sub-10px decorations — a `px` width/`min-width` on a content box is the
+bug, since it stays full-size while everything around it shrinks. **No icon carries a
+`width`/`height`** (not in `index.html`, and `svgIcon`'s `size:` option was removed) — containers
+size glyphs in rem. Hand-synced rem pairs that must not drift:
+`th, td { padding: .55rem .75rem }` ↔ the `1.5rem` in `depsColgroup`; `.alter-result-head`'s
+`calc(0.7rem + 1px)` ↔ the search-result row's border+padding.
+Four tokens carry what rem cannot: **`--hairline: 1.15px`** for all borders (a flat `1px` is 1.75
+device px at 175% scaling and snaps to 1 *or* 2 depending on position, so borders read patchy;
+1.15px is always 2 there and still 1px at 100%) — decoration strokes stay literal px;
+**`--ink-lift` / `--ink-lift-control`** correct optical centring (browsers centre the line box, so
+ink lands low — 0.042em on chips, 0.086em on full-height buttons, measured from painted pixels;
+uppercase pills excluded); **`--checkbox-lift`** for the Target-selection checkbox. Retune the
+token, never sweep the rules. **`.section-label`** is the one small-uppercase section label
+(sized by `--fs-section`), replacing five drifted near-duplicates.
 
 **App-shell layout:** `body` is a flex column with `overflow:hidden` (no whole-page
 scroll); header + tabs fixed. Operations = two independently scrolling columns
@@ -190,7 +218,24 @@ arbitrary JSON, no forced keys): Fields↔Raw toggle, Fields edits string values
 come from Settings-managed `Config.CommentFields` (`comment_fields`, default full_name/e_mail,
 `SaveCommentFields`); empty comments default to `ui.comment_default_view` (`preferredCommentView`);
 `editorFromComment`/`assembleComment(From)`/`switchEditorMode`/`parseCommentObject` are the core
-helpers. Run: both modes build per-cluster ordered op lists and send ONE
+helpers. **Find-role result columns are configured too**, never a hardcoded comment key:
+`Config.SearchColumns` (`search_columns`, ordered `{label,template}`, `SaveSearchColumns`, Settings
+→ **Role Details** list editor / `searchColumnsDraft`) is rendered frontend-side by
+`renderSearchTemplate` over `RoleMatch.Comment` — same two namespaces as the call templates:
+`${{<key>}}` = any JSON comment key, and the closed bare set's only member `${comment}` =
+the raw comment, unresolved → `''`, result whitespace-collapsed; `searchCellValues` flags `≠` when
+clusters disagree. Layout: **CSS subgrid**. The container `#alter-results` owns the tracks
+(`--search-cols` from `searchGridTemplate(colCount)`: `fit-content(40ch)` rolename, one
+`fit-content(30ch)` per column, `minmax(8ch, auto)` chips); the header and every row are
+`grid-column: 1 / -1` + `grid-template-columns: subgrid`, so the browser does the sizing. A subgrid
+child's border+padding insets its tracks, so `.alter-result-head` must keep
+`padding: 0 calc(0.7rem + 1px)` to match the row; the column gap lives on the container and is
+inherited. This needs **WebKit 16 / macOS 12+ / WebKitGTK 2.38+** — see the installation docs.
+`search_columns` has
+no `omitempty` so an explicit `[]` ("rolename only") survives a restart while an absent key gets the
+default; `searchColumns()` therefore has no frontend default fallback. `pg.ParseFullName` and the
+`FullName` fields are gone — don't reintroduce them. Run: both modes build per-cluster ordered op
+lists and send ONE
 `App.RunRoleBatch(RoleBatchRequest)` (`executeRoleBatch`); the backend (`batch.runClusterTx`) runs
 each cluster's ops in a **single transaction** (commit/rollback, one result per cluster, bounded
 concurrency), emitting a `role-batch-progress` Wails event (`model.ClusterProgress`) per cluster
@@ -279,7 +324,7 @@ main.go, app.go           Wails entry + bindings
 internal/config/          YAML persistence
 internal/model/           Shared types + RunRequest
 internal/calltemplate/    Call template parse/validate/SQL build (stdlib only)
-internal/pg/              DSN, auth, Connect, CallFunction, introspect.go (role reads)
+internal/pg/              DSN, auth, Connect, ExecuteOperation, introspect.go (role reads)
 internal/batch/           Concurrent executor + all-cluster scan (Search/LoadRoleDetails)
 internal/commands/        Op validation + arg maps
 internal/update/          GitHub-Releases version check (stdlib http + semver compare)

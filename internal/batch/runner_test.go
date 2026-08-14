@@ -53,99 +53,6 @@ func TestResolveClusters_noneMatched(t *testing.T) {
 	}
 }
 
-func TestRun_removeRole_validatesRequest(t *testing.T) {
-	r := NewRunner(testStore(t))
-	_, err := r.Run(model.RunRequest{
-		OperationSpec: model.OperationSpec{Operation: commands.OpRemoveRole, RemoveRole: &model.RemoveRoleParams{LoginName: ""}},
-		CategoryIDs:   []string{"uat"},
-	})
-	if err == nil || !strings.Contains(err.Error(), "login") {
-		t.Fatalf("got: %v", err)
-	}
-}
-
-func TestRun_removeRole_requiresProductionConfirm(t *testing.T) {
-	r := NewRunner(testStore(t))
-	_, err := r.Run(model.RunRequest{
-		OperationSpec:     model.OperationSpec{Operation: commands.OpRemoveRole, RemoveRole: &model.RemoveRoleParams{LoginName: "jdoe"}},
-		CategoryIDs:       []string{"production"},
-		ConfirmProduction: false,
-		Auth:              model.AuthContext{User: "postgres"},
-	})
-	if err == nil || !strings.Contains(err.Error(), "production") {
-		t.Fatalf("got: %v", err)
-	}
-}
-
-func TestRun_removeRole_buildsWithoutDB(t *testing.T) {
-	// Exercises validation + resolution; runOne fails on connect (no server) — results still returned.
-	r := NewRunner(testStore(t))
-	results, err := r.Run(model.RunRequest{
-		OperationSpec:     model.OperationSpec{Operation: commands.OpRemoveRole, RemoveRole: &model.RemoveRoleParams{LoginName: "jdoe"}},
-		CategoryIDs:       []string{"uat"},
-		ConfirmProduction: true,
-		Auth:              model.AuthContext{User: "nobody", Password: "nopass"},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(results) != 2 {
-		t.Fatalf("got %d results", len(results))
-	}
-	for _, res := range results {
-		if res.Status != "error" {
-			t.Fatalf("expected connect error, got %s: %s", res.Status, res.Message)
-		}
-		if res.Alias == "" {
-			t.Fatal("missing alias in result")
-		}
-	}
-}
-
-func TestRun_grantParents_and_changePassword_resolve(t *testing.T) {
-	r := NewRunner(testStore(t))
-
-	for _, op := range []struct {
-		op  string
-		req model.RunRequest
-	}{
-		{
-			op: commands.OpGrantParents,
-			req: model.RunRequest{
-				OperationSpec: model.OperationSpec{Operation: commands.OpGrantParents, GrantParents: &model.GrantParentsParams{LoginName: "u", ParentRoles: "gr_a"}},
-				CategoryIDs:   []string{"uat"},
-				Auth:          model.AuthContext{User: "x"},
-			},
-		},
-		{
-			op: commands.OpRevokeParents,
-			req: model.RunRequest{
-				OperationSpec: model.OperationSpec{Operation: commands.OpRevokeParents, RevokeParents: &model.RevokeParentsParams{LoginName: "u", ParentRoles: "gr_a"}},
-				CategoryIDs:   []string{"uat"},
-				Auth:          model.AuthContext{User: "x"},
-			},
-		},
-		{
-			op: commands.OpChangePassword,
-			req: model.RunRequest{
-				OperationSpec: model.OperationSpec{Operation: commands.OpChangePassword, ChangePassword: &model.ChangePasswordParams{LoginName: "u", NewPassword: "p"}},
-				CategoryIDs:   []string{"uat"},
-				Auth:          model.AuthContext{User: "x"},
-			},
-		},
-	} {
-		t.Run(op.op, func(t *testing.T) {
-			results, err := r.Run(op.req)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(results) != 2 {
-				t.Fatalf("got %d results", len(results))
-			}
-		})
-	}
-}
-
 func TestRunRoleBatch_validation(t *testing.T) {
 	r := NewRunner(testStore(t))
 	// Empty batch → error.
@@ -160,6 +67,17 @@ func TestRunRoleBatch_validation(t *testing.T) {
 		}},
 	}, nil)
 	if err == nil || !strings.Contains(err.Error(), "cluster") {
+		t.Fatalf("got: %v", err)
+	}
+	// A malformed operation is rejected before anything connects (was covered via the removed
+	// single-op Run path).
+	_, err = r.RunRoleBatch(model.RoleBatchRequest{
+		Clusters: []model.ClusterOps{{
+			ClusterID:  "c-uat-1",
+			Operations: []model.OperationSpec{{Operation: commands.OpRemoveRole, RemoveRole: &model.RemoveRoleParams{LoginName: ""}}},
+		}},
+	}, nil)
+	if err == nil || !strings.Contains(err.Error(), "login") {
 		t.Fatalf("got: %v", err)
 	}
 }

@@ -5,18 +5,19 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/michalbartak/dbaccounts/internal/calltemplate"
 	"github.com/michalbartak/dbaccounts/internal/model"
 	"gopkg.in/yaml.v3"
 )
 
-// parentRoleRE bounds a preconfigured parent group to a bare SQL identifier, matching
-// what the grant path accepts (unquoted role names).
-var parentRoleRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+// A preconfigured parent group and a comment-field key are both bounded to a bare SQL identifier,
+// matching what the grant path accepts (unquoted role names). The rule lives in calltemplate —
+// the package that actually embeds these values in SQL — rather than in a copy of the pattern here.
+var isIdentifier = calltemplate.IsIdentifier
 
 var ErrNotFound = errors.New("config not found")
 
@@ -81,6 +82,7 @@ func DefaultConfig() model.Config {
 		Batch:         model.BatchSettings{MaxConcurrency: 5},
 		UI:            model.UISettings{Theme: model.ThemeSystem, CommentDefaultView: model.CommentViewFields, PasswordGen: model.DefaultPasswordGen()},
 		CommentFields: defaultCommentFields(),
+		SearchColumns: defaultSearchColumns(),
 	}
 }
 
@@ -90,6 +92,14 @@ func defaultCommentFields() []model.CommentField {
 	return []model.CommentField{
 		{Key: "full_name", Label: "Full name"},
 		{Key: "e_mail", Label: "Email"},
+	}
+}
+
+// defaultSearchColumns is the built-in Find-role result layout, used when config omits
+// search_columns. Mirrors what the app showed before the columns became configurable.
+func defaultSearchColumns() []model.SearchColumn {
+	return []model.SearchColumn{
+		{Label: "Full name", Template: "${{full_name}}"},
 	}
 }
 
@@ -164,6 +174,12 @@ func (s *Store) Load() error {
 	if len(cfg.CommentFields) == 0 {
 		cfg.CommentFields = defaultCommentFields()
 	}
+	// Absent key (older config) → the built-in column; an explicit `search_columns: []`
+	// stays empty, because "role name only" is a legitimate choice the user can save.
+	cfg.SearchColumns = sanitizeSearchColumns(cfg.SearchColumns)
+	if cfg.SearchColumns == nil {
+		cfg.SearchColumns = defaultSearchColumns()
+	}
 	migrateDBFunctions(&cfg.DBFunctions)
 	migrateDBReads(&cfg.DBReads)
 	s.cfg = cfg
@@ -229,6 +245,7 @@ func cloneConfig(c model.Config) model.Config {
 	c.Clusters = append([]model.Cluster(nil), c.Clusters...)
 	c.ParentRoles = append([]string(nil), c.ParentRoles...)
 	c.CommentFields = append([]model.CommentField(nil), c.CommentFields...)
+	c.SearchColumns = append([]model.SearchColumn(nil), c.SearchColumns...)
 	c.Targets.CategoryIDs = append([]string(nil), c.Targets.CategoryIDs...)
 	c.Targets.ClusterIDs = append([]string(nil), c.Targets.ClusterIDs...)
 	return c
@@ -259,6 +276,55 @@ func (s *Store) UpdateDBReads(reads model.DBReads) error {
 	return s.save()
 }
 
+// SaveSettings validates and applies the whole Settings page in ONE write. Every field is
+// validated BEFORE anything is assigned, so a rejected template can no longer leave the parent
+// groups and comment fields already persisted (which is what the previous seven-call sequence
+// did). Command templates are checked against the comment fields FROM THIS PAYLOAD, so adding a
+// field and using it as a ${{key}} placeholder in the same save works without ordering tricks.
+func (s *Store) SaveSettings(p model.SettingsPayload) error {
+	parents, err := validateParentRoles(p.ParentRoles)
+	if err != nil {
+		return err
+	}
+	fields, err := validateCommentFields(p.CommentFields)
+	if err != nil {
+		return err
+	}
+	cols, err := validateSearchColumns(p.SearchColumns)
+	if err != nil {
+		return err
+	}
+	keys := make([]string, 0, len(fields))
+	for _, f := range fields {
+		if f.Key != "" {
+			keys = append(keys, f.Key)
+		}
+	}
+	if err := validateDBFunctions(p.DBFunctions, keys...); err != nil {
+		return err
+	}
+	reads := p.DBReads
+	migrateDBReads(&reads) // a blank query from the editor falls back to its default
+	if err := validateDBReads(reads); err != nil {
+		return err
+	}
+	batch := p.Batch
+	if batch.MaxConcurrency <= 0 {
+		batch.MaxConcurrency = 5
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cfg.ParentRoles = parents
+	s.cfg.CommentFields = fields
+	s.cfg.SearchColumns = cols
+	s.cfg.DBFunctions = p.DBFunctions
+	s.cfg.DBReads = reads
+	s.cfg.Batch = batch
+	s.cfg.UI = normalizeUI(p.UI)
+	return s.save()
+}
+
 func (s *Store) UpdateBatch(batch model.BatchSettings) error {
 	if batch.MaxConcurrency <= 0 {
 		batch.MaxConcurrency = 5
@@ -269,16 +335,22 @@ func (s *Store) UpdateBatch(batch model.BatchSettings) error {
 	return s.save()
 }
 
-func (s *Store) UpdateUI(ui model.UISettings) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.cfg.UI = model.UISettings{
+// normalizeUI coerces the UI block to valid values. Field-by-field (not a blanket copy) so a
+// field added to UISettings has to be considered here rather than silently riding through.
+func normalizeUI(ui model.UISettings) model.UISettings {
+	return model.UISettings{
 		Theme:                  model.NormalizeTheme(ui.Theme),
 		CommentDefaultView:     model.NormalizeCommentView(ui.CommentDefaultView),
 		StageCreateOnTargetAdd: ui.StageCreateOnTargetAdd,
 		CheckForUpdates:        ui.CheckForUpdates,
 		PasswordGen:            ui.PasswordGen.Normalized(),
 	}
+}
+
+func (s *Store) UpdateUI(ui model.UISettings) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cfg.UI = normalizeUI(ui)
 	return s.save()
 }
 
@@ -321,6 +393,17 @@ func (s *Store) UpdateParentRoles(roles []string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.cfg.ParentRoles = cleaned
+	return s.save()
+}
+
+func (s *Store) UpdateSearchColumns(cols []model.SearchColumn) error {
+	cleaned, err := validateSearchColumns(cols)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cfg.SearchColumns = cleaned
 	return s.save()
 }
 
@@ -593,7 +676,7 @@ func validateParentRoles(roles []string) ([]string, error) {
 		if r == "" {
 			continue
 		}
-		if !parentRoleRE.MatchString(r) {
+		if !isIdentifier(r) {
 			return nil, fmt.Errorf("invalid parent group %q: use letters, digits, underscore", r)
 		}
 		if seen[r] {
@@ -632,7 +715,7 @@ func validateCommentFields(fields []model.CommentField) ([]model.CommentField, e
 		if key == "" {
 			continue
 		}
-		if !parentRoleRE.MatchString(key) {
+		if !isIdentifier(key) {
 			return nil, fmt.Errorf("invalid comment field key %q: use letters, digits, underscore", key)
 		}
 		if seen[key] {
@@ -655,7 +738,7 @@ func sanitizeCommentFields(fields []model.CommentField) []model.CommentField {
 	var out []model.CommentField
 	for _, f := range fields {
 		key := strings.TrimSpace(f.Key)
-		if key == "" || seen[key] || !parentRoleRE.MatchString(key) {
+		if key == "" || seen[key] || !isIdentifier(key) {
 			continue
 		}
 		seen[key] = true
@@ -666,6 +749,91 @@ func sanitizeCommentFields(fields []model.CommentField) []model.CommentField {
 		out = append(out, model.CommentField{Key: key, Label: label})
 	}
 	return out
+}
+
+// searchBuiltins is the closed bare-${…} namespace for a search-column template. A comment key is
+// written ${{key}} instead, so a key named "comment" stays reachable.
+var searchBuiltins = map[string]bool{"comment": true}
+
+// The token syntax itself comes from calltemplate (ScanTemplate / HasMalformedPlaceholder) — a
+// search column is a different NAMESPACE over the same grammar, not a different grammar, so there
+// is no second regex here to drift out of step with the call templates'.
+
+// validateSearchColumns trims label+template and drops rows with a blank template (a column
+// with nothing to show). A blank label is kept — the header cell is then simply empty. A malformed
+// or unknown-built-in placeholder is rejected, so a typo is reported rather than rendering empty.
+func validateSearchColumns(cols []model.SearchColumn) ([]model.SearchColumn, error) {
+	var out []model.SearchColumn
+	for _, c := range cols {
+		tmpl := strings.TrimSpace(c.Template)
+		if tmpl == "" {
+			continue
+		}
+		if err := checkSearchTemplate(tmpl); err != nil {
+			return nil, err
+		}
+		out = append(out, model.SearchColumn{Label: strings.TrimSpace(c.Label), Template: tmpl})
+	}
+	return out, nil
+}
+
+// sanitizeSearchColumns is the load-time counterpart: it drops a structurally broken row rather
+// than failing, but keeps a row whose only problem is an unknown bare name — that one still renders
+// (as the literal token) and the user gets the guiding error when they next save, which is better
+// than silently deleting a column from their config file. Nil-ness is preserved, so Load can tell
+// an absent key (→ default column) from an explicit empty list.
+func sanitizeSearchColumns(cols []model.SearchColumn) []model.SearchColumn {
+	if cols == nil {
+		return nil
+	}
+	out := make([]model.SearchColumn, 0, len(cols))
+	for _, c := range cols {
+		tmpl := strings.TrimSpace(c.Template)
+		if tmpl == "" || checkSearchTemplateSyntax(tmpl) != nil {
+			continue
+		}
+		out = append(out, model.SearchColumn{Label: strings.TrimSpace(c.Label), Template: tmpl})
+	}
+	return out
+}
+
+// checkSearchTemplateSyntax rejects a malformed placeholder — a "${" that is not part of a
+// well-formed ${name} / ${{name}} token, or an empty name. Comment KEYS are deliberately
+// unconstrained beyond that: they are arbitrary JSON keys (which may contain '-' or '.'), and the
+// template is display text the frontend HTML-escapes, never SQL.
+func checkSearchTemplateSyntax(tmpl string) error {
+	if calltemplate.HasMalformedPlaceholder(tmpl) {
+		return fmt.Errorf(
+			"invalid search column template %q: unfinished placeholder — write ${comment} or ${{comment_key}} with both braces closed", tmpl)
+	}
+	for _, tok := range calltemplate.ScanTemplate(tmpl) {
+		if tok.Name == "" {
+			return fmt.Errorf("invalid search column template %q: empty placeholder — put a name between the braces", tmpl)
+		}
+	}
+	return nil
+}
+
+// checkSearchTemplate is checkSearchTemplateSyntax plus the closed bare-namespace rule, used when
+// saving. The error names the fix, because writing ${full_name} for a comment key is the mistake
+// this separation invites. It deliberately does NOT call ${comment} a "built-in": the call-template
+// built-ins (${loginname}, ${parent_roles}, …) are not available here at all, so that framing sent
+// users looking for placeholders a search column cannot have.
+func checkSearchTemplate(tmpl string) error {
+	if err := checkSearchTemplateSyntax(tmpl); err != nil {
+		return err
+	}
+	for _, tok := range calltemplate.ScanTemplate(tmpl) {
+		if tok.NS == calltemplate.TokenCommentField {
+			continue // any comment key is allowed
+		}
+		if !searchBuiltins[tok.Name] {
+			return fmt.Errorf(
+				"invalid search column template %q: ${%s} is not supported — use ${{%s}} for a comment key, or ${comment} for the whole comment",
+				tmpl, tok.Name, tok.Name)
+		}
+	}
+	return nil
 }
 
 // normalizeColor keeps a #rrggbb hex or returns "" (frontend falls back to a default).

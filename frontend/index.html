@@ -59,7 +59,6 @@
                   <textarea id="rce-raw" class="rce-raw hidden" rows="4" autocapitalize="none" autocomplete="off" spellcheck="false"></textarea>
                   <p class="hint rce-notice" id="rce-notice"></p>
                 </div>
-                <p class="hint ri-note" id="role-identity-note"></p>
               </div>
               <p class="hint" id="alter-current-hint">Use the <strong>Alter role</strong> button above to find a role.</p>
               <div id="alter-detail" class="alter-detail hidden"></div>
@@ -117,7 +116,7 @@
     <section id="panel-settings" class="panel">
       <div class="settings-body">
         <div class="settings-group">
-          <span class="settings-group-label">General</span>
+          <span class="section-label">General</span>
           <div class="settings-row">
             <div class="settings-field">
               <span class="settings-field-label">Appearance</span>
@@ -153,7 +152,7 @@
         </div>
 
         <div class="settings-group">
-          <span class="settings-group-label">Password generator <button type="button" class="q-hint" data-hint="Controls the random password produced by the Generate button on the role form's password field. At least one character class stays enabled (lowercase is forced on if you turn them all off).">?</button></span>
+          <span class="section-label">Password generator <button type="button" class="q-hint" data-hint="Controls the random password produced by the Generate button on the role form's password field. At least one character class stays enabled (lowercase is forced on if you turn them all off).">?</button></span>
           <div class="settings-row settings-row-gap pwgen-classes">
             <div class="pwgen-col">
               <div class="settings-check-line">
@@ -186,16 +185,16 @@
         </div>
 
         <div class="settings-group">
-          <span class="settings-group-label">Preconfigured parent groups <button type="button" class="q-hint" data-hint="Role names offered as pick-list choices when granting privileges in Create role and Alter role. Drag the handle to reorder.">?</button></span>
+          <span class="section-label">Preconfigured parent groups <button type="button" class="q-hint" data-hint="Role names offered as pick-list choices when granting privileges in Create role and Alter role. Drag the handle to reorder.">?</button></span>
           <div id="parent-roles-editor" class="list-editor"></div>
           <button type="button" class="list-add" id="btn-add-parent-role">Add group…</button>
         </div>
 
         <div class="settings-group">
-          <span class="settings-group-label">Comments</span>
+          <span class="section-label">Comments</span>
           <div class="settings-row settings-row-top">
             <div class="settings-field">
-              <span class="settings-field-label">Comment fields <button type="button" class="q-hint" data-hint="JSON keys shown as labeled inputs when a role comment holds JSON (Create / Alter role). Drag the handle to reorder; keys not listed here are still shown. Plain-text comments use the Raw view.">?</button></span>
+              <span class="settings-field-label">Comment fields <button type="button" class="q-hint" data-hint="JSON keys shown as labeled inputs when a role comment holds JSON (Create / Alter role). Drag the handle to reorder; keys not listed here are still shown. Plain-text comments use the Raw view. Each key is also available as a ${{key}} placeholder in the create_role and set_comment call templates.">?</button></span>
               <div id="comment-fields-editor" class="list-editor"></div>
               <button type="button" class="list-add" id="btn-add-comment-field">Add field…</button>
             </div>
@@ -210,16 +209,22 @@
         </div>
 
         <div class="settings-group">
+          <span class="section-label">Role Details <button type="button" class="q-hint" data-hint="Extra columns shown next to the role name when you search for a role. Two placeholders are supported: ${{key}} for one key of the role&#39;s JSON comment (e.g. ${{first_name}} ${{last_name}}), and ${comment} for the whole comment. Nothing else — a missing key renders empty. Drag the handle to reorder; remove every row to show the role name only.">?</button></span>
+          <div id="search-columns-editor" class="list-editor"></div>
+          <button type="button" class="list-add" id="btn-add-search-column">Add column…</button>
+        </div>
+
+        <div class="settings-group">
           <div class="settings-two-col">
             <div class="settings-col">
               <div class="settings-group-head">
-                <span class="settings-group-label">DB command templates</span>
+                <span class="section-label">DB command templates</span>
               </div>
               <div id="db-functions-editor" class="scope-rows fn-list"></div>
             </div>
             <div class="settings-col">
               <div class="settings-group-head">
-                <span class="settings-group-label">Introspection queries <button type="button" class="q-hint" data-hint="Read-only catalog queries used by Alter role. Point one at a privileged wrapper function or view if the connect user cannot read the catalogs directly. Each must return its contract columns (shown in the editor); $1 is the search pattern or role name.">?</button></span>
+                <span class="section-label">Introspection queries <button type="button" class="q-hint" data-hint="Read-only catalog queries used by Alter role. Point one at a privileged wrapper function or view if the connect user cannot read the catalogs directly. Each must return its contract columns (shown in the editor); $1 is the search pattern or role name.">?</button></span>
               </div>
               <div id="db-reads-editor" class="scope-rows fn-list"></div>
             </div>
@@ -227,11 +232,11 @@
         </div>
 
         <div class="settings-meta">
-          <span class="settings-meta-label">Config file</span>
+          <span class="section-label">Config file</span>
           <div class="config-path-line">
             <code id="config-path" class="config-path"></code>
             <button type="button" id="btn-copy-config-path" class="config-path-copy" title="Copy path" aria-label="Copy config path to clipboard">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="1" width="10" height="11" rx="2"/><rect x="1" y="4" width="10" height="11" rx="2"/></svg>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="1" width="10" height="11" rx="2"/><rect x="1" y="4" width="10" height="11" rx="2"/></svg>
             </button>
           </div>
         </div>
@@ -258,7 +263,12 @@
       </ul>
 
       <h3>Placeholders</h3>
-      <p>Use <code>${field}</code> in templates. Common fields: <code>${loginname}</code>, <code>${fullname}</code>, <code>${email}</code>, <code>${parent_role}</code>, <code>${parent_roles}</code>, <code>${new_password}</code>, <code>${rolename}</code> (remove_role alias).</p>
+      <p>Two forms, and they are separate namespaces:</p>
+      <ul>
+        <li><code>${name}</code> — a <strong>built-in</strong>, from the closed set an operation offers: <code>${loginname}</code>, <code>${parent_roles}</code>, <code>${comment}</code>, <code>${new_password}</code>, <code>${attributes}</code>, <code>${config_name}</code>, <code>${config_value}</code>, and <code>${rolename}</code> (remove_role alias). Any other name is rejected.</li>
+        <li><code>${{key}}</code> — a <strong>configured comment field</strong> (Settings → Comment fields), in <code>create_role</code> and <code>set_comment</code> only. Typed from the role's JSON comment; empty or absent becomes <code>NULL</code>.</li>
+      </ul>
+      <p>So <code>${comment}</code> is the whole comment, while <code>${{comment}}</code> is a JSON key named <code>comment</code>. A comment field cannot be used inside the <code>ARRAY[...] || ${...}</code> concat form.</p>
       <p>Function mode: do not use raw <code>$1</code> or <code>SELECT</code> in the template. Statement/block mode: role names are identifiers, not bind parameters.</p>
 
       <menu>
@@ -461,7 +471,7 @@
       <div class="fn-titlebar">
         <h2 id="fn-dialog-title">Command template</h2>
         <button type="button" id="fn-help" class="icon-btn" title="Template syntax help" aria-label="Template syntax help">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="8" cy="8" r="6.5"/>
             <path d="M8 7.25v4"/>
             <path d="M8 4.75h.01"/>
@@ -506,30 +516,30 @@
       </p>
       <div class="about-links">
         <button type="button" class="about-link" id="about-docs" data-url="https://michal-bartak.github.io/pg-accounts-management/">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M2.5 2.5h6a2 2 0 012 2v9a1.5 1.5 0 00-1.5-1.5h-6.5z"/>
             <path d="M13.5 2.5h-3a2 2 0 00-2 2v9a1.5 1.5 0 011.5-1.5h3.5z"/>
           </svg>
           Documentation
         </button>
         <button type="button" class="about-link" id="about-repo" data-url="https://github.com/michal-bartak/pg-accounts-management">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
             <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
           </svg>
           GitHub
         </button>
       </div>
       <div class="about-section">
-        <span class="about-lbl">Version</span>
+        <span class="section-label">Version</span>
         <p id="about-update" class="about-update"></p>
         <button type="button" id="btn-check-update" class="about-check">Check for updates</button>
       </div>
       <div class="about-section">
-        <span class="about-lbl">Credits</span>
+        <span class="section-label">Credits</span>
         <p>Created by Michal Bartak<br /><span class="about-ai">assisted by <a href="#" class="about-link-inline" data-url="https://claude.ai">Claude</a></span></p>
       </div>
       <div class="about-section">
-        <span class="about-lbl">License</span>
+        <span class="section-label">License</span>
         <p>Released under the MIT License. © 2026 Michal Bartak.</p>
       </div>
     </div>
@@ -545,7 +555,7 @@
       <p class="about-desc" id="update-message"></p>
       <div class="about-links">
         <button type="button" class="about-link" id="update-release-link" data-url="">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M6 8h4M8 6v4"/>
             <path d="M2.5 4.5h11v9h-11z"/>
           </svg>

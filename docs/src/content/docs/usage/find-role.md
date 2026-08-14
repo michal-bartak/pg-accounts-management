@@ -30,6 +30,9 @@ Altering starts with a search, so you never act on a mistyped name.
   name or email if the comment holds it.
 - Results are grouped by login name, with [scope labels](/pg-accounts-management/usage/)
   showing where each one exists.
+- Next to each role name sit the columns you configured in **Settings → Role Details** — built from
+  the role's comment, so you can show a full name assembled from two keys, an email, or the raw
+  comment. See [Role Details](/pg-accounts-management/configuration/role-details/).
 - An unreachable cluster is reported but doesn't stop the search.
 
 ## When a cluster can't be searched

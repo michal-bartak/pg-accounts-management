@@ -91,6 +91,7 @@ export default defineConfig({
             { label: 'Overview', link: '/configuration/' },
             { label: 'Clusters', link: '/configuration/clusters/' },
             { label: 'Comment fields', link: '/configuration/comment-fields/' },
+            { label: 'Role Details', link: '/configuration/role-details/' },
             { label: 'Call templates', link: '/configuration/call-templates/' },
             { label: 'Preconfigured parent groups', link: '/configuration/parent-roles/' },
             { label: 'Password generator', link: '/configuration/password-generator/' },
