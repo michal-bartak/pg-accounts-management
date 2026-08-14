@@ -605,6 +605,14 @@ blur/Escape — **not** on plain focus (which used to flash the hint while tabbi
 Delegated `mouseover` + `keydown` handlers drive it, so JS-rendered badges (e.g. the
 Alter-role sections) work without per-element wiring. Used on Role Parents/Attributes/Settings
 (Alter role), and the Cluster-groups / Find-role / Comments dialogs.
+**The badge's optical nudge rides on `vertical-align` (`0.07em`), never on `position/top`.** A badge
+sits in one of two container kinds: **inline** (`.section-label`, `.settings-field-label`, a dialog
+`h2`), where it is baseline-aligned and needs lifting; or **flex** (`.settings-check-line`,
+`#cluster-form .field-label-row`, `.rce-field-label`), where `align-items: center` already centres
+it. `vertical-align` is ignored for flex items *by spec*, so the correction self-scopes to the
+contexts that need it — whereas the old `top: -1px` applied to both and left every flex label's badge
+~1.1px high (measured −1.06/−1.31 vs the label's cap band; now −0.06/−0.31). Don't reintroduce a
+`top`, and don't "fix" a new flex label with a per-context reset.
 
 **Shared UI conventions (solve once, apply everywhere — don't re-patch per popup).**
 Open every `<dialog>` via the **`openModal(dlgOrId)`** helper in

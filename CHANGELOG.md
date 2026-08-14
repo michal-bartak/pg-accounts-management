@@ -27,6 +27,7 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The **`?` help badge** now sits level with its label everywhere — beside a checkbox and inside a field label (Edit cluster, comment fields) it rendered a pixel too high.
 - A comment field named like a built-in no longer corrupts what `set_comment` writes in function mode (the comment could be re-serialized, or an empty one stored as NULL).
 - Adding a comment field and using it in a call template in the same Settings save now works.
 - **Settings saves are all-or-nothing** — a rejected template or field no longer leaves the earlier sections of the page already written to the config file while the error is reported.

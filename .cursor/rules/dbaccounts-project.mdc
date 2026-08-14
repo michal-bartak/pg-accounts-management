@@ -179,7 +179,10 @@ the Clusters toolbar (right-aligned `btn-manage-groups` → `#groups-dialog` lis
 behind a **`?` help badge** (`.q-hint`, via `hintBadge(text)`); mouse hover shows a shared
 `position:fixed`, viewport-clamped popover (`.q-hint-pop`) driven by delegated
 `mouseover`/`keydown` handlers (no forced `tabindex`; opens on Enter/Space when
-keyboard-focused, not on plain focus).
+keyboard-focused, not on plain focus). Its optical nudge rides on `vertical-align: 0.07em`, never a
+`position/top`: flex containers centre the badge themselves and ignore `vertical-align`, so the
+correction self-scopes to inline labels — a `top` applied to both and left every flex label ~1.1px
+high.
 
 **Shared UI conventions (solve once, don't re-patch per popup):** open every `<dialog>` via
 the `openModal(dlgOrId)` helper (never bare `.showModal()`) — it drops `showModal()`'s

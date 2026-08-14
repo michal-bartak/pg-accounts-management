@@ -440,7 +440,18 @@ tr:last-child td { border-bottom: none; }
   flex: 0 0 auto; border-radius: 50%; font-size: 0.72rem; cursor: help;
   color: var(--hint-color); background: transparent; border: var(--hairline) solid var(--hint-color);
   display: inline-flex; align-items: center; justify-content: center;
-  vertical-align: middle; position: relative; top: -1px;
+  /* Optical centring on the label's CAP BAND, and it must ride on `vertical-align` — not on a
+     `position: relative; top`, which is what this used to be. A badge sits in one of two kinds of
+     container: an inline one (.section-label, .settings-field-label, a dialog h2), where it is
+     baseline-aligned and needs lifting off the baseline; or a flex/grid one
+     (.settings-check-line, #cluster-form .field-label-row, .rce-field-label), where
+     `align-items: center` already centres it. `top` applied to BOTH, so it overshot by ~1.1px in
+     every flex label — reported as "the ? sits 1px too high" next to checkboxes and field labels.
+     `vertical-align` is ignored for flex items by spec, so the correction now lands only where it
+     is needed and a new flex label can't reintroduce the bug. Measured against painted pixels:
+     ±0.08px in the common label sizes, +0.5px on a 1rem dialog h2 (the em tracks the badge's own
+     font, not the parent's, which is the one thing the old `top` did slightly better). */
+  vertical-align: 0.07em;
 }
 /* Deliberately understated and the SAME in every state: a muted glyph in a matching 1px ring
    on a transparent fill. --hint-color is --muted softened (per theme, via color-mix).
