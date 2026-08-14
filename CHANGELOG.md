@@ -14,26 +14,24 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- **Configurable search columns** — choose what shows next to a role name when searching.
+- **Configurable role additional info** — choose what shows next to a role name when searching.
+- **Comment fields fill the width** — they flow into columns depending on window width.
+- **A picked cluster visible after a restart** — the collapsed cluster list opens itself to show your selection.
 
 ### Changed
 
 - **Clusters now live in their own file** — `clusters.yaml`, next to `config.yaml`, holds your clusters, groups and last target selection.
-- **Comment fields fill the width** — they flow into columns that grow with the window instead of one tall list.
 - **"Privileges" renamed to "Role Parents"** — any role can be a parent, not just a group, so the wording finally says so.
 - **Assign several parents at once** — type a comma-separated list instead of one name at a time.
 - **Denser UI** — about 12% smaller text and controls, so more fits on screen.
-- **Breaking: comment placeholders use double braces** — `${{full_name}}`, not `${full_name}`. Update any custom template that referenced a comment key this way.
-- **Find-role results line up as a table** and no longer assume a `full_name` comment key.
-- **An unknown `${name}` in a template is now reported**, instead of silently rendering empty.
+- **Breaking: comment placeholders use double braces** — `${{full_name}}`, in opposite to `${full_name}`.
+- **An unknown `${key}` in a template is now reported**, instead of silently rendering empty.
 
 ### Fixed
 
-- **A picked cluster is visible again after a restart** — the collapsed cluster list now opens itself to show your selection.
 - **Settings save is atomic** — a rejected template no longer leaves part of the page already saved, and a new comment field can be used in a template in the same save.
-- **A comment field named like a built-in no longer corrupts what gets saved.**
 - **A comment containing `${` no longer breaks the operation.**
-- The **`?` help badge** now lines up with its label everywhere.
+- Minor positioning adjustements.
 
 ## [0.9.0] - 2026-08-12
 
