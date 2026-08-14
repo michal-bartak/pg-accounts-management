@@ -81,6 +81,9 @@ sandbox.removeEventListener = () => {};
 sandbox.console = console;
 sandbox.setTimeout = () => 0;
 sandbox.clearTimeout = () => {};
+// Unlike setTimeout above, this one DOES invoke its callback, so a deferred-to-next-frame side
+// effect (revealPickedClusters' scroll) is observable synchronously in a test.
+sandbox.requestAnimationFrame = (fn) => { fn(); return 0; };
 
 const ctx = vm.createContext(sandbox);
 vm.runInContext(source, ctx, { filename: 'app.js' });
@@ -1278,4 +1281,64 @@ test('closeModal: drops the focus the UA restores after a pointer-driven open, k
   assert.equal(r.byKeyboard.closed, 2);
   assert.equal(r.byKeyboard.blurs, 0);
   assert.equal(r.byKeyboard.active, true);
+});
+
+// ---------------------------------------------------------------------------------------------
+test('revealPickedClusters: opens the collapsed cluster list only when a restored pick is really there', () => {
+  const r = evalJSON(`(() => {
+    const realGet = document.getElementById;
+    const realQSA = document.querySelectorAll;
+    // Drive the real function against a recording stand-in for the sidebar.
+    const run = (picks, checkedValues) => {
+      const rec = { toggled: [], aria: null, caret: null, scrolled: null };
+      const caret = { textContent: '▸' };
+      const btn = {
+        setAttribute(k, v) { if (k === 'aria-expanded') rec.aria = v; },
+        querySelector: (sel) => (sel === '.caret' ? caret : null),
+      };
+      let hidden = true;
+      const list = { classList: {
+        toggle(cls, on) { if (cls === 'hidden') { hidden = on; rec.toggled.push(on); } },
+        contains: () => hidden,
+      } };
+      const inputs = ['c1', 'c2', 'c3'].map((v) => {
+        const label = { scrollIntoView(o) { rec.scrolled = { value: v, block: o && o.block }; } };
+        return { value: v, checked: checkedValues.includes(v), closest: () => label };
+      });
+      document.getElementById = (id) =>
+        id === 'btn-toggle-clusters' ? btn : id === 'cluster-checkboxes' ? list : null;
+      document.querySelectorAll = () => inputs;
+      selectedClusterIds = new Set(picks);
+      revealPickedClusters();
+      rec.hidden = hidden;
+      rec.caret = caret.textContent;
+      return rec;
+    };
+    const noPicks = run([], []);
+    const stalePick = run(['gone'], []);   // remembered id whose cluster has since been deleted
+    const livePick = run(['c2'], ['c2']);
+    document.getElementById = realGet;     // leave the stub as we found it
+    document.querySelectorAll = realQSA;
+    selectedClusterIds = new Set();
+    return { noPicks, stalePick, livePick };
+  })()`);
+
+  // Nothing picked (the default "all groups") → the list is left exactly as it was.
+  assert.deepEqual(r.noPicks.toggled, []);
+  assert.equal(r.noPicks.hidden, true);
+  assert.equal(r.noPicks.scrolled, null);
+
+  // A pick whose cluster no longer exists → still collapsed, rather than opening an empty-looking
+  // list. This is the branch that reads `checked` off the DOM instead of trusting the Set.
+  assert.deepEqual(r.stalePick.toggled, []);
+  assert.equal(r.stalePick.hidden, true);
+  assert.equal(r.stalePick.scrolled, null);
+
+  // A live pick → expanded, with aria-expanded and the caret kept in step, and that row brought
+  // into view by the minimum amount ('nearest' keeps .ops-sidebar from scrolling too).
+  assert.deepEqual(r.livePick.toggled, [false]); // toggle('hidden', false) = un-hide
+  assert.equal(r.livePick.hidden, false);
+  assert.equal(r.livePick.aria, 'true');
+  assert.equal(r.livePick.caret, '▾');
+  assert.deepEqual(r.livePick.scrolled, { value: 'c2', block: 'nearest' });
 });

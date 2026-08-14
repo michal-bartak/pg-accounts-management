@@ -77,7 +77,7 @@ Published from [pg-accounts-management](https://github.com/michal-bartak/pg-acco
 
 ### Release description
 
-The workflow assembles it from four parts, in order:
+The workflow assembles it from three parts, in order:
 
 1. **What's new** — the `CHANGELOG.md` section matching `VERSION`, extracted by the
    *Extract changelog section* step.
@@ -85,8 +85,11 @@ The workflow assembles it from four parts, in order:
    tags cut before the file existed and always shows the complete history), so a user who wants
    every version gets the readable file rather than the commit list.
 3. The **install instructions** per platform.
-4. GitHub's auto-generated **What's Changed** — the raw commit/PR list
-   (`generate_release_notes: true`). Accurate but noisy; the changelog is what most users want.
+
+`generate_release_notes` is **off**: GitHub's generator always appends a
+`**Full Changelog**: <compare url>` footer with no way to suppress just that line, and this repo
+merges local branches rather than pull requests, so the "What's Changed" list it would otherwise
+add is empty anyway — the footer would be the only thing it contributed.
 
 GitLab (`origin`) pushes are independent; the release workflow runs only on GitHub.
 

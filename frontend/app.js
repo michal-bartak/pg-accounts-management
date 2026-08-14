@@ -723,6 +723,41 @@ function renderClusterCheckboxes() {
   }
 }
 
+/** Expand/collapse the "Or pick clusters" list, keeping the caret and aria-expanded in step. */
+function setClusterListExpanded(expanded) {
+  const btn = document.getElementById('btn-toggle-clusters');
+  const list = document.getElementById('cluster-checkboxes');
+  if (!btn || !list) return;
+  list.classList.toggle('hidden', !expanded);
+  btn.setAttribute('aria-expanded', String(expanded));
+  const caret = btn.querySelector('.caret');
+  if (caret) caret.textContent = expanded ? '▾' : '▸';
+}
+
+// On STARTUP ONLY (called from the DOMContentLoaded init, not from loadConfig/renderAll — a later
+// config load must not re-open a list the user deliberately collapsed): a cluster pick restored
+// from config renders inside the collapsed list, so it is invisible even though it decides what the
+// next run targets. Open the list and bring one picked row into view.
+//
+// Reads `checked` off the DOM rather than iterating selectedClusterIds, which handles a stale
+// remembered id for free: if that cluster has since been deleted no checkbox carries its value, so
+// we don't expand a list with nothing highlighted. Toggling classes cannot fire `change`, so this
+// never triggers onTargetChange's debounced save.
+function revealPickedClusters() {
+  if (!selectedClusterIds.size) return;
+  const first = [...document.querySelectorAll('#cluster-checkboxes input[name="cluster"]')]
+    .find((el) => el.checked);
+  if (!first) return;
+  setClusterListExpanded(true);
+  // The rows had no layout box until the line above (.hidden is display:none), and the expanded
+  // list flex-sizes against the sidebar — wait a frame so the scroll has real geometry. 'nearest'
+  // keeps the movement inside .cluster-list (.ops-sidebar scrolls too) and is a no-op when the row
+  // is already visible, which is the common case when every cluster fits.
+  requestAnimationFrame(() => {
+    first.closest('label')?.scrollIntoView({ block: 'nearest' });
+  });
+}
+
 // Recompute the remembered selection from the checkboxes, refresh the preview, and persist
 // (debounced) so it survives re-renders and restarts.
 let saveTargetsTimer = null;
@@ -4287,13 +4322,8 @@ for (const [btnId, pathId] of [['btn-copy-config-path', 'config-path'], ['btn-co
   });
 }
 
-document.getElementById('btn-toggle-clusters')?.addEventListener('click', (ev) => {
-  const btn = ev.currentTarget;
-  const list = document.getElementById('cluster-checkboxes');
-  const expanded = list.classList.toggle('hidden') === false;
-  btn.setAttribute('aria-expanded', String(expanded));
-  const caret = btn.querySelector('.caret');
-  if (caret) caret.textContent = expanded ? '▾' : '▸';
+document.getElementById('btn-toggle-clusters')?.addEventListener('click', () => {
+  setClusterListExpanded(document.getElementById('cluster-checkboxes').classList.contains('hidden'));
 });
 
 // Cluster groups editor: a popup (list) reached from the Clusters toolbar, with a
@@ -4860,6 +4890,9 @@ window.addEventListener('DOMContentLoaded', async () => {
   syncQHintLabels();
   initAbout();
   await loadConfig();
+  // Startup only: surface a restored cluster pick, which loadConfig has just rendered inside the
+  // collapsed "Or pick clusters" list.
+  revealPickedClusters();
   // The app opens on Create role; build the comment editor now so it honours the configured
   // preferred view (loadCommentEditor otherwise runs only on op-tab entry / role load).
   loadCommentEditor();
