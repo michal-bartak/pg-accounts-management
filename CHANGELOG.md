@@ -16,6 +16,7 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Comment fields fill the width** — the role form lays them out in as many columns as fit (two on a small window, more as it widens) instead of one tall column, and the Comments dialog is wider, with two columns per version.
 - **"Privileges" is now "Role Parents"** — the role-form section, its dialog (*Assign parents…*) and the Settings list (*Preconfigured role parents*) are named for what they hold: any role can be a parent, not just a group.
 - **Assign several parents by typing** — the Assign-parents dialog takes a comma-separated list of role names, mixable with the preconfigured chips; it previously accepted only one typed name.
 - **Denser UI** — text, controls, table rows and spacing render about 12% smaller, so noticeably more fits on screen.

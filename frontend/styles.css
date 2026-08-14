@@ -727,7 +727,10 @@ tr:last-child td { border-bottom: none; }
   flex-direction: column;
   gap: 0.75rem;
 }
-.ri-login { max-width: 50%; }
+/* Own cap, in rem: .role-identity is deliberately uncapped so the comment editor can use the form's
+   width, and a percentage here would track that instead. 13.125rem = the width this input had when
+   it was 50% of the old 26.25rem cap, so the login row is unchanged. */
+.ri-login { max-width: 13.125rem; }
 #role-login[readonly] { opacity: 0.7; cursor: default; }
 
 /* Inline comment editor (Fields / Raw). */
@@ -744,10 +747,17 @@ tr:last-child td { border-bottom: none; }
 }
 .rce-label { font-size: var(--fs-label); }
 .rce-mode { flex: 0 0 auto; }
+/* Comment fields flow into as many columns as fit, so a handful of keys costs a couple of rows
+   instead of a screenful. Same intrinsic idiom as .settings-two-col — this stylesheet has no media
+   queries and shouldn't gain its first one. Shared with the Comments dialog, which emits the same
+   .rce-fields container.
+   `auto-fill`, NOT `auto-fit`: auto-fit collapses the empty tracks, so the default two comment
+   fields would each stretch to half the (now full-width) form. auto-fill keeps the tracks, so a
+   field is never wider than one column while the column COUNT still follows the window. */
 .rce-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.5rem 0.75rem;
 }
 .rce-field {
   display: flex;
@@ -1131,7 +1141,9 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   display: block;
   max-width: none;
 }
-.role-identity { max-width: 26.25rem; margin-bottom: 0.5rem; }
+/* NOT capped: the comment editor lives here and its Fields grid earns a column per 14rem of form
+   width, so a cap would fix the column count. The login input carries its own cap instead. */
+.role-identity { margin-bottom: 0.5rem; }
 
 .alter-search { display: flex; gap: 0.5rem; align-items: center; }
 .alter-search input[type="search"] { flex: 1; }
@@ -1442,8 +1454,11 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 .pick-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 .scope-preconfigured { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
 
-/* Comments dialog — fixed width so it doesn't jitter as field/comment lengths change. */
-#comments-dialog { width: min(35rem, 92vw); }
+/* Comments dialog — fixed width so it doesn't jitter as field/comment lengths change; wide enough
+   for TWO comment-field columns (~19.5rem each after the body/box padding). `max-width` is not
+   redundant: the base `dialog` rule caps at min(40rem, 92vw) and would clamp this back. Three
+   columns would need ~47.7rem, so this width holds the grid at two on purpose. */
+#comments-dialog { width: min(44rem, 94vw); max-width: min(44rem, 94vw); }
 #comments-list { display: grid; gap: 0.9rem; max-height: 55vh; overflow-y: auto; }
 .comment-version {
   border: var(--hairline) solid var(--border);

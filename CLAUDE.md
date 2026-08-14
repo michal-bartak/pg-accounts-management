@@ -691,6 +691,17 @@ The header is a `.brand` row (accent dot + smaller title + version chip + round 
   version editable via its own Fields/Raw editor (`commentVersionEditors`). It has no per-row
   save — **OK** stages edits into `commentOverrides` (`commitCommentsDialog`), **Cancel**
   discards, and the staged comments publish with everything else on **Save changes**.
+  **Fields layout — `.rce-fields` is a responsive grid**, `repeat(auto-fill, minmax(14rem, 1fr))`,
+  so the keys flow into as many columns as the width allows (2 at an 800px window, 3 at 1024, 4 at
+  1280 — the form gets window − 21.25rem) instead of one tall column. One class-level rule serves
+  **both** the inline editor and the Comments dialog, which emits the same container. Two things not
+  to undo: (1) **`auto-fill`, not `auto-fit`** — auto-fit collapses the empty tracks, so with only
+  the two default comment fields each input would stretch to half the form; (2) **`.role-identity`
+  carries no `max-width`** — it used to cap the block at 26.25rem, which fixed the column count at
+  one, so the login input holds its own `13.125rem` cap instead (the width it had as 50% of that
+  cap). `#comments-dialog` is `min(44rem, 94vw)` **with a matching `max-width`**, since the base
+  `dialog` rule caps at `min(40rem, 92vw)` and would otherwise clamp it; 44rem holds that grid at
+  exactly two columns (three would need ~47.7rem).
 - **Password** row: a masked field inside a `.pw-field` with an overlaid **Copy** icon
   (`#btn-copy-password`, left) + **reveal eye** (`.pw-toggle`, right), a **Generate** icon button
   (`#btn-gen-password`, `.pw-gen`) to the right of the field, and the **Set password** checkbox.

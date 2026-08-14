@@ -280,7 +280,10 @@ combined)**→set_config→reset_config→set_comment; create prepends `create_r
 (`buildCreateClusterOps`). Comment persists via `set_comment` (per-cluster `commentOverrides` wins,
 else `assembleComment`; create's/presence-add's `create_role` gets its comment-field placeholders
 from `commentFieldArgs(effectiveComment)`, follow-up `set_comment` authoritative). When comments vary the inline editor hides and the Comments
-dialog reconciles per cluster (`commentVersionEditors`). One shared
+dialog reconciles per cluster (`commentVersionEditors`). `.rce-fields` (both surfaces) is a
+`repeat(auto-fill, minmax(14rem, 1fr))` grid — `auto-fill` on purpose, or two fields would stretch
+across the form — and `.role-identity` is deliberately uncapped so the column count can follow the
+window; the login input carries its own 13.125rem cap. One shared
 `confirmScopeDialog`/`buildScopeTargets` (no create fork). **Errors never touch the role form**:
 `executeRoleBatch` returns the results array or `null`; on `null`/any per-cluster failure the
 Save/Create/Remove paths leave the form + pending edits intact (chip/popup are the only error
