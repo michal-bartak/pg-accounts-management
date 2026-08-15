@@ -3,8 +3,7 @@ title: Clusters
 description: Define clusters, their credentials, and the groups that gate confirmation
 ---
 
-The **Clusters** tab holds every database the app can reach, and the groups they belong to.
-Editing is staged — press **Save** to write, **Discard** to revert.
+The **Clusters** tab holds every database the app can reach, and the groups they belong to. Editing is staged — press **Save** to write, **Discard** to revert.
 
 <figure class="shot">
 <div class="light-only">
@@ -56,38 +55,51 @@ filled by **Test connections**.
 The app resolves credentials the way `psql` does. First match wins:
 
 - **User** — the cluster's **Username** → `PGUSER` → your OS login name.
-- **Password** — the cluster's **Password** → `PGPASSWORD` → `~/.pgpass` → none (works with
-  trust authentication).
+- **Password** — the cluster's **Password** → `PGPASSWORD` → `~/.pgpass` → none (works with trust authentication).
 
 :::caution[The password is stored in clear text]
-The optional per-cluster password is written to `clusters.yaml`. The file is created
-with owner-only permissions, but it is not encrypted. Leave it blank and use `~/.pgpass` if
-that matters to you.
+The optional per-cluster password is written to `clusters.yaml`. The file is created with owner-only permissions, but it is not encrypted. Leave it blank and use `~/.pgpass` if that matters to you.
 :::
 
 ## Testing connections
 
-- **Test connections** (toolbar) checks every **saved** cluster and writes the result into
-  each row's Status column.
-- **Test connection** (inside the cluster editor) tests the values currently on screen, so
-  you can verify a host or password before saving.
+- **Test connections** (toolbar) checks every **saved** cluster and writes the result into each row's Status column.
+- **Test connection** (inside the cluster editor) tests the values currently on screen, so you can verify a host or password before saving.
 
 ## Cluster groups
 
-Groups are edited from the **Cluster groups** button in the toolbar.
+Groups are edited from the **Cluster groups** button in the toolbar. The dialog lists every group with its colour, whether it requires confirmation, and per-row
+<svg class="doc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg> **edit** and
+<svg class="doc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> **delete** actions.
 
 <figure class="shot">
 <div class="light-only">
 
-![Cluster groups dialog and the group editor](../../../assets/configuration/cluster-groups-light.png)
+![Cluster groups dialog](../../../assets/configuration/cluster-groups-light.png)
 
 </div>
 <div class="dark-only">
 
-![Cluster groups dialog and the group editor](../../../assets/configuration/cluster-groups-dark.png)
+![Cluster groups dialog](../../../assets/configuration/cluster-groups-dark.png)
 
 </div>
-<figcaption>Cluster groups dialog and the group editor — label, colour, require confirmation</figcaption>
+<figcaption>Cluster groups dialog — every group, its confirmation flag, and row actions</figcaption>
+</figure>
+
+**Add group** and the row's edit button open the same small form. **Apply** stages the change; like everything else on the Clusters tab it is only written when you press **Save** in the footer.
+
+<figure class="shot">
+<div class="light-only">
+
+![Group editor](../../../assets/configuration/cluster-groups-editor-light.png)
+
+</div>
+<div class="dark-only">
+
+![Group editor](../../../assets/configuration/cluster-groups-editor-dark.png)
+
+</div>
+<figcaption>Group editor — label, colour, and the confirmation flag</figcaption>
 </figure>
 
 | Field | Notes |
@@ -96,5 +108,10 @@ Groups are edited from the **Cluster groups** button in the toolbar.
 | **Colour** | Base colour used for that group everywhere in the app. |
 | **Require confirmation** | Any run touching this group stops at a confirmation dialog first. |
 
-The confirmation gate is the flag — not the group's name. You decide which groups count as
-production. A group cannot be deleted while a cluster still uses it.
+:::tip
+The confirmation gate is the flag, not the group's name — you decide which groups count as critical ones.
+:::
+
+:::caution
+A group cannot be deleted while a cluster still uses it.
+:::

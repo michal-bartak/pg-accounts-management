@@ -28,7 +28,8 @@ Controls the random password produced by **Generate** on the role form's passwor
 | **Exclude look-alike characters** | Drops `i l 1 I o O 0`, for passwords that get read aloud or retyped. |
 | **Length** | Between 6 and 128. |
 
-At least one class stays enabled — turn them all off and lowercase comes back on.
+Passwords are generated with the platform's cryptographic random source. See [Setting a password](/pgcowboy/usage/password/) for the field itself.
 
-Passwords are generated with the platform's cryptographic random source. See
-[Setting a password](/pgcowboy/usage/password/) for the field itself.
+:::caution
+At least one class stays enabled — turn them all off and lowercase comes back on.
+:::

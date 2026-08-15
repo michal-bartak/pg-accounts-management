@@ -40,11 +40,14 @@ removing — applies to **exactly** the clusters selected in the sidebar.
 </figure>
 
 - Tick whole **groups**, or expand **Or pick clusters** to choose individual clusters.
-- The selection is remembered between sessions.
+- The selection is remembered between sessions and application restarts.
 
 The selection in force when you search becomes the role's **scope**. Everything the form then
-shows and does is about those clusters, and nothing else. Widening the selection later doesn't
-retroactively widen an open form — search again.
+shows and does is about those clusters, and nothing else.
+
+:::tip
+You can change the selection later, after the role is loaded into the form. The app re-synthesises its content to match the selected targets.
+:::
 
 ## Scope labels
 
@@ -65,31 +68,15 @@ search results — the app uses the same labels, coloured by group:
 <figcaption>Scope labels — an outlined group label next to filled per-cluster labels</figcaption>
 </figure>
 
-- **Outlined label** (bordered, transparent) — *every* cluster of that group in scope matches.
-  One label stands for the whole group, matching the bordered group boxes in Target selection.
-- **Filled labels** (no border) — a partial match. You get one label per matching cluster, so
-  a partial state is never hidden behind a group name.
+- **Outlined label** (bordered, transparent) — carries the **cluster group name**. It is the visual cue that *every* cluster of that group matches — for example, a parent role is assigned on all clusters of the group.
+- **Filled labels** (no border) — carry a **cluster name**, used when the setting varies across the clusters of a group. The colour still follows the group colour.
 
 ### Pending changes
 
 Labels also show edits you haven't saved yet:
 
-<figure class="shot">
-<div class="light-only">
 
-![Scope labels](../../../assets/usage/scope-labels-pending-light.png)
-
-</div>
-<div class="dark-only">
-
-![Scope labels](../../../assets/usage/scope-labels-pending-dark.png)
-
-</div>
-<figcaption>Scope labels — a pending addition prefixed with +, and a pending removal in red strikethrough</figcaption>
-</figure>
-
-- **Pending addition** — a leading **`+`** on the label. The colour doesn't change: the label
-  keeps its group colour, so you can still tell where the addition lands.
+- **Pending addition** — a leading **`+`** on the label. The label follows its group colour.
 - **Pending removal** — the label turns **red and struck through**, and drops its group colour.
 
 Both are staged only. Nothing reaches a database until you Save.
@@ -97,13 +84,13 @@ Both are staged only. Nothing reaches a database until you Save.
 ## How a change is applied
 
 1. You edit the form. Nothing is sent while you edit.
-2. **Save changes** (or **Create role**) builds an ordered list of operations **per cluster**.
-3. Each cluster's list runs as **one transaction** on its own connection — commit on success,
-   roll back on the first error. Clusters never interfere with each other.
-4. Progress and results appear in the [command log](/pgcowboy/usage/command-log/).
+1. **Save changes** (or **Create role**) builds an ordered list of operations **per cluster**.
+1. Each cluster's list runs as **one transaction** on its own connection — commit on success, roll back on the first error.
+1. Progress and results appear in the [command log](/pgcowboy/usage/command-log/).
 
-Runs that touch a group flagged **require confirmation** stop at a dialog first. Removing a
-role always asks.
+Runs that touch a group flagged **require confirmation** stop at a dialog first.
+
+If a role drop is involved, the app performs a pre-flight check. Its result is displayed, and doubles as the confirmation dialog.
 
 ## Where to go next
 

@@ -3,11 +3,17 @@ title: Finding the role to alter
 description: The search that starts every alter
 ---
 
-Altering starts with a search, so you never act on a mistyped name.
+Altering starts with a search, so you always work with an existing role.
 
 1. Set the clusters or groups you want to compare in **Target selection**.
-2. Click the **Alter role** tab. The search dialog opens straight away.
-3. Type at least two characters.
+1. Click the **Alter role** tab. The search dialog opens straight away.
+1. Type at least two characters.
+1. Press the **Search** button.
+1. All matching roles are offered to select from.
+
+:::tip
+The result initially contains the rolename only. It can be extended with the role comment, or with selected JSON values found in the comment — see [Role Details](/pgcowboy/configuration/role-details/).
+:::
 
 <figure class="shot">
 <div class="light-only">
@@ -26,47 +32,40 @@ Altering starts with a search, so you never act on a mistyped name.
 ## What is searched
 
 - Only the **selected** clusters, queried in parallel.
-- The term matches the **role name** and its `COMMENT ON ROLE`, so you can find a person by
-  name or email if the comment holds it.
-- Results are grouped by login name, with [scope labels](/pgcowboy/usage/)
-  showing where each one exists.
-- Next to each role name sit the columns you configured in **Settings → Role Details** — built from
-  the role's comment, so you can show a full name assembled from two keys, an email, or the raw
-  comment. See [Role Details](/pgcowboy/configuration/role-details/).
+- The entered string is matched against role names and their comments (plain text). The SQL can be [adjusted to your liking](/pgcowboy/configuration/call-templates/).
+- Results are grouped by login name, with [scope labels](/pgcowboy/usage/) indicating the role presence.
 - An unreachable cluster is reported but doesn't stop the search.
 
-## When a cluster can't be searched
+## Operation status
 
-Failures are summarised in **one line** ("2 of 5 clusters could not be searched"), never a wall of
-repeated messages. The per-cluster detail lives behind the **Status** at the bottom of the popup:
-click it for the same panel used for runs — every cluster with its status, how long it took, the
-error, and the exact query that ran. Clusters that were searched fine but matched nothing show up
-there too, so you can tell "nothing matched" from "never reached".
+The status of the operation is displayed at the bottom of the popup. It shows the number of successful and failed clusters; the per-cluster details are available after clicking on it. See also [Command log](/pgcowboy/usage/command-log/).
 
 This status covers the **search** only. Once you pick a role, loading its details gets its own
 status in the main window's bottom bar.
 
 ## Picking a role
 
-Picking a result loads **one form** for the role's whole identity across those clusters — not
-one form per cluster.
+Picking a result aggregates the data from all clusters into **one form**. The [scope labels](/pgcowboy/usage/) indicate where each individual setting appears — on a whole cluster group or on single clusters.
 
 <figure class="shot">
 <div class="light-only">
 
-![Alter role form](../../../assets/usage/alter-form-light.png)
+![Alter role form](../../../assets/usage/operations-overview-light.png)
 
 </div>
 <div class="dark-only">
 
-![Alter role form](../../../assets/usage/alter-form-dark.png)
+![Alter role form](../../../assets/usage/operations-overview-dark.png)
 
 </div>
 <figcaption>Alter role — Present on, comment, role parents and attributes in one form</figcaption>
 </figure>
 
-The clusters selected at search time become the role's working scope. To bring another cluster
-into play, re-select targets and search again.
+The clusters selected at search time become the role's working scope.
+
+:::tip
+You can bring another cluster into play, or remove one from the scope, by changing the selected targets.
+:::
 
 From here you can edit the [comment](/pgcowboy/usage/comments/),
 [role parents](/pgcowboy/usage/parent-roles/),

@@ -4,69 +4,48 @@ description: Maintain PostgreSQL roles across many clusters from one desktop app
 ---
 
 pgCowboy is a desktop app for maintaining **PostgreSQL roles across many clusters**.
-You keep a list of clusters (grouped, for example, into Production and UAT), pick which
-ones to act on, and create or change a role on all of them from a single form. The role
-change is applied to each cluster in one transaction, and you see a per-cluster result.
+Keep your clusters grouped — for example into Production and UAT — then pick the group(s) and add or adjust a role against them.
 
-The app does not hard-code any DDL. Every change — create, drop, grant, revoke, password,
-comment, attribute, setting — runs through a **SQL call template** you can read and edit.
-The defaults are plain PostgreSQL statements; you can point any of them at a wrapper
-function or view so a low-privilege connection can act through it.
-
-:::note[Requirements]{icon="information"}
-
-- A reachable PostgreSQL server (or several) that the connecting user can act on.
-- Credentials come from the cluster's own user and optional password, the `PG*` environment
-  variables, or `~/.pgpass` — resolved in that order, like `psql`.
-
-:::
+Thanks to **templating** of SQL queries, you can extend the basic operations, and give access to users who could not otherwise execute them.
 
 <figure class="shot">
 <div class="light-only">
 
-![pgCowboy — Alter role](../../assets/usage/alter-form-light.png)
+![pgCowboy — Alter role](../../assets/usage/operations-overview-light.png)
 
 </div>
 <div class="dark-only">
 
-![pgCowboy — Alter role](../../assets/usage/alter-form-dark.png)
+![pgCowboy — Alter role](../../assets/usage/operations-overview-dark.png)
 
 </div>
 <figcaption>Altering a role across Production and UAT from one form</figcaption>
 </figure>
 
-## What it does
+## Main Features
 
-- **Group clusters** and pick targets. A cluster belongs to a group (for example Production, UAT);
-  each group has a colour and an optional *require confirmation* flag. You select whole
-  groups and/or individual clusters, and that selection is remembered between sessions.
-- **Create a role** on every selected cluster at once — login name, and (via your template)
-  parent roles and the configured comment fields (full name, email, …).
-- **Alter a role** by searching for it first, then editing its whole identity in one form:
-  parent-role memberships, attributes (superuser, create role, create DB, inherit, login,
-  replication, bypass RLS), settings (role-level `GUC`s such as `statement_timeout`),
-  comment, password, and which clusters it exists on.
-- **See where things differ.** When a role's memberships, settings, or comment vary across
-  clusters, the app shows that per cluster and lets you reconcile it, rather than hiding the
-  difference.
-- **Edit the SQL.** Each operation's template and execution mode live in Settings. A
-  **Default** button reverts any template to the built-in plain-SQL version.
-- **Confirm before production.** Runs that touch a group flagged *require confirmation* stop
-  at a dialog first. Removing a role also asks for confirmation.
+- **Clusters grouping** - aggregate clusters into color-coded groups. Mark the groups that require extra confirmation.
+- **Operations on groups** - combine groups (and single clusters) as operation targets.
+- **PGUSER, PGPASSWORD and pgpass** support.
+- **Differences visual feedback** - differences in role settings between groups or clusters are easy to spot and even easier to reconcile.
+- **Custom information fields** - a role comment can be treated as a JSON object that carries customizable information.
+- **Preflight checks** - before role creation or removal, the app checks for possible dependencies and shows the report.
+- **Templatable SQL** - every operation the app issues against a database is configurable, so you can extend both what it does and who can do it.
+- **Password generator** - configurable password generator.
 
 ## How a change is applied
 
-1. You choose the target clusters/groups in **Target selection**.
-2. You make edits in the form (grants, attributes, settings, comment, password).
-3. On **Save**, the app builds an ordered list of operations per cluster and runs each
-   cluster's list as **one transaction** — commit on success, roll back on the first error.
-4. Each cluster reports its own outcome (and the exact SQL it ran) in a status panel; one
-   unreachable or failing cluster does not stop the others.
+1. Choose the target groups and/or single clusters in **Target selection**.
+1. Select **Create role** to clear the form, or **Alter role** to find and load role data from all selected clusters.
+1. Edit in the form (parents, attributes, settings, comment, password).
+1. On **Save**, the app
+   - performs pre-flight checks
+   - builds an ordered list of operations per cluster and runs each cluster's list as **one transaction** — commit on success, roll back on the first error.
+1. A report is available afterwards. It includes the status and the SQL commands issued against each cluster.
 
 ## Where to go next
 
 - [Installation](/pgcowboy/installation/) — download a build or install from source.
 - [Usage](/pgcowboy/usage/) — target selection, scope labels, and how a change is applied.
 - [Configuration](/pgcowboy/configuration/) — clusters, comment fields, templates, preferences.
-- [Call templates](/pgcowboy/configuration/call-templates/) — how the editable SQL works.
 - [Troubleshooting](/pgcowboy/troubleshooting/) — connection and permission issues.
