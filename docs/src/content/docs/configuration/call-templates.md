@@ -3,15 +3,11 @@ title: Call templates
 description: How pgCowboy turns form input into the SQL it runs
 ---
 
-Every change the app makes runs through a **call template** — a short piece of SQL with
-`${placeholder}` fields. Templates live in **Settings → DB command templates**, or in the
-config file under `db_functions.<operation>`. Each has an **execution mode**: `statement`,
-`block`, or `function`.
+Every change the app makes runs through a **call template** — a short piece of SQL with `${placeholder}` fields. Templates live in **Settings → DB command templates**, or in the config file under `db_functions.<operation>`. Each has an **execution mode**: `statement`, `block` or `function`.
 
-The defaults are plain PostgreSQL and cover everything out of the box. You only edit a
-template when you want the app to go through a wrapper function or view — for example, so a
-low-privilege connection can create roles via a `SECURITY DEFINER` function, or to add audit
-logging.
+:::tip
+The defaults are plain PostgreSQL and cover everything out of the box. Edit a template when you want the app to go through a wrapper function or view — so a low-privilege connection can create roles via a `SECURITY DEFINER` function, or to add audit logging.
+:::
 
 <figure class="shot">
 <div class="light-only">
@@ -27,9 +23,7 @@ logging.
 <figcaption>Settings → DB command templates and Introspection queries, side by side</figcaption>
 </figure>
 
-Clicking a command opens its editor: execution mode, the template text, clickable placeholder
-chips, and a **Default** button that restores the built-in version. The **?** in the title bar
-opens the full syntax reference.
+Clicking a command opens its editor: execution mode, the template text, clickable placeholder chips, and a **Default** button that restores the built-in version. The **?** in the title bar opens the full syntax reference.
 
 <figure class="shot">
 <div class="light-only">
@@ -61,47 +55,36 @@ opens the full syntax reference.
 
 ## Execution modes
 
-- **statement** / **block** — the template is raw SQL (DDL, `GRANT`, `ALTER ROLE`).
-  PostgreSQL can't bind a role name as `$1`, so the app embeds names as quoted **identifiers**
-  and literals as **escaped strings**. Use `block` when the SQL is a `DO $$ … $$` block.
-- **function** — the template is a function call. Values are passed as real bind parameters
-  (`$1`, `$2`, …), which is the safest option when your DDL is wrapped in a function.
+- **statement** / **block** — the template is raw SQL (DDL, `GRANT`, `ALTER ROLE`). PostgreSQL can't bind a role name as `$1`, so the app embeds names as quoted **identifiers** and literals as **escaped strings**. Use `block` when the SQL is a `DO $$ … $$` block.
+- **function** — the template is a function call. Values are passed as real bind parameters (`$1`, `$2`, …), which is the safest option when your DDL is wrapped in a function.
 
 ## Two placeholder namespaces
 
-- **`${name}`** — a **built-in**, from the closed set the operation offers (the table above).
-  Anything else in single braces is rejected when you save.
-- **`${{key}}`** — a **comment field** you configured under
-  [Comment fields](/pgcowboy/configuration/comment-fields/), in `create_role` and
-  `set_comment` only.
+- **`${name}`** — a **built-in**, from the closed set the operation offers (the table above). Anything else in single braces is rejected when you save.
+- **`${{key}}`** — a **comment field** you configured under [Comment fields](/pgcowboy/configuration/comment-fields/), in `create_role` and `set_comment` only.
 
-Keeping them apart is what lets a comment key named like a built-in still be used: `${comment}` is
-the whole comment, while `${{comment}}` is a JSON key called `comment`.
+:::tip
+The two namespaces never overlap, so a comment key named like a built-in still works: `${comment}` is the whole comment, while `${{comment}}` is a JSON key called `comment`.
+:::
 
 ## How fields are embedded
 
 The app knows the kind of each field, so you don't quote them yourself:
 
 - **Role names** (`loginname`) → double-quoted identifiers, preserving case.
-- **`parent_roles`** (create_role, grant_parents, revoke_parents) → in **statement/block** mode a
-  comma-separated list of quoted identifiers (`"a", "b"`); in **function** mode an inline
-  `ARRAY['a', 'b']` literal (values verbatim, an empty selection → `NULL`).
+- **`parent_roles`** (create_role, grant_parents, revoke_parents) → in **statement/block** mode a comma-separated list of quoted identifiers (`"a", "b"`); in **function** mode an inline `ARRAY['a', 'b']` literal (values verbatim, an empty selection → `NULL`).
 - **`new_password`**, **`comment`**, **`config_value`** → escaped string literals.
-- **Comment fields** — one `${{key}}` placeholder per key configured under
-  [Comment fields](/pgcowboy/configuration/comment-fields/) (e.g. `${{full_name}}`,
-  `${{e_mail}}`), available in **`create_role`** and **`set_comment`**.
-  The value comes from the role's JSON comment and is embedded by type: string → quoted literal,
-  number/boolean → bare literal, array/object → JSON text, and an empty/`null`/missing value →
-  bare `NULL`. A comment field cannot be used inside the `ARRAY[...] || ${...}` form.
+- **Comment fields** — one `${{key}}` placeholder per key configured under [Comment fields](/pgcowboy/configuration/comment-fields/) (e.g. `${{full_name}}`, `${{e_mail}}`), available in **`create_role`** and **`set_comment`**. The value comes from the role's JSON comment and is embedded by type: string → quoted literal, number/boolean → bare literal, array/object → JSON text, and an empty/`null`/missing value → bare `NULL`.
 - **`config_name`** → a bare, validated GUC name (never quoted).
-- **`attributes`** → a space-separated keyword list, each keyword checked against a whitelist
-  (`SUPERUSER`/`NOSUPERUSER`, `CREATEROLE`, `LOGIN`, `REPLICATION`, `BYPASSRLS`, …). All of a
-  cluster's attribute changes are combined into one `ALTER ROLE … WITH …`.
+- **`attributes`** → a space-separated keyword list, each keyword checked against a whitelist (`SUPERUSER`/`NOSUPERUSER`, `CREATEROLE`, `LOGIN`, `REPLICATION`, `BYPASSRLS`, …). All of a cluster's attribute changes are combined into one `ALTER ROLE … WITH …`.
+
+:::caution
+A comment field cannot be used inside the `ARRAY[...] || ${...}` form.
+:::
 
 ## A function-mode example
 
-Suppose role creation must go through a helper that also assigns fixed groups. Set
-`create_role` to **function** mode with:
+Suppose role creation must go through a helper that also assigns fixed groups. Set `create_role` to **function** mode with:
 
 ```text
 admin_access.create_role(
@@ -110,19 +93,17 @@ admin_access.create_role(
 )
 ```
 
-- `${loginname}` is a bind; `${{full_name}}` / `${{e_mail}}` are comment-field placeholders (their
-  values come from the role's comment, typed, `NULL` when empty/absent).
+- `${loginname}` is a bind; `${{full_name}}` / `${{e_mail}}` are comment-field placeholders (their values come from the role's comment, typed, `NULL` when empty/absent).
 - `NULL` is a plain SQL literal for an unused argument.
-- `ARRAY[...] || ${parent_roles}` appends the selected parent roles to a fixed set (it becomes
-  `|| NULL` when the selection is empty).
+- `ARRAY[...] || ${parent_roles}` appends the selected parent roles to a fixed set (it becomes `|| NULL` when the selection is empty).
 
 ## Read (introspection) queries
 
-Alter-role search and detail, plus the dependency check run before a role is dropped, use four
-**read** queries, also editable (Settings → Introspection queries, or `db_reads` in config).
-Each takes a single `${rolename}` bind, and its result columns are matched **by name** against
-a fixed contract — so you can point one at a privileged wrapper function or view when the
-connecting user can't read the catalogs directly.
+Alter-role search and detail, plus the dependency check run before a role is dropped, use four **read** queries, also editable (Settings → Introspection queries, or `db_reads` in config). Each takes a single `${rolename}` bind, and its result columns are matched **by name** against a fixed contract.
+
+:::tip
+Because matching is by name, you can point a read query at a privileged wrapper function or view when the connecting user can't read the catalogs directly.
+:::
 
 | Query | Contract columns |
 |-------|------------------|
@@ -131,11 +112,10 @@ connecting user can't read the catalogs directly.
 | `role_parents` | `rolname` |
 | `role_dependencies` | `database`, `dependency`, `class`, `object` |
 
-Column order doesn't matter and a missing column is tolerated, but an unexpected extra column
-is rejected.
+Column order doesn't matter and a missing column is tolerated, but an unexpected extra column is rejected.
 
-`role_dependencies` is the pre-flight check: it runs on every cluster a removal targets and its
-rows are shown per cluster before anything is dropped.
+`role_dependencies` is the pre-flight check: it runs on every cluster a removal targets, and its rows are shown per cluster before anything is dropped.
 
-Full syntax, the field whitelist, YAML examples, and common mistakes are in the repository's
-[`sql/README.md`](https://github.com/michal-bartak/pgcowboy/blob/main/sql/README.md).
+:::tip
+Full syntax, the field whitelist, YAML examples and common mistakes are in the repository's [`sql/README.md`](https://github.com/michal-bartak/pgcowboy/blob/main/sql/README.md).
+:::

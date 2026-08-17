@@ -3,10 +3,7 @@ title: Altering settings
 description: Role-level GUCs, which can hold a different value per cluster
 ---
 
-**Settings** are role-level configuration parameters (`GUC`s) — `statement_timeout`,
-`log_statement`, `search_path`, and so on. They're read from the role's stored configuration
-and use the same rows and per-cluster editor as
-[role parents](/pgcowboy/usage/parent-roles/).
+**Settings** are role-level configuration parameters (`GUC`s) — `statement_timeout`, `log_statement`, `search_path`, and so on. They are read from the role's stored configuration and use the same rows and per-cluster editor as [role parents](/pgcowboy/usage/parent-roles/).
 
 <figure class="shot">
 <div class="light-only">
@@ -22,11 +19,9 @@ and use the same rows and per-cluster editor as
 <figcaption>Settings section — one row per name/value pair, with scope labels</figcaption>
 </figure>
 
-## Rows are name **and** value
+## Name and value
 
-A setting can hold a different value on different clusters, so rows are keyed by `name=value`.
-The same parameter with two values shows as two rows, each with its own scope — the difference
-is visible instead of averaged away.
+A setting can hold a different value on different clusters, so rows are keyed by `name=value`. The same parameter with two values shows as two rows, each with its own scope.
 
 <figure class="shot">
 <div class="light-only">
@@ -50,8 +45,7 @@ is visible instead of averaged away.
 
 ## Adding a setting
 
-**Add setting…** takes a parameter **name** and a **value**, plus the clusters to apply them
-to.
+**Add setting…** takes a parameter **name** and a **value**, plus the clusters to apply them to.
 
 <figure class="shot">
 <div class="light-only">

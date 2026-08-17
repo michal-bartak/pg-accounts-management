@@ -7,8 +7,7 @@ description: Build and run pgCowboy locally
 
 - Go 1.22+
 - [Wails v2](https://wails.io/docs/gettingstarted/installation)
-- Platform WebView dependencies: Xcode Command Line Tools (macOS), WebView2 (Windows), or
-  `webkit2gtk` (Linux).
+- Platform WebView dependencies: Xcode Command Line Tools (macOS), WebView2 (Windows), or `webkit2gtk` (Linux).
 
 ## Clone and run
 
@@ -23,8 +22,7 @@ wails dev
 
 ## Build a release installer
 
-`make package` builds the app and then the native installer for the machine you are on,
-under `dist/`:
+`make package` builds the app and then the native installer for the machine you are on, under `dist/`:
 
 | Host | Artifact | Extra tooling |
 |------|----------|---------------|
@@ -38,9 +36,7 @@ make package                            # host platform
 make package PLATFORM=darwin/universal  # Intel + Apple silicon in one bundle
 ```
 
-The per-platform recipes live in `build/scripts/` (`make-dmg.sh`,
-`make-msi.ps1`, `make-linux-packages.sh`) and are the same scripts the release workflow
-runs, so a local package matches a released one.
+The per-platform recipes live in `build/scripts/` (`make-dmg.sh`, `make-msi.ps1`, `make-linux-packages.sh`) and are the same scripts the release workflow runs, so a local package matches a released one.
 
 Other useful targets:
 
@@ -58,15 +54,11 @@ make sync-wails-version # align wails.json with VERSION
 make test
 ```
 
-CI runs the same checks on every push and pull request. The suite covers call-template SQL
-generation, comment parsing, command validation, config migration, and batch target
-resolution. Database calls need a live server, so those paths are exercised against a
-throwaway PostgreSQL when needed.
+CI runs the same checks on every push and pull request. The suite covers call-template SQL generation, comment parsing, command validation, config migration and batch target resolution. Database calls need a live server, so those paths are exercised against a throwaway PostgreSQL when needed.
 
 ## Working on these docs
 
-The docs are an [Astro](https://astro.build/) + [Starlight](https://starlight.astro.build/)
-site under `docs/`. To preview them offline:
+The docs are an [Astro](https://astro.build/) + [Starlight](https://starlight.astro.build/) site under `docs/`. To preview them offline:
 
 ```bash
 make docs-install   # one-time: install the docs dependencies
@@ -76,8 +68,7 @@ make docs-build     # static build into docs/dist/
 make docs-preview   # serve the built site locally
 ```
 
-On push to `main`, the `deploy-docs` workflow builds the site and publishes it to GitHub
-Pages.
+On push to `main`, the `deploy-docs` workflow builds the site and publishes it to GitHub Pages.
 
 ### Screenshots
 
@@ -88,17 +79,17 @@ docs/src/assets/usage/target-selection-light.png
 docs/src/assets/usage/target-selection-dark.png
 ```
 
-Starlight's theme toggle picks one, so **replacing a screenshot is just overwriting the file
-and rebuilding** — no markdown to edit. Capture both themes with the same window size and
-scroll position, or the swap reads as a page jump instead of a theme change.
+Starlight's theme toggle picks one, so **replacing a screenshot is just overwriting the file and rebuilding** — no markdown to edit.
 
-Files not captured yet hold a generated placeholder that names itself, so a missing shot never
-breaks the build:
+:::caution
+Capture both themes with the same window size and scroll position, or the swap reads as a page jump instead of a theme change.
+:::
+
+Files not captured yet hold a generated placeholder that names itself, so a missing shot never breaks the build:
 
 ```bash
 make docs-shots-status   # which screenshots are real, which are still placeholders
 make docs-shots          # generate placeholders for newly referenced images
 ```
 
-`docs-shots` also runs automatically before `docs-dev` and `docs-build`, so adding a figure to
-a page and rebuilding is enough to get its placeholder.
+`docs-shots` also runs automatically before `docs-dev` and `docs-build`, so adding a figure to a page and rebuilding is enough to get its placeholder.
