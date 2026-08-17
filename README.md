@@ -2,6 +2,8 @@
 
 A cross-platform desktop app for maintaining **PostgreSQL roles across many clusters**. Create and alter roles on all your selected clusters from one form, through SQL call templates you can read and edit. Built with Go, Wails v2, and pgx.
 
+<img src="docs/src/assets/usage/operations-overview-light.png" width="50%">
+
 📖 **[Full documentation](https://michal-bartak.github.io/pgcowboy/)**
 
 ## Quick start
