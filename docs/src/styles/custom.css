@@ -3,10 +3,6 @@
   --sl-color-accent-high: var(--sl-color-accent) !important;
 }
 
-a[href="#_top"] {
-  display: none;
-}
-
 /* Click a screenshot in the docs body to view it full-size in a lightbox. */
 .sl-markdown-content img {
   cursor: zoom-in;

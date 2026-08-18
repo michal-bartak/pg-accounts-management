@@ -3,7 +3,7 @@ title: Altering settings
 description: Role-level GUCs, which can hold a different value per cluster
 ---
 
-**Settings** are role-level configuration parameters (`GUC`s) — `statement_timeout`, `log_statement`, `search_path`, and so on. They are read from the role's stored configuration and use the same rows and per-cluster editor as [role parents](/pgcowboy/usage/parent-roles/).
+**Settings** are role-level configuration parameters (`GUC`s) — `statement_timeout`, `log_statement`, `search_path`, and so on. They are read from the clusters and use the editor similar to [role parents](/pgcowboy/usage/parent-roles/).
 
 <figure class="shot">
 <div class="light-only">
@@ -23,19 +23,6 @@ description: Role-level GUCs, which can hold a different value per cluster
 
 A setting can hold a different value on different clusters, so rows are keyed by `name=value`. The same parameter with two values shows as two rows, each with its own scope.
 
-<figure class="shot">
-<div class="light-only">
-
-![The same parameter with different values on different clusters, shown as two rows](../../../assets/usage/settings-differing-values-light.png)
-
-</div>
-<div class="dark-only">
-
-![The same parameter with different values on different clusters, shown as two rows](../../../assets/usage/settings-differing-values-dark.png)
-
-</div>
-<figcaption>The same parameter with different values on different clusters, shown as two rows</figcaption>
-</figure>
 
 | Button | Effect |
 |--------|--------|
@@ -46,6 +33,11 @@ A setting can hold a different value on different clusters, so rows are keyed by
 ## Adding a setting
 
 **Add setting…** takes a parameter **name** and a **value**, plus the clusters to apply them to.
+
+</div>
+<figcaption>When creating a new role, the popup opens with all clusters selected</figcaption>
+</figure>
+
 
 <figure class="shot">
 <div class="light-only">
@@ -61,5 +53,5 @@ A setting can hold a different value on different clusters, so rows are keyed by
 <figcaption>Add setting dialog — name, value, and cluster selection</figcaption>
 </figure>
 
-On save these become `set_config` and `reset_config` operations
-(`ALTER ROLE … SET name = value` / `RESET name` by default).
+On save all perfoemed changes translates into `Set config` and `Reset config` operations.
+(`ALTER ROLE … SET name = value` / `ALTER ROLE … RESET name` by default).

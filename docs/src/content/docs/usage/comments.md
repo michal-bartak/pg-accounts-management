@@ -63,7 +63,7 @@ Details worth knowing:
 ## Comment discrepancy across clusters
 
 If the same role carries different comments on different clusters, the inline editor is
-replaced by a **Comments differ** banner. Reconciliation moves to the **Comments** dialog.
+replaced by a **Comments differ across clusters** button. Reconciliation moves to the **Comments** dialog.
 
 <figure class="shot">
 <div class="light-only">
@@ -81,7 +81,7 @@ replaced by a **Comments differ** banner. Reconciliation moves to the **Comments
 
 - Clusters are grouped by comment content. JSON is compared **by value**, so formatting and key order don't count as a difference.
 - Each version gets its own Fields/Raw editor.
-- **Use in all clusters** broadcasts one version to every other version box.
+- **Use in all clusters** buttons broadcasts one version to every other version box.
 - **OK** stages your edits; **Cancel** discards them.
 - If the versions end up identical, OK folds them back into the inline editor and the banner
   clears.

@@ -81,16 +81,16 @@ Labels also show edits you haven't saved yet:
 
 Both are staged only. Nothing reaches a database until you Save.
 
-## How a change is applied
+## How changes are applied
 
-1. You edit the form. Nothing is sent while you edit.
+1. You edit the form. Changes are being staged within the app
 1. **Save changes** (or **Create role**) builds an ordered list of operations **per cluster**.
-1. Each cluster's list runs as **one transaction** on its own connection — commit on success, roll back on the first error.
+1. Each cluster's list runs as **one transaction** — commit on success, roll back on the first error.
 1. Progress and results appear in the [command log](/pgcowboy/usage/command-log/).
 
 Runs that touch a group flagged **require confirmation** stop at a dialog first.
 
-If a role drop is involved, the app performs a pre-flight check. Its result is displayed, and doubles as the confirmation dialog.
+If a role drop or creation are involved, the app performs a pre-flight check showing the result.
 
 ## Where to go next
 

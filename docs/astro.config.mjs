@@ -20,6 +20,8 @@ export default defineConfig({
       title: 'pgCowboy',
       description: 'Maintain PostgreSQL roles across many clusters from one desktop app',
       plugins: [starlightThemeRapide()],
+      // Renames the table-of-contents' top entry from "Overview" to the page title.
+      routeMiddleware: './src/starlightRouteData.ts',
       favicon: '/appicon.png',
       logo: {
         src: './src/assets/appicon.png',

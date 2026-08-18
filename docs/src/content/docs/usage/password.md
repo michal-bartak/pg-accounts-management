@@ -3,7 +3,7 @@ title: Setting a password
 description: The password row, the generator, and where it applies
 ---
 
-The password row sits with the rest of the form and is off until you ask for it.
+The password row sits with the rest of the form and is off until you enable it.
 
 <figure class="shot">
 <div class="light-only">
@@ -21,7 +21,7 @@ The password row sits with the rest of the form and is off until you ask for it.
 
 ## Set password
 
-Nothing happens to the password unless **Set password** is ticked. Until then the field, **Generate**, **Copy** and the reveal eye are all disabled.
+Nothing happens to the password unless **Set password** is ticked. Until then the text field, **Generate**, **Copy** and the reveal ey buttons are all disabled.
 
 | Control | Effect |
 |---------|--------|
@@ -33,16 +33,17 @@ Nothing happens to the password unless **Set password** is ticked. Until then th
 
 ## Generate
 
-**Generate** builds a password from your [password generator settings](/pgcowboy/configuration/password-generator/) — length, character classes, and whether look-alike characters are excluded — using the platform's cryptographic random source. Press it again for a different one.
+**Generate** builds a password from your [password generator settings](/pgcowboy/configuration/password-generator/) — length, character classes, and whether look-alike characters are excluded — using the platform's cryptographic random source.
 
 :::caution
 Copy the password before you save. The app never displays it again.
 :::
 
-## Where it applies
+## Execution
 
-On **Save changes** the password is set on **every cluster in [scope](/pgcowboy/usage/) where the role exists**, as part of that cluster's transaction. It runs through the `change_password` [call template](/pgcowboy/configuration/call-templates/), which is `ALTER ROLE … PASSWORD …` by default.
+If the password is enabled, the **Save changes** sets it on **every cluster in [scope](/pgcowboy/usage/#scope-labels) where the role exists**, as part of that cluster's transaction. 
 
-:::tip
-Passwords are not stored in the app's configuration, and they are not shown in the [command log](/pgcowboy/usage/command-log/).
-:::
+It runs through the `Change password` [call template](/pgcowboy/configuration/call-templates/).
+
+Final query is folded into each cluster's transaction.
+

@@ -3,8 +3,7 @@ title: Altering attributes
 description: The role flags, enabled or disabled per cluster
 ---
 
-**Attributes** are PostgreSQL's role flags. They use the same rows and the same per-cluster
-editor as [role parents](/pgcowboy/usage/parent-roles/).
+**Attributes** are PostgreSQL's role flags. Unlike other settings, the list of flags is fixed; there is no option to add or remove any. 
 
 <figure class="shot">
 <div class="light-only">
@@ -20,6 +19,8 @@ editor as [role parents](/pgcowboy/usage/parent-roles/).
 <figcaption>Attributes section — all seven flags with their scope labels</figcaption>
 </figure>
 
+It supports following attributes:
+
 | Attribute | Keyword |
 |-----------|---------|
 | Superuser | `SUPERUSER` / `NOSUPERUSER` |
@@ -30,10 +31,7 @@ editor as [role parents](/pgcowboy/usage/parent-roles/).
 | Replication | `REPLICATION` / `NOREPLICATION` |
 | Bypass RLS | `BYPASSRLS` / `NOBYPASSRLS` |
 
-All seven rows always render, whether or not the flag is set. An attribute that is simply off looks neutral; only a **pending** change is marked, using the shared
-[scope-label convention](/pgcowboy/usage/) — a pending enable is prefixed with
-**`+`**, a pending disable turns **red and struck through**.
-
+All seven rows always render, depicting clusters where are enabled. If the particular attribute is enabled nowhere, the `off` symbol is displayed.
 
 | Button | Effect |
 |--------|--------|
@@ -57,7 +55,6 @@ Click on Edit button opens the popup with selection of clusters
 <figcaption>Attributes section — all seven flags with their scope labels</figcaption>
 </figure>
 
-Pending changes are visible before you save, through the shared scope-label convention: a pending grant is prefixed with +, a pending revoke turns red and struck through.
+Pending changes are visible before you save, through the shared [scope-label convention](/pgcowboy/usage/#scope-labels): a pending grant is prefixed with `+`, a pending revoke turns red and struck through.
 
-When executing all of a cluster's attribute changes are combined into a single
-`ALTER ROLE … WITH keyword keyword …`, so enabling `LOGIN` and disabling `SUPERUSER` turns into single statement, not two.
+When executing all of a cluster's attribute changes are combined into a single `ALTER ROLE … WITH keyword keyword …` query, so enabling `LOGIN` and disabling `SUPERUSER` turns into single statement, not two.
