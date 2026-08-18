@@ -3,7 +3,7 @@ title: Comment fields
 description: Which JSON keys in a role comment get labelled inputs
 ---
 
-A role comment can be plain text or JSON. **Comment fields** decide which JSON keys the role form shows as labelled inputs, and in what order.
+In PostgreSQL a role comment lives as plain text. But we can store an JSON formatted string there. **Comment fields** defines the form that helps editing json content.
 
 <figure class="shot">
 <div class="light-only">
@@ -22,18 +22,17 @@ A role comment can be plain text or JSON. **Comment fields** decide which JSON k
 ## The field list
 
 Each entry is a **key** (the JSON key, a bare identifier) and a **label** (what the form shows). Drag the handle to reorder;
-<svg class="doc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> removes an entry; **Add field…** appends one.
-Defaults are `full_name` → *Full name* and `e_mail` → *Email*.
+<svg class="doc-ic" width="1.05em" height="1.05em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> removes an entry; **Add field…** appends one.
 
 Rules:
 
-- Configured fields always render, even when the key is absent from the comment.
-- Keys **not** on the list still render, labelled by their raw key — nothing is hidden.
+- Configured fields found in the comment always render, even when the key is absent from the comment.
+- Keys **not** found in the comments but missing from the list still render, labelled by their raw key.
 - Values that aren't strings (number, boolean, array, object) render **read-only**, so their type survives a round trip. Edit them in the Raw view.
 - Leaving the label blank falls back to the key.
 
 :::tip
-Each configured key also becomes a placeholder — `${{full_name}}`, `${{e_mail}}`, … — usable in the `create_role` and `set_comment` [call templates](/pgcowboy/configuration/call-templates/).
+Each configured key also becomes a placeholder — `${{key}}` — usable in the `create_role` and `set_comment` [call templates](/pgcowboy/configuration/call-templates/) or [role details](/pgcowboy/configuration/role-details/) feature.
 :::
 
 ## Preferred comment view

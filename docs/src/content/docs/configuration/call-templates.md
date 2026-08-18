@@ -3,7 +3,9 @@ title: Call templates
 description: How pgCowboy turns form input into the SQL it runs
 ---
 
-Every change the app makes runs through a **call template** — a short piece of SQL with `${placeholder}` fields. Templates live in **Settings → DB command templates**, or in the config file under `db_functions.<operation>`. Each has an **execution mode**: `statement`, `block` or `function`.
+Every change the app makes runs through a **call template** — a short piece of SQL with `${placeholder}` or `${{placeholder}}` fields. Templates live in **Settings → DB command templates**. 
+
+Command templates offers three **execution modes*: `statement`, `block` or `function` while introspection templates accepts sql `statements` only.
 
 :::tip
 The defaults are plain PostgreSQL and cover everything out of the box. Edit a template when you want the app to go through a wrapper function or view — so a low-privilege connection can create roles via a `SECURITY DEFINER` function, or to add audit logging.
@@ -20,10 +22,10 @@ The defaults are plain PostgreSQL and cover everything out of the box. Edit a te
 ![Settings → DB command templates and Introspection queries, side by side](../../../assets/configuration/settings-templates-dark.png)
 
 </div>
-<figcaption>Settings → DB command templates and Introspection queries, side by side</figcaption>
+<figcaption>DB command templates and Introspection queries, side by side</figcaption>
 </figure>
 
-Clicking a command opens its editor: execution mode, the template text, clickable placeholder chips, and a **Default** button that restores the built-in version. The **?** in the title bar opens the full syntax reference.
+Clicking a command opens its editor: execution mode, the template text, clickable placeholder chips, and a **Default** button that restores the built-in version. The information button in the title bar opens the full syntax reference.
 
 <figure class="shot">
 <div class="light-only">
@@ -117,5 +119,5 @@ Column order doesn't matter and a missing column is tolerated, but an unexpected
 `role_dependencies` is the pre-flight check: it runs on every cluster a removal targets, and its rows are shown per cluster before anything is dropped.
 
 :::tip
-Full syntax, the field whitelist, YAML examples and common mistakes are in the repository's [`sql/README.md`](https://github.com/michal-bartak/pgcowboy/blob/main/sql/README.md).
+Full syntax, the field whitelist, examples and common mistakes are in the repository's [`sql/README.md`](https://github.com/michal-bartak/pgcowboy/blob/main/sql/README.md).
 :::

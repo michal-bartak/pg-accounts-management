@@ -43,8 +43,17 @@
 }
 
 /* The app's own action icons, inlined so the docs show the exact glyph the UI does.
-   Geometry is copied from ICONS in frontend/app.js — keep the two in sync. */
-.doc-ic {
+   Geometry is copied from ICONS in frontend/app.js — keep the two in sync.
+   The selector must out-specify Starlight's own
+   `.sl-markdown-content :is(img,picture,video,canvas,svg,iframe)` rule (0,1,1), which forces
+   `display:block` + `height:auto` on every SVG in the content — that is what put each icon on
+   its own line. A bare `.doc-ic` (0,1,0) loses to it.
+   The `width`/`height` attributes on each <svg> in the markdown are NOT redundant with this rule:
+   they are presentation attributes, which lose to any author CSS, so this rule still governs the
+   built site — but they are all a plain markdown renderer with no stylesheet (VS Code's preview,
+   GitHub's .md view) has to go on. Without them such a renderer falls back to the default
+   replaced-element size and the icon comes out enormous. Keep the two in step. */
+.sl-markdown-content svg.doc-ic {
   display: inline-block;
   width: 1.05em;
   height: 1.05em;

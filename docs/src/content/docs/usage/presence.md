@@ -22,7 +22,7 @@ The **Present on** block, just above the login name, shows which clusters the ro
 
 ## Editing presence
 
-The <svg class="doc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg> **edit** button opens a picker listing the role's [scope](/pgcowboy/usage/) — the clusters that Target selection resolved to when you searched. Tick to create the role on added cluster or untick to drop role from removed cluster.
+The <svg class="doc-ic" width="1.05em" height="1.05em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg> **edit** button opens a picker listing the role's [scope](/pgcowboy/usage/) — the clusters that Target selection resolved to when you searched. Tick to create the role on added cluster or untick to drop role from removed cluster.
 
 
 <figure class="shot">

@@ -3,9 +3,9 @@ title: Role Details
 description: What is shown next to the role name when you search for a role
 ---
 
-Searching for a role lists every match by name. **Role Details** decides what is shown *beside* each name — a full name, an email, whatever your comments happen to carry.
+**Role Details** decides what is shown *beside* login role — a full name, an email, whatever your comments happen to carry.
 
-The role name is always the first column; every column after it is one you configure.
+The result is currently seen in [Role search](/pgcowboy/usage/find-role/) dialog.
 
 <figure class="shot">
 <div class="light-only">
@@ -24,22 +24,22 @@ The role name is always the first column; every column after it is one you confi
 ## The column list
 
 Each row is a **label** (the column header) and a **template** (what to show). Drag the handle to reorder;
-<svg class="doc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> removes a row; **Add column…** appends one.
+<svg class="doc-ic" width="1.05em" height="1.05em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> removes a row; **Add column…** appends one.
 
 Out of the box there is a single *Full name* column over `${{full_name}}`.
 
 ## Templates
 
-A template is display text — never SQL — and it supports exactly two placeholders:
+A template is display text and it supports exactly two placeholders:
 
 | Placeholder | Resolves to |
 |---|---|
 | `${{<key>}}` | that key's value in the role's JSON comment |
 | `${comment}` | the whole comment, verbatim |
 
-`${{<key>}}` reaches **any** key in the comment, whether or not it is listed under [Comment fields](/pgcowboy/configuration/comment-fields/) — that list only decides which keys get labelled inputs in the role form.
+`${{<key>}}` reaches **any** key in the comment, whether or not it is listed under [Comment fields](/pgcowboy/configuration/comment-fields/) — that list only decides which keys get labelled inputs in the role form. 
 
-:::tip
+:::note
 `${comment}` is the one to use for **plain-text** comments, which have no keys to address.
 :::
 
@@ -72,8 +72,8 @@ The two forms are independent, so a comment that carries its own `comment` key i
 
 ## What happens to missing or odd values
 
-- An unknown key, a JSON `null`, and a plain-text comment all resolve to **empty**.
-- Surrounding whitespace is collapsed, so `${{first_name}} ${{last_name}}` shows `Ada` — not `Ada ` — for a role with no last name.
+- An unknown key, a JSON `null`, and a plain-text comment all resolve to **empty string**.
+- Surrounding whitespace is collapsed, so `${{first_name}} ${{nokey}}` shows `Ada` — not `Ada ` — for a role with no `nokey` key.
 - Values that aren't strings render typed: `42`, `true`, `["a","b"]`.
 - When a role's comment **differs between clusters**, each column shows the first value it finds, looking through the clusters the role was found on in cluster-group order, then alias.
 - That search **skips** a cluster whose comment has nothing for the column, rather than showing the column empty. So the value you see can come from further down the list, and because each column searches on its own, two columns in one row can come from different clusters.
@@ -81,10 +81,6 @@ The two forms are independent, so a comment that carries its own `comment` key i
 :::caution
 Differences are not marked in the search results. Open the role and the comment editor reports them, with the [Comments dialog](/pgcowboy/usage/comments/) to reconcile the versions.
 :::
-
-## Layout
-
-Columns are sized to their widest value and line up across rows, so several matches read as a table. A column too wide to show in full — `${comment}` usually is — takes whatever space is left over instead, and the popup widens to fit. Shortened values show in full on hover.
 
 :::tip
 Remove every row to show the role name only. That is a saved choice, not replaced by the default the next time the app starts.
