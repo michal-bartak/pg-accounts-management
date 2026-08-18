@@ -19,7 +19,7 @@ Thanks to **templating** of SQL queries, you can extend the basic operations, an
 ![pgCowboy — Alter role](../../assets/usage/operations-overview-dark.png)
 
 </div>
-<figcaption>Altering a role across Production and UAT from one form</figcaption>
+<figcaption>Altering a role across clusters</figcaption>
 </figure>
 
 ## Main Features

@@ -18,7 +18,7 @@ The result is currently seen in [Role search](/pgcowboy/usage/find-role/) dialog
 ![Settings → Role Details](../../../assets/configuration/settings-role-details-dark.png)
 
 </div>
-<figcaption>Settings → Role Details — one row per column, each a label and a template</figcaption>
+<figcaption>Role Details settings</figcaption>
 </figure>
 
 ## The column list

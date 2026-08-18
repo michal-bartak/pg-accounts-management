@@ -14,7 +14,7 @@ description: Appearance, concurrency, staged creation, and the update check
 ![Settings → General](../../../assets/configuration/settings-general-dark.png)
 
 </div>
-<figcaption>Settings → General — Appearance, Max concurrency, and both checkboxes</figcaption>
+<figcaption>General settings</figcaption>
 </figure>
 
 ## Appearance

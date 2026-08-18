@@ -16,7 +16,7 @@ The password row sits with the rest of the form and is off until you enable it.
 ![Password row](../../../assets/usage/password-row-dark.png)
 
 </div>
-<figcaption>Password row — Set password checkbox, masked field with Copy and reveal, Generate button</figcaption>
+<figcaption>Password row</figcaption>
 </figure>
 
 ## Set password

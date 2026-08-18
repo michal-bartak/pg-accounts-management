@@ -16,7 +16,7 @@ In PostgreSQL a role comment lives as plain text. But we can store an JSON forma
 ![Settings → Comments](../../../assets/configuration/settings-comments-dark.png)
 
 </div>
-<figcaption>Settings → Comments — the field list with drag handles, Add field, and Preferred comment view</figcaption>
+<figcaption>Comment fields settings</figcaption>
 </figure>
 
 ## The field list

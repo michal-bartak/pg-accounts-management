@@ -22,7 +22,7 @@ The comment editor sits under the login name, with a **Fields ↔ Raw** toggle.
 ![Comment editor, Fields view](../../../assets/usage/comment-fields-view-dark.png)
 
 </div>
-<figcaption>Comment editor, Fields view — configured fields plus an extra key labelled by its raw name</figcaption>
+<figcaption>Comment editor, Fields view</figcaption>
 </figure>
 
 - **Raw** — shows the comment as editable free text.
@@ -76,7 +76,7 @@ replaced by a **Comments differ across clusters** button. Reconciliation moves t
 ![Comments dialog](../../../assets/usage/comments-dialog-dark.png)
 
 </div>
-<figcaption>Comments dialog — one editor per distinct comment, grouped by content</figcaption>
+<figcaption>Comments dialog</figcaption>
 </figure>
 
 - Clusters are grouped by comment content. JSON is compared **by value**, so formatting and key order don't count as a difference.

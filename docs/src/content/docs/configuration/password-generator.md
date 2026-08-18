@@ -16,7 +16,7 @@ Controls the random password produced by **Generate** on the role form's passwor
 ![Settings → Password generator](../../../assets/configuration/settings-pwgen-dark.png)
 
 </div>
-<figcaption>Settings → Password generator — character classes, look-alike exclusion, length</figcaption>
+<figcaption>Password generator settings</figcaption>
 </figure>
 
 | Option | Notes |

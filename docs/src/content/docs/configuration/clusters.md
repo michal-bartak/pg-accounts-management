@@ -18,7 +18,7 @@ Editing of clusters and cluster groups is staged — press **Save** to confirm, 
 ![Clusters tab](../../../assets/configuration/clusters-tab-dark.png)
 
 </div>
-<figcaption>Clusters tab — cluster list, Status column, and toolbar</figcaption>
+<figcaption>Clusters tab</figcaption>
 </figure>
 
 Each cluster's row has
@@ -86,7 +86,7 @@ Groups are edited from the **Cluster groups** button in the toolbar. The dialog 
 ![Cluster groups dialog](../../../assets/configuration/cluster-groups-dark.png)
 
 </div>
-<figcaption>Cluster groups dialog — every group, its confirmation flag, and row actions</figcaption>
+<figcaption>Cluster groups dialog</figcaption>
 </figure>
 
 **Add group** and the row's edit button open the same small form. **Apply** stages the change; like everything else on the Clusters tab it is only written when you press **Save** in the footer.
@@ -102,7 +102,7 @@ Groups are edited from the **Cluster groups** button in the toolbar. The dialog 
 ![Group editor](../../../assets/configuration/cluster-groups-editor-dark.png)
 
 </div>
-<figcaption>Group editor — label, colour, and the confirmation flag</figcaption>
+<figcaption>Group editor</figcaption>
 </figure>
 
 | Field | Notes |

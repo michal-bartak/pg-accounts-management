@@ -16,7 +16,7 @@ description: Role-level GUCs, which can hold a different value per cluster
 ![Settings section](../../../assets/usage/settings-rows-dark.png)
 
 </div>
-<figcaption>Settings section — one row per name/value pair, with scope labels</figcaption>
+<figcaption>Role settings section</figcaption>
 </figure>
 
 ## Name and value
@@ -32,12 +32,7 @@ A setting can hold a different value on different clusters, so rows are keyed by
 
 ## Adding a setting
 
-**Add setting…** takes a parameter **name** and a **value**, plus the clusters to apply them to.
-
-</div>
-<figcaption>When creating a new role, the popup opens with all clusters selected</figcaption>
-</figure>
-
+**Add setting…** takes a parameter **name** and a **value**, plus the clusters to apply them to. When creating a new role, the popup opens with all clusters selected.
 
 <figure class="shot">
 <div class="light-only">
@@ -50,7 +45,7 @@ A setting can hold a different value on different clusters, so rows are keyed by
 ![Add setting dialog](../../../assets/usage/add-setting-dark.png)
 
 </div>
-<figcaption>Add setting dialog — name, value, and cluster selection</figcaption>
+<figcaption>Add/alter role setting dialog</figcaption>
 </figure>
 
 On save all perfoemed changes translates into `Set config` and `Reset config` operations.

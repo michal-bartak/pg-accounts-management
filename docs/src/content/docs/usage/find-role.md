@@ -26,7 +26,7 @@ The result initially contains the rolename only. It can be extended with the rol
 ![Find role dialog](../../../assets/usage/find-role-dark.png)
 
 </div>
-<figcaption>Find role dialog — search box and results grouped by login name with scope labels</figcaption>
+<figcaption>Find role dialog</figcaption>
 </figure>
 
 ## What is searched
@@ -58,7 +58,7 @@ Picking a result aggregates the data from all clusters into **one form**. The [s
 ![Alter role form](../../../assets/usage/operations-overview-dark.png)
 
 </div>
-<figcaption>Alter role — Present on, comment, role parents and attributes in one form</figcaption>
+<figcaption>Alter role form</figcaption>
 </figure>
 
 The clusters selected at search time become the role's working scope.

@@ -25,7 +25,7 @@ Save is active only while there are unsaved changes.
 ![Settings tab](../../../assets/configuration/settings-overview-dark.png)
 
 </div>
-<figcaption>Settings tab — all sections, with the Discard / Save footer</figcaption>
+<figcaption>Settings tab</figcaption>
 </figure>
 
 ## Sections

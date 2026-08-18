@@ -22,7 +22,7 @@ The defaults are plain PostgreSQL and cover everything out of the box. Edit a te
 ![Settings → DB command templates and Introspection queries, side by side](../../../assets/configuration/settings-templates-dark.png)
 
 </div>
-<figcaption>DB command templates and Introspection queries, side by side</figcaption>
+<figcaption>DB command templates and Introspection queries</figcaption>
 </figure>
 
 Clicking a command opens its editor: execution mode, the template text, clickable placeholder chips, and a **Default** button that restores the built-in version. The information button in the title bar opens the full syntax reference.
@@ -38,7 +38,7 @@ Clicking a command opens its editor: execution mode, the template text, clickabl
 ![Template editor](../../../assets/configuration/template-editor-dark.png)
 
 </div>
-<figcaption>Template editor — execution mode, template text, placeholder chips, Default button</figcaption>
+<figcaption>Template editor</figcaption>
 </figure>
 
 ## Operations and their defaults

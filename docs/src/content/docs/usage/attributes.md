@@ -16,7 +16,7 @@ description: The role flags, enabled or disabled per cluster
 ![Attributes section](../../../assets/usage/attributes-rows-dark.png)
 
 </div>
-<figcaption>Attributes section — all seven flags with their scope labels</figcaption>
+<figcaption>Attributes section</figcaption>
 </figure>
 
 It supports following attributes:
@@ -44,15 +44,15 @@ Click on Edit button opens the popup with selection of clusters
 <figure class="shot">
 <div class="light-only">
 
-![Attributes section](../../../assets/usage/set-attribute-light.png)
+![Per-cluster attribute editor](../../../assets/usage/set-attribute-light.png)
 
 </div>
 <div class="dark-only">
 
-![Attributes section](../../../assets/usage/set-attribute-dark.png)
+![Per-cluster attribute editor](../../../assets/usage/set-attribute-dark.png)
 
 </div>
-<figcaption>Attributes section — all seven flags with their scope labels</figcaption>
+<figcaption>Per-cluster attribute editor</figcaption>
 </figure>
 
 Pending changes are visible before you save, through the shared [scope-label convention](/pgcowboy/usage/#scope-labels): a pending grant is prefixed with `+`, a pending revoke turns red and struck through.

@@ -16,7 +16,7 @@ description: Role parents, granted and revoked per cluster
 ![Role Parents section](../../../assets/usage/privileges-rows-dark.png)
 
 </div>
-<figcaption>Role Parents section — rows with scope labels and the three row actions</figcaption>
+<figcaption>Role Parents section</figcaption>
 </figure>
 
 ## Editing the parent
@@ -42,7 +42,7 @@ The editor provides list of clusters, showing the desired end state — tick to 
 ![Per-cluster editor](../../../assets/usage/privilege-scope-editor-dark.png)
 
 </div>
-<figcaption>Per-cluster editor — checkboxes for the desired end state</figcaption>
+<figcaption>Per-cluster parent editor</figcaption>
 </figure>
 
 Pending changes are visible before you save, through the shared [scope-label convention](/pgcowboy/usage/#scope-labels): a pending grant is prefixed with **`+`**, a pending revoke turns **red and struck through**.
@@ -69,7 +69,7 @@ Any role can be a parent, and several can be added at once.
 ![Assign parents dialog](../../../assets/usage/add-privilege-dark.png)
 
 </div>
-<figcaption>Assign parents dialog — typed names, parent chips, and cluster selection</figcaption>
+<figcaption>Assign parents dialog</figcaption>
 </figure>
 
 On **Save changes**, the application synthesises grant and revoke commands based on changes performed in the editor.

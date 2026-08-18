@@ -16,7 +16,7 @@ A short list of role names you grant often. They appear as **toggle chips** in t
 ![Settings → Preconfigured role parents](../../../assets/configuration/settings-parent-roles-dark.png)
 
 </div>
-<figcaption>Settings → Preconfigured role parents — list with drag handles and Add parent</figcaption>
+<figcaption>Preconfigured role parents settings</figcaption>
 </figure>
 
 - Each entry is a bare role identifier. Invalid names are rejected on save, duplicates are dropped.

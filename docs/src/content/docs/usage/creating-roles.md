@@ -17,7 +17,7 @@ selected in **Target selection**.
 ![Create role](../../../assets/usage/create-role-form-dark.png)
 
 </div>
-<figcaption>Create role — login name, comment editor, role parents, attributes, settings</figcaption>
+<figcaption>Create role form</figcaption>
 </figure>
 
 It is the same form as Alter, over an empty baseline: every edit is a grant, an enable, or a
@@ -71,7 +71,7 @@ If a cluster fails, then:
 ![Command log after a run where one cluster failed and the others succeeded](../../../assets/usage/create-role-partial-failure-dark.png)
 
 </div>
-<figcaption>Command log after a run where one cluster failed and the others succeeded</figcaption>
+<figcaption>Command log after a partial failure</figcaption>
 </figure>
 
 What happens next depends on how much got through:

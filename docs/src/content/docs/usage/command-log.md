@@ -16,7 +16,7 @@ Results don't appear in the form. They go to the **status chip** in the footer, 
 ![Footer status chip](../../../assets/usage/run-status-chip-dark.png)
 
 </div>
-<figcaption>Footer status chip — running, then OK or Error</figcaption>
+<figcaption>Footer status chip</figcaption>
 </figure>
 
 The chip is hidden until something runs, then shows `running… (done/total)` and settles on **OK** or **Error**. It updates live, one step per cluster.
@@ -40,7 +40,7 @@ Click the chip to open the results panel. It fills in while the run is still goi
 ![Results panel](../../../assets/usage/run-status-dialog-dark.png)
 
 </div>
-<figcaption>Results panel — one row per cluster: Cluster, Category, Status, Duration, Message</figcaption>
+<figcaption>Results panel</figcaption>
 </figure>
 
 | Column | Notes |
@@ -72,7 +72,7 @@ The view button opens the statements the app sent to that cluster, in order.
 ![Executed SQL for one cluster, with its own Copy button](../../../assets/usage/run-queries-dialog-dark.png)
 
 </div>
-<figcaption>Executed SQL for one cluster, with its own Copy button</figcaption>
+<figcaption>Executed SQL for one cluster</figcaption>
 </figure>
 
 - The SQL is the real thing, after placeholder substitution — including a failing statement's, which is recorded before the error.

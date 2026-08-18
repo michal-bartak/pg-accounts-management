@@ -16,7 +16,7 @@ The **Present on** block, just above the login name, shows which clusters the ro
 ![Present on](../../../assets/usage/present-on-dark.png)
 
 </div>
-<figcaption>Present on — existing clusters, a pending addition prefixed with +, a pending removal in red strikethrough</figcaption>
+<figcaption>Present on section</figcaption>
 </figure>
 
 
@@ -36,7 +36,7 @@ The <svg class="doc-ic" width="1.05em" height="1.05em" viewBox="0 0 24 24" fill=
 ![Presence picker](../../../assets/usage/presence-editor-dark.png)
 
 </div>
-<figcaption>Presence picker — the clusters in scope, with the role's current presence ticked</figcaption>
+<figcaption>Presence picker</figcaption>
 </figure>
 
 **Dropping** a cluster records a `DROP ROLE` for that cluster alone, pre-flighted by the [dependency check](#dependency-check-before-a-drop) when you Save.
@@ -70,7 +70,7 @@ Before a `DROP ROLE` goes out — whether from **Remove role** or from a cluster
 ![Dependency check before removing a role](../../../assets/usage/remove-role-confirm-dark.png)
 
 </div>
-<figcaption>Dependency check — per cluster, what depends on the role and whether to drop it there</figcaption>
+<figcaption>Dependency check</figcaption>
 </figure>
 
 Clusters are grouped into three sections, in this order — and inside each by group, then alias:

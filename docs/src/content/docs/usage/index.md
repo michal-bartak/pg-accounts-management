@@ -17,7 +17,7 @@ targets; the right side is one form for the role.
 ![Operations tab](../../../assets/usage/operations-overview-dark.png)
 
 </div>
-<figcaption>Operations tab — Target selection on the left, the role form on the right</figcaption>
+<figcaption>Operations tab</figcaption>
 </figure>
 
 ## Everything goes to the selected targets
@@ -36,7 +36,7 @@ removing — applies to **exactly** the clusters selected in the sidebar.
 ![Target selection](../../../assets/usage/target-selection-dark.png)
 
 </div>
-<figcaption>Target selection — group checkboxes and the expanded "Or pick clusters" list</figcaption>
+<figcaption>Target selection</figcaption>
 </figure>
 
 - Tick whole **groups**, or expand **Or pick clusters** to choose individual clusters.
@@ -65,7 +65,7 @@ search results — the app uses the same labels, coloured by group:
 ![Scope labels](../../../assets/usage/scope-labels-dark.png)
 
 </div>
-<figcaption>Scope labels — an outlined group label next to filled per-cluster labels</figcaption>
+<figcaption>Scope labels</figcaption>
 </figure>
 
 - **Outlined label** (bordered, transparent) — carries the **cluster group name**. It is the visual cue that *every* cluster of that group matches — for example, a parent role is assigned on all clusters of the group.
