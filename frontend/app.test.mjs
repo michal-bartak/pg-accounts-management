@@ -132,18 +132,66 @@ test('editorFromComment: non-string (number) stays read-only and shown as JSON',
   assert.equal(r.value, '5');
 });
 
-test('editorFromComment: mode is Raw for plain text, configured pref for empty', () => {
+test('editorFromComment: the configured preference decides the mode, except for plain text', () => {
   const r = evalJSON(`(() => {
     ${SETUP_STATE}
     const plain = editorFromComment('just text', false).mode;
     const empty = editorFromComment('', false).mode;
+    const json = editorFromComment('{"full_name":"A"}', false).mode;
     state.ui.commentDefaultView = 'raw';
     const emptyRaw = editorFromComment('', false).mode;
-    return { plain, empty, emptyRaw };
+    // The point of the change: a JSON comment no longer overrides a Raw preference.
+    const jsonRaw = editorFromComment('{"full_name":"A"}', false).mode;
+    const plainRaw = editorFromComment('just text', false).mode;
+    return { plain, empty, json, emptyRaw, jsonRaw, plainRaw };
   })()`);
   assert.equal(r.plain, 'raw');
   assert.equal(r.empty, 'fields');
+  assert.equal(r.json, 'fields');
   assert.equal(r.emptyRaw, 'raw');
+  assert.equal(r.jsonRaw, 'raw');
+  assert.equal(r.plainRaw, 'raw');
+});
+
+test('commentFieldInputsHtml: says so rather than rendering an empty box', () => {
+  const r = evalJSON(`(() => {
+    state = { ui:{}, commentFields: [] };
+    const e = editorFromComment('', false);
+    const empty = commentFieldInputsHtml(e, null, false);
+    state.commentFields = [{key:'full_name',label:'Full name'}];
+    const withField = commentFieldInputsHtml(editorFromComment('', false), null, false);
+    return { empty, hasInput: withField.includes('data-cf-key="full_name"') };
+  })()`);
+  assert.match(r.empty, /rce-empty/);
+  assert.match(r.empty, /No comment fields configured/);
+  assert.equal(r.hasInput, true);
+});
+
+test('commentFields: no built-in fallback, so an emptied list stays empty', () => {
+  const r = evalJSON(`(() => {
+    state = { ui:{}, commentFields: [] };
+    const emptied = commentFields().length;
+    state = { ui:{} };
+    const absent = commentFields().length;
+    return { emptied, absent };
+  })()`);
+  assert.equal(r.emptied, 0);
+  assert.equal(r.absent, 0);
+});
+
+test('preferredCommentView: raw unless fields is explicitly configured', () => {
+  const r = evalJSON(`(() => {
+    state = { ui:{} };
+    const unset = preferredCommentView();
+    state.ui.commentDefaultView = 'fields';
+    const fields = preferredCommentView();
+    state.ui.commentDefaultView = 'raw';
+    const raw = preferredCommentView();
+    return { unset, fields, raw };
+  })()`);
+  assert.equal(r.unset, 'raw');
+  assert.equal(r.fields, 'fields');
+  assert.equal(r.raw, 'raw');
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -1207,6 +1255,38 @@ test('search-columns dirty check matches what the backend stores', () => {
   assert.equal(r.edited, true);
   assert.equal(r.cleared, true); // removing every column is a real change
   assert.equal(r.blankRow, false);
+});
+
+test('clusters dirty check: an empty saved list arrives as null and is not a change', () => {
+  // Go marshals an empty []Cluster as JSON null, so the saved half and the freshly seeded draft
+  // must still compare equal — otherwise a fresh install starts out "dirty".
+  const r = evalJSON(`(() => {
+    state = { clusters: null, categories: [{id:'uat', label:'UAT', color:'#6eb5ff'}] };
+    resetClusterDrafts();
+    const clean = clustersDirty();
+    clustersDraft.push({ id:'tmp_1', alias:'a', host:'h', port:5432, database:'postgres', category:'uat', sslmode:'prefer' });
+    return { clean, afterAdd: clustersDirty() };
+  })()`);
+  assert.equal(r.clean, false);
+  assert.equal(r.afterAdd, true);
+});
+
+test('renderClustersTable reports the footer state even with no clusters', () => {
+  // The empty-draft early return used to skip refreshClustersDirty(), leaving Save/Discard in
+  // their initial enabled state on a fresh install.
+  const r = evalJSON(`(() => {
+    state = { clusters: [], categories: [{id:'uat', label:'UAT', color:'#6eb5ff'}] };
+    resetClusterDrafts();
+    const buttons = {};
+    const stub = (id) => (buttons[id] = buttons[id] || { id, disabled: null, classList:{ add(){}, remove(){}, toggle(){} } });
+    const realGet = document.getElementById, realQuery = document.querySelector;
+    document.getElementById = (id) => (id.endsWith('-clusters') ? stub(id) : realGet(id));
+    document.querySelector = () => ({ innerHTML: '', querySelectorAll: () => [], appendChild(){} });
+    try { renderClustersTable(); } finally { document.getElementById = realGet; document.querySelector = realQuery; }
+    return { save: buttons['btn-save-clusters'].disabled, discard: buttons['btn-discard-clusters'].disabled };
+  })()`);
+  assert.equal(r.save, true, 'Save must be inert when nothing has been edited');
+  assert.equal(r.discard, true, 'Discard must be inert when nothing has been edited');
 });
 
 test('stripClusterPrefix: the alias is not repeated in a table that has a Cluster column', () => {

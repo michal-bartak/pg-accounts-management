@@ -98,7 +98,7 @@
               <th>Host</th>
               <th>Port</th>
               <th>Database</th>
-              <th>Category</th>
+              <th>Group</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
@@ -108,8 +108,8 @@
       </div>
       <div class="clusters-footer">
         <p id="clusters-error" class="form-error hidden"></p>
-        <button type="button" id="btn-discard-clusters">Discard</button>
-        <button type="button" id="btn-save-clusters" class="primary">Save</button>
+        <button type="button" id="btn-discard-clusters" disabled>Discard</button>
+        <button type="button" id="btn-save-clusters" class="primary" disabled>Save</button>
       </div>
     </section>
 
@@ -135,9 +135,9 @@
             <div class="settings-check-line">
               <label class="settings-check">
                 <input type="checkbox" id="ui-stage-create" />
-                <span>Stage role creation when an added target doesn't yet have the role</span>
+                <span>Stage role creation for added targets</span>
               </label>
-              <button type="button" class="q-hint" data-hint="In Alter role, when you add a target where the role doesn't exist yet: this option enabled stages the role creation on that cluster automatically; Otherwise it just brings the cluster into view — you can still add the role manually in the `Present on` section.">?</button>
+              <button type="button" class="q-hint" data-hint="In Alter role, when you add a target where the role doesn't exist yet: on, its creation is staged for that cluster automatically; off, the cluster is only brought into view — you can still add the role yourself from the Present on section.">?</button>
             </div>
           </div>
           <div class="settings-row settings-row-gap">
@@ -194,16 +194,16 @@
           <span class="section-label">Comments</span>
           <div class="settings-row settings-row-top">
             <div class="settings-field">
-              <span class="settings-field-label">Comment fields <button type="button" class="q-hint" data-hint="JSON keys shown as labeled inputs when a role comment holds JSON (Create / Alter role). Drag the handle to reorder; keys not listed here are still shown. Plain-text comments use the Raw view. Each key is also available as a ${{key}} placeholder in the create_role and set_comment call templates.">?</button></span>
-              <div id="comment-fields-editor" class="list-editor"></div>
-              <button type="button" class="list-add" id="btn-add-comment-field">Add field…</button>
-            </div>
-            <div class="settings-field">
-              <span class="settings-field-label">Preferred comment view <button type="button" class="q-hint" data-hint="Default editor mode for a new/empty comment (Create role, or a role with no comment). Comments that already have content auto-detect.">?</button></span>
+              <span class="settings-field-label">Preferred comment view <button type="button" class="q-hint" data-hint="Which mode the comment editor opens in — in the role form and in the Comments dialog alike. A preference, not a rule: a plain-text comment always opens in Raw, since Fields cannot represent it.">?</button></span>
               <div class="segmented" id="comment-view-pref" role="group" aria-label="Preferred comment view">
                 <button type="button" class="seg-btn" data-pref="fields">Fields</button>
                 <button type="button" class="seg-btn" data-pref="raw">Raw</button>
               </div>
+            </div>
+            <div class="settings-field">
+              <span class="settings-field-label">Comment fields <button type="button" class="q-hint" data-hint="JSON keys shown as labeled inputs when a role comment holds JSON (Create / Alter role). Empty by default — add the keys your site uses. Drag the handle to reorder; keys not listed here are still shown. Plain-text comments use the Raw view. Each key is also available as a ${{key}} placeholder in the create_role and set_comment call templates.">?</button></span>
+              <div id="comment-fields-editor" class="list-editor"></div>
+              <button type="button" class="list-add" id="btn-add-comment-field">Add field…</button>
             </div>
           </div>
         </div>
@@ -250,8 +250,8 @@
 
       <div class="settings-footer">
         <p id="settings-error" class="form-error hidden"></p>
-        <button type="button" id="btn-discard-settings">Discard</button>
-        <button type="button" id="btn-save-settings" class="primary">Save</button>
+        <button type="button" id="btn-discard-settings" disabled>Discard</button>
+        <button type="button" id="btn-save-settings" class="primary" disabled>Save</button>
       </div>
     </section>
   </main>
@@ -343,7 +343,7 @@
       <div class="table-wrap">
         <table id="run-status-table">
           <thead>
-            <tr><th>Cluster</th><th>Category</th><th>Status</th><th>Duration</th><th>Message</th><th></th></tr>
+            <tr><th>Cluster</th><th>Group</th><th>Status</th><th>Duration</th><th>Message</th><th></th></tr>
           </thead>
           <tbody></tbody>
         </table>
@@ -423,7 +423,7 @@
         </label>
       </div>
       <hr class="form-sep" />
-      <label>Category <select name="category" required></select></label>
+      <label>Group <select name="category" required></select></label>
       <menu>
         <button type="button" id="btn-test-cluster">Test connection</button>
         <button type="button" value="cancel">Cancel</button>

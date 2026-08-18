@@ -146,13 +146,14 @@ batch:
   max_concurrency: 5
 
 # ui.theme: light | dark | system (follow OS appearance)
-# ui.comment_default_view: fields | raw — preferred comment editor mode for a NEW/empty
-#   comment (Create role, or a role with no comment). Content-bearing comments auto-detect.
+# ui.comment_default_view: fields | raw — the mode the comment editor opens in, in the role
+#   form and in the Comments dialog alike. A preference, not a rule: a plain-text comment has
+#   no fields to show and always opens in raw. Defaults to raw.
 # ui.password_gen: role-form random password generator. length is clamped to [6,128] (default
 #   10); at least one character class stays enabled (lowercase forced on if all are off).
 ui:
   theme: system
-  comment_default_view: fields
+  comment_default_view: raw
   password_gen:
     length: 10
     lowercase: true
@@ -170,8 +171,9 @@ parent_roles:
 
 # comment_fields: JSON keys surfaced as labeled inputs in the role form when a role's
 # COMMENT holds JSON. Ordered; keys not listed here are still shown generically. Keys are
-# bare identifiers. Defaults to full_name/e_mail when omitted. Plain-text comments are
-# edited via the Raw view regardless of this list.
+# bare identifiers. Empty by default — which keys a comment carries is a site convention —
+# and never refilled on load, so removing every field sticks. Plain-text comments are edited
+# via the Raw view regardless of this list.
 comment_fields:
   - key: full_name
     label: Full name
@@ -188,8 +190,8 @@ comment_fields:
 # An unknown key, a JSON null and a non-JSON comment all resolve to empty,
 # and the result is whitespace-collapsed, so "${{first_name}} ${{last_name}}" yields "John" when
 # there is no last name. Non-string values render typed (42, true, ["a"]).
-# Omit the key to get the default single "Full name" column; an explicit empty list
+# Omit the key to get the default single "Comment" column; an explicit empty list
 # (search_columns: []) shows the role name only.
 search_columns:
-  - label: Full name
-    template: ${{full_name}}
+  - label: Comment
+    template: ${comment}

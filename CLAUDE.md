@@ -135,9 +135,15 @@ into prose, it goes stale.
   The role form's inline comment editor (`#role-comment-editor`) has a **Fields ↔ Raw**
   toggle: *Fields* edits string values only (never adds/removes keys); *Raw* edits the whole
   comment as free text. Which JSON keys get friendly labels is a Settings-managed list
-  **`Config.CommentFields`** (YAML `comment_fields`, ordered `{key,label}`), defaulting to
-  `full_name→Full name`, `e_mail→Email`, saved via `SaveCommentFields`
-  (`Store.UpdateCommentFields` validates identifier keys, dedupes, defaults blank labels).
+  **`Config.CommentFields`** (YAML `comment_fields`, ordered `{key,label}`), **empty by default**
+  and saved via `SaveCommentFields` (`Store.UpdateCommentFields` validates identifier keys,
+  dedupes, defaults blank labels). Which keys a comment carries is a site convention, so the app
+  ships none and **nothing refills the list** — no `defaultCommentFields()`, no `len == 0` gate in
+  `readMainFile`, and `commentFields()` in the frontend has **no fallback** either (it now mirrors
+  `searchColumns()`; there is no `DEFAULT_COMMENT_FIELDS`). That is the whole fix for "an emptied
+  field list came back on restart" — don't reintroduce a default at any of those four layers.
+  With no fields configured and none in the comment, `commentFieldInputsHtml` renders a muted
+  `.rce-empty` one-liner instead of a blank box.
   Configured fields always render; **every other key** in the comment also renders (labeled by
   raw key) — string values are editable, non-string values (number/bool/array/object) render
   **read-only** (shown as JSON, edited via Raw; `e.readonly`) so their type is preserved via
@@ -147,8 +153,16 @@ into prose, it goes stale.
   stores null); a key that was never in the comment stays absent, so an all-blank/empty comment
   still assembles to `''` (load stays idempotent — opening a role never marks it dirty).
   `editorFromComment`
-  builds the model (Fields for JSON, Raw for non-JSON content, and for an **empty** comment
-  the configured **`ui.comment_default_view`** — `fields`|`raw`, `preferredCommentView()`);
+  builds the model, and **the configured `ui.comment_default_view` decides the mode** —
+  `fields`|`raw`, `preferredCommentView()`, **defaulting to `raw`**. It is the *only* place the
+  mode is chosen, so the role form, the Comments dialog's per-version boxes, *Use in all clusters*
+  and `commitCommentsDialog`'s fold-back all agree for free. The one override is structural: a
+  **plain-text** comment has no fields, so it always lands in Raw (same reason `commentFieldsBlocked`
+  disables the toggle). It deliberately does **not** auto-detect JSON into Fields any more — picking
+  Raw and then being shown Fields read as a bug. Raw mode assembles `e.raw.trim()`, which is the
+  loaded comment verbatim, and the dirty check compares `canonicalComment`s, so load idempotence
+  holds (it in fact *improves*: fields mode rewrites `{"k":""}`→`{"k":null}` and trims values on
+  open);
   `assembleComment`/`assembleCommentFrom` serialize it (empty value → null for existing keys, else
   drops the key; preserves
   unknown keys); `parseCommentObject` is the shared reader; `switchEditorMode` round-trips
@@ -192,11 +206,14 @@ into prose, it goes stale.
   rather than silently deleted from the user's config. Comment KEYS stay unvalidated beyond that —
   they are arbitrary JSON keys (`e-mail`) and the output is HTML-escaped.
   `search_columns` carries **no `omitempty`**: an
-  absent key (older config) gets the default `Full name = ${{full_name}}`, while an explicit
+  absent key (older config) gets the default `Comment = ${comment}` — the whole comment verbatim,
+  which says something useful whatever the comment holds, where a `${{key}}` default would assume a
+  JSON convention the site may not have — while an explicit
   `search_columns: []` means "rolename only" and must survive a restart — hence `Load` keys the
   default off `== nil` and `sanitizeSearchColumns` preserves nil-ness. The frontend `searchColumns()`
-  therefore has **no default fallback** (unlike `commentFields()`), or an explicit empty list would
-  resurrect the default. `searchCellValues` returns one **string** per column — the first non-empty
+  therefore has **no default fallback**, or an explicit empty list would
+  resurrect the default (`commentFields()` is now the same shape, but for the simpler reason that it
+  has no default at all). `searchCellValues` returns one **string** per column — the first non-empty
   value in `byGroupThenAlias` order (results arrive in completion order). Clusters disagreeing about a
   value is deliberately **not** flagged in a search row (a `≠` marker was tried and read as an
   unexplained artifact): the popup is for finding a role, and reconciliation is reported once the role
@@ -534,6 +551,30 @@ container sizes its glyph in rem, so a hand-written SVG with `width="14"` is the
 out of step. Two rem values are hand-synced and must not drift:
 `th, td { padding: .55rem .75rem }` with the `1.5rem` in `depsColgroup`, and
 `.alter-result-head`'s `calc(0.7rem + 1px)` with the search-result row's border+padding.
+
+**Vertical rhythm inside a Settings group is `--settings-row-gap`**, applied two ways: as
+`.settings-row-gap`'s `margin-top` between sibling rows, and as `.pwgen-col`'s flex `gap` — the
+password-generator classes stack two lines inside ONE `.settings-row`, so no margin falls between
+them and the column has to supply the same value itself (it used to be `0.5rem`, which left
+*Uppercase*/*Symbols* visibly tighter than every other stacked check line).
+
+**The Settings list-row grid is tokenised** (`--le-gap`, `--le-primary-w`, `--le-grip-w`) because
+one position is derived from it rather than hand-synced: in the **Comments** row *Preferred comment
+view* takes the LEFT slot (narrow and fixed) so the wide **Comment fields** editor beside it starts
+at a stable x whichever keys are configured — and
+`.settings-field:has(> #comment-view-pref)`'s `calc(grip + primary + 2·gap − 1rem)` puts that x on
+the **template** column of the Role Details editor one section below. It is written as a
+relationship so changing `--le-primary-w` moves both together; only `--le-grip-w` is nominal (the
+grip is sized by its `⠿` glyph, so a different platform font shifts the alignment by a pixel).
+`.settings-field:has(> .list-editor)` carries `--list-editor-w` for the same class of reason — the
+editor's own `100%` resolves against the field, so an EMPTY list would otherwise collapse the field
+to its "Add …" button and drag the control beside it left. An empty editor is also `display:none`d
+with its button's clearance cancelled (`.list-editor:empty` / `.list-editor:empty + .list-add`), so
+every **Add …** button sits exactly where the editor's FIRST ROW would be instead of clearing a box
+with no content — under *Comment fields* that is the line Fields/Raw starts on (it sat 7px lower,
+because a gapped `.settings-field` column charged for the empty item twice), and under
+*Preconfigured role parents* / *Role Details* one `--settings-row-gap` below the section label.
+Deliberately NOT scoped to `.settings-field`: the alignment is wanted in all three.
 
 Three density tokens carry the parts a plain `rem` cannot:
 **`--hairline: 1.15px`** for every border (a flat `1px` is 1.75 device px at 175% display scaling,

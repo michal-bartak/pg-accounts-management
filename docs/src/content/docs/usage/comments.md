@@ -9,7 +9,7 @@ Storing JSON in the comment lets you keep additional role information — name, 
 
 ## The inline editor
 
-The comment editor sits under the login name, with a **Fields ↔ Raw** toggle.
+The comment editor sits under the login name, with a **Fields ↔ Raw** toggle. It opens in whichever mode [Preferred comment view](/pgcowboy/configuration/comment-fields/) is set to — **Raw** unless you change it — and the toggle overrides that for the role you are looking at.
 
 <figure class="shot">
 <div class="light-only">
@@ -26,7 +26,7 @@ The comment editor sits under the login name, with a **Fields ↔ Raw** toggle.
 </figure>
 
 - **Raw** — shows the comment as editable free text.
-- **Fields** — breaks the comment into one labelled input per JSON key. The friendly labels come from [Comment fields](/pgcowboy/configuration/comment-fields/), and any other key in the comment still appears, labelled by its raw key.
+- **Fields** — breaks the comment into one labelled input per JSON key. The friendly labels come from [Comment fields](/pgcowboy/configuration/comment-fields/), and any other key in the comment still appears, labelled by its raw key. With no fields configured and none in the comment, it says so instead of showing an empty box.
 
 :::tip
 You can switch between the two modes at any time, editing the data in either one.
@@ -57,7 +57,8 @@ Details worth knowing:
 - Clearing a field that already existed stores JSON `null`; a key that was never there stays
   absent. An entirely blank comment saves as empty.
 - The **Fields** toggle is disabled when the comment is non-empty plain text — Fields can't
-  represent it, and switching would drop it. Edit that comment in Raw.
+  represent it, and switching would drop it. Edit that comment in Raw. This is also why a
+  plain-text comment ignores a **Fields** preference and opens in Raw anyway.
 - A non-JSON comment is saved verbatim as plain text.
 
 ## Comment discrepancy across clusters
@@ -80,7 +81,7 @@ replaced by a **Comments differ across clusters** button. Reconciliation moves t
 </figure>
 
 - Clusters are grouped by comment content. JSON is compared **by value**, so formatting and key order don't count as a difference.
-- Each version gets its own Fields/Raw editor.
+- Each version gets its own Fields/Raw editor, opening in the same preferred mode as the inline one.
 - **Use in all clusters** buttons broadcasts one version to every other version box.
 - **OK** stages your edits; **Cancel** discards them.
 - If the versions end up identical, OK folds them back into the inline editor and the banner

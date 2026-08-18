@@ -79,27 +79,22 @@ func DefaultConfig() model.Config {
 			RoleParents:      model.DBRead{Query: defaultRoleParentsQuery},
 			RoleDependencies: model.DBRead{Query: defaultRoleDependenciesQuery},
 		},
-		Batch:         model.BatchSettings{MaxConcurrency: 5},
-		UI:            model.UISettings{Theme: model.ThemeSystem, CommentDefaultView: model.CommentViewFields, PasswordGen: model.DefaultPasswordGen()},
-		CommentFields: defaultCommentFields(),
+		Batch: model.BatchSettings{MaxConcurrency: 5},
+		UI:    model.UISettings{Theme: model.ThemeSystem, CommentDefaultView: model.CommentViewRaw, PasswordGen: model.DefaultPasswordGen()},
+		// CommentFields is deliberately empty: which JSON keys a role comment carries is a
+		// site convention, not something the app can guess, and a plain-text comment needs
+		// none at all. Nothing substitutes a default for it, so an emptied list stays empty.
 		SearchColumns: defaultSearchColumns(),
 	}
 }
 
-// defaultCommentFields is the built-in comment-key mapping (the company convention),
-// used when config omits comment_fields.
-func defaultCommentFields() []model.CommentField {
-	return []model.CommentField{
-		{Key: "full_name", Label: "Full name"},
-		{Key: "e_mail", Label: "Email"},
-	}
-}
-
 // defaultSearchColumns is the built-in Find-role result layout, used when config omits
-// search_columns. Mirrors what the app showed before the columns became configurable.
+// search_columns. The whole comment, verbatim: it says something useful whatever the comment
+// holds — plain text included — where a ${{key}} column needs a JSON convention the user may
+// not have.
 func defaultSearchColumns() []model.SearchColumn {
 	return []model.SearchColumn{
-		{Label: "Full name", Template: "${{full_name}}"},
+		{Label: "Comment", Template: "${comment}"},
 	}
 }
 
@@ -191,10 +186,9 @@ func readMainFile(path string) (model.Config, error) {
 	cfg.UI.CommentDefaultView = model.NormalizeCommentView(cfg.UI.CommentDefaultView)
 	cfg.UI.PasswordGen = cfg.UI.PasswordGen.Normalized()
 	cfg.ParentRoles = sanitizeParentRoles(cfg.ParentRoles)
+	// No default is injected: an empty comment_fields list is a legitimate choice (and the
+	// built-in one), so it must survive a round trip rather than be refilled here.
 	cfg.CommentFields = sanitizeCommentFields(cfg.CommentFields)
-	if len(cfg.CommentFields) == 0 {
-		cfg.CommentFields = defaultCommentFields()
-	}
 	// Absent key (older config) → the built-in column; an explicit `search_columns: []`
 	// stays empty, because "role name only" is a legitimate choice the user can save.
 	cfg.SearchColumns = sanitizeSearchColumns(cfg.SearchColumns)
@@ -950,7 +944,7 @@ func validateClusterInput(in model.ClusterInput) error {
 		return errors.New("database is required")
 	}
 	if in.Category == "" {
-		return errors.New("category is required")
+		return errors.New("group is required")
 	}
 	return nil
 }

@@ -41,6 +41,23 @@
   --control-h: 2.1rem;
   --control-pad-y: 0.4rem;
   --control-pad-x: 0.55rem;
+  /* Width of a Settings list editor (role parents / comment fields / Find-role columns) AND of
+     the .settings-field that wraps one — the two must agree, or the field would size to its
+     content and the editor's 100% would resolve against that. */
+  --list-editor-w: min(32rem, 100%);
+  /* The list-row grid: drag grip, then a fixed primary column (comment key / role parent /
+     column label), then the flexible one (comment label / column template). Tokens because the
+     Comments row derives a column position from them — see .settings-field:has(> #comment-view-pref).
+     --le-grip-w is NOMINAL: the grip is sized by its ⠿ glyph (14.72px here) and no width is
+     imposed on it, so a platform whose glyph differs shifts that derived position by a pixel or
+     two. That is a rounding error in an alignment, not a layout that breaks. */
+  /* Vertical rhythm between consecutive lines in a Settings group. Applied as a margin by
+     .settings-row-gap and as a flex gap by .pwgen-col, which stacks its own lines inside ONE
+     .settings-row instead of getting a row each — same rhythm, two mechanisms, one value. */
+  --settings-row-gap: 0.9rem;
+  --le-gap: 0.4rem;
+  --le-primary-w: 13rem;
+  --le-grip-w: 1.05rem;
   /* Optical text centring. A browser centres the LINE box, which reserves descender depth and
      diacritic headroom, so the cap band (cap top → baseline, what the eye reads as the text
      block) can land off centre. How far off depends only on the FONT SIZE, via the metrics the
@@ -770,6 +787,14 @@ tr:last-child td { border-bottom: none; }
   grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
   gap: 0.5rem 0.75rem;
 }
+/* Nothing to lay out: no configured comment fields and none in the comment. Spans every column
+   so the note reads as one line rather than sitting in the first grid cell. */
+.rce-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
 .rce-field {
   display: flex;
   flex-direction: column;
@@ -908,11 +933,14 @@ tr:last-child td { border-bottom: none; }
    doesn't toggle the box). */
 .settings-check-line { display: flex; align-items: center; gap: 0.4rem; }
 /* Extra breathing room above a row that follows another within the same settings group. */
-.settings-row-gap { margin-top: 0.9rem; }
+.settings-row-gap { margin-top: var(--settings-row-gap); }
 
-/* Password-generator character classes in two columns: lower/upper | digits/symbols. */
+/* Password-generator character classes in two columns: lower/upper | digits/symbols. Both lines
+   of a column live in ONE .settings-row, so they get no .settings-row-gap margin between them —
+   the column's own gap has to supply it, or the second line (Uppercase / Symbols) sits tighter
+   than every other stacked check line in the panel. */
 .pwgen-classes { display: flex; align-items: flex-start; gap: 2.5rem; }
-.pwgen-col { display: flex; flex-direction: column; gap: 0.5rem; }
+.pwgen-col { display: flex; flex-direction: column; gap: var(--settings-row-gap); }
 
 /* Two side-by-side subsections (DB command templates | Introspection queries).
    Collapses to one column when the panel is too narrow. */
@@ -1103,7 +1131,7 @@ dialog .form-row > label {
 .pw-gen svg { display: block; width: 0.85rem; height: 0.85rem; flex-shrink: 0; }
 .pw-gen:hover { opacity: 1; }
 .pw-gen:disabled { opacity: 0.35; pointer-events: none; cursor: default; }
-/* Separator before the (bottom) Category field. */
+/* Separator before the (bottom) Group field. */
 #cluster-form .form-sep { width: 100%; border: none; border-top: var(--hairline) solid var(--border); margin: 0.4rem 0; }
 /* Test connection sits on the left; Save / Cancel stay on the right. */
 #cluster-form menu #btn-test-cluster { margin-right: auto; }
@@ -1383,24 +1411,40 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  width: min(32rem, 100%);
+  width: var(--list-editor-w);
+}
+/* A .settings-field holding a list editor keeps that width even when the list is EMPTY. The
+   editor's own `100%` resolves against the field, and the field — a flex item in .settings-row —
+   is content-sized, so an empty list left it as wide as its "Add …" button and any control beside
+   it slid left. .settings-row is a block-level flex container, so the percentage here has a
+   definite basis and the circularity is broken. Comment fields (empty by default) sits next to
+   Preferred comment view, which is where this showed. */
+.settings-field:has(> .list-editor) { width: var(--list-editor-w); }
+/* Comments row: Preferred comment view takes the LEFT slot because it is the narrow, fixed one,
+   so the wide Comment fields editor beside it starts at a stable x whatever the field list holds.
+   The width is what puts that x on the TEMPLATE column of the Role Details editor one section
+   below — panel edge + this width + the .settings-row gap has to equal a list row's
+   grip + gap + primary column + gap, hence the subtraction. Change --le-primary-w or the row gap
+   and this follows on its own; it is stated as a relationship for exactly that reason. */
+.settings-field:has(> #comment-view-pref) {
+  width: calc(var(--le-grip-w) + var(--le-primary-w) + 2 * var(--le-gap) - 1rem);
 }
 .le-row {
   display: flex;
-  gap: 0.4rem;
+  gap: var(--le-gap);
   align-items: center;
 }
 .le-row input { flex: 1 1 0; min-width: 0; }
 /* The primary text field (comment key / role-parent value) shares one fixed width so the two
    editors line up; the comment label takes the remaining space. */
 .le-row .cf-key,
-.le-row .pr-value { flex: 0 0 13rem; }
+.le-row .pr-value { flex: 0 0 var(--le-primary-w); }
 .le-row .cf-label { flex: 1 1 0; }
 /* A search column is label + template; the label matches the fixed primary-field width above so
    the Comments and Role Details editors line up, and the template takes the remaining space. The
    template keeps the standard UI font — monospace reads as out of place at this size, next to the
    plain-text inputs of the other list editors. */
-.le-row .sc-label { flex: 0 0 13rem; }
+.le-row .sc-label { flex: 0 0 var(--le-primary-w); }
 .le-row .sc-template { flex: 1 1 0; }
 /* A template whose placeholders won't save (searchTemplateError); the reason is on the title.
    The `.list-editor` qualifier is load-bearing, not decoration: the baseline
@@ -1448,6 +1492,14 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
    sits between the two, so subtract it — otherwise that editor's button clears more than the ones
    placed directly in a .settings-group. */
 .settings-field .list-editor + .list-add { margin-top: calc(0.5rem - var(--settings-field-gap)); }
+/* An EMPTY editor still holds a box, so the "Add …" button below it clears content that isn't
+   there — and inside a .settings-field the gapped column pays for it a second time. Dropping the
+   empty box out of the flow and cancelling the button's clearance puts every "Add …" button
+   exactly where the editor's FIRST ROW would be: under Comment fields that is the line the
+   Fields/Raw control beside it starts on (it used to sit 7px lower), and under Preconfigured role
+   parents / Role Details it is one --settings-row-gap below the section label. */
+.list-editor:empty { display: none; }
+.list-editor:empty + .list-add { margin-top: 0; }
 
 /* Settings row whose fields differ in height (e.g. list editor + toggle): top-align labels. */
 .settings-row-top { align-items: flex-start; }

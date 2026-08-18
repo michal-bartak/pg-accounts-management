@@ -228,8 +228,9 @@ Alter = search → `pickUser` → `reloadDetails`. The static `#role-identity` b
 (readonly in edit) + an inline **comment editor** (`#role-comment-editor`, module-level
 `commentEditor` state, `loadCommentEditor`). Comments are **format-agnostic** (plain text or
 arbitrary JSON, no forced keys): Fields↔Raw toggle, Fields edits string values only, labels
-come from Settings-managed `Config.CommentFields` (`comment_fields`, default full_name/e_mail,
-`SaveCommentFields`); empty comments default to `ui.comment_default_view` (`preferredCommentView`);
+come from Settings-managed `Config.CommentFields` (`comment_fields`, **empty by default and never
+refilled on load**, `SaveCommentFields`); the mode always follows `ui.comment_default_view`
+(`preferredCommentView`, default **raw**) except for plain text, which has no fields and stays Raw;
 `editorFromComment`/`assembleComment(From)`/`switchEditorMode`/`parseCommentObject` are the core
 helpers. **Find-role result columns are configured too**, never a hardcoded comment key:
 `Config.SearchColumns` (`search_columns`, ordered `{label,template}`, `SaveSearchColumns`, Settings

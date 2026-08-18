@@ -137,9 +137,9 @@ const (
 
 type UISettings struct {
 	Theme string `yaml:"theme" json:"theme"` // light | dark | system
-	// CommentDefaultView is the comment editor's preferred mode for an empty comment
-	// (create role / a role with no comment): fields | raw. Content-bearing comments always
-	// auto-detect (JSON -> fields, plain text -> raw).
+	// CommentDefaultView is the mode the comment editor opens in — in the role form and in
+	// the Comments dialog alike: fields | raw. It is a preference, not a guarantee: a
+	// plain-text comment has no fields to show and always opens in raw.
 	CommentDefaultView string `yaml:"comment_default_view,omitempty" json:"commentDefaultView"`
 	// StageCreateOnTargetAdd controls Alter-role behaviour when the user adds a target
 	// cluster on which the role does not yet exist: when true, the role's creation is
@@ -216,12 +216,13 @@ func NormalizeTheme(theme string) string {
 	}
 }
 
-// NormalizeCommentView returns a valid comment-view preference; unknown values become fields.
+// NormalizeCommentView returns a valid comment-view preference; unknown values become raw,
+// which is also the built-in default (a comment is plain text until a site decides otherwise).
 func NormalizeCommentView(view string) string {
-	if strings.ToLower(strings.TrimSpace(view)) == CommentViewRaw {
-		return CommentViewRaw
+	if strings.ToLower(strings.TrimSpace(view)) == CommentViewFields {
+		return CommentViewFields
 	}
-	return CommentViewFields
+	return CommentViewRaw
 }
 
 // ClusterSet is everything persisted in clusters.yaml: the cluster inventory, the groups it
@@ -262,13 +263,14 @@ type Config struct {
 	ParentRoles []string `yaml:"parent_roles,omitempty" json:"parentRoles"`
 	// CommentFields are the JSON keys the app surfaces as labeled inputs when a role
 	// comment holds JSON (Create role / Alter role). Ordered; keys not listed here are
-	// still shown generically. Defaults to full_name/e_mail.
+	// still shown generically. Empty by default and never defaulted on load, so a user who
+	// removes every field keeps an empty list.
 	CommentFields []CommentField `yaml:"comment_fields,omitempty" json:"commentFields"`
 	// SearchColumns are the extra columns shown next to the role name in the Find-role
 	// results, each built from a display template over the role's comment. Ordered. No
 	// omitempty: an explicitly empty list means "role name only" and must round-trip as
 	// `search_columns: []`, while an absent key (older config) still gets the default
-	// "Full name" column.
+	// "Comment" column.
 	SearchColumns []SearchColumn `yaml:"search_columns" json:"searchColumns"`
 	// WindowWidth/WindowHeight are the last OS window size (Wails WindowGetSize, not the
 	// webview viewport), restored on next launch. 0 = use the built-in default.

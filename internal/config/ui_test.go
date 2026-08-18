@@ -17,9 +17,10 @@ func TestNormalizeCommentView(t *testing.T) {
 	tests := []struct{ in, want string }{
 		{"raw", model.CommentViewRaw},
 		{"fields", model.CommentViewFields},
-		{"", model.CommentViewFields},
-		{"invalid", model.CommentViewFields},
+		{"", model.CommentViewRaw},
+		{"invalid", model.CommentViewRaw},
 		{" RAW ", model.CommentViewRaw},
+		{" FIELDS ", model.CommentViewFields},
 	}
 	for _, tc := range tests {
 		if got := model.NormalizeCommentView(tc.in); got != tc.want {
@@ -36,12 +37,12 @@ func TestUpdateUIPersistsCommentView(t *testing.T) {
 	if got := s.Get().UI.CommentDefaultView; got != model.CommentViewRaw {
 		t.Fatalf("comment view not persisted: %q", got)
 	}
-	// invalid normalizes to fields
+	// invalid normalizes to raw (the built-in default)
 	if err := s.UpdateUI(model.UISettings{Theme: "dark", CommentDefaultView: "nope"}); err != nil {
 		t.Fatal(err)
 	}
-	if got := s.Get().UI.CommentDefaultView; got != model.CommentViewFields {
-		t.Fatalf("invalid comment view should normalize to fields: %q", got)
+	if got := s.Get().UI.CommentDefaultView; got != model.CommentViewRaw {
+		t.Fatalf("invalid comment view should normalize to raw: %q", got)
 	}
 }
 

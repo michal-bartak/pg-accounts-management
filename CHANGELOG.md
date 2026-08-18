@@ -10,9 +10,19 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-18
+
 ### Changed
 
-- **Renamed to pgCowboy** — the app, its bundle, install location and configuration directory all change name. Settings are not migrated: copy `config.yaml` and `clusters.yaml` from the old `DbAccounts` directory to the new `pgCowboy` one to keep your clusters and saved passwords ([paths](https://michal-bartak.github.io/pgcowboy/installation/#upgrading-from-dbaccounts)). On macOS and Linux, remove the old app or package by hand; the Windows installer replaces it automatically.
+- **Comment view preference is always respected** — Raw stays Raw, whatever the comment holds.
+- **New comment defaults (new installations only)** — no comment fields, Raw editor, plain comment in search results.
+
+### Fixed
+
+- **Leftover "Category" renamed to "Group".**
+- **Comment fields can be emptied** — removing every field now sticks.
+- **Layout polishing** in the Settings panel.
+- **Clusters Save** was active on app start when no clusters file existed
 
 ## [1.0.0] - 2026-08-14
 

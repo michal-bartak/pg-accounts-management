@@ -51,7 +51,7 @@ filled by result of **Test connections** action.
 | **SSL mode** | `prefer` (default), `disable`, `require`, `verify-ca`, `verify-full`. |
 | **Username** | Optional. See [Credentials](#credentials) below. |
 | **Password** | Optional, masked, with a <svg class="doc-ic" width="1.05em" height="1.05em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3.2"/></svg> reveal toggle. |
-| **Category** | Required. The cluster group this cluster belongs to — it sets the colour and the confirmation gate. |
+| **Group** | Required. The cluster group this cluster belongs to — it sets the colour and the confirmation gate. |
 
 ## Credentials
 

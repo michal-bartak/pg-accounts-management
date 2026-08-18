@@ -259,7 +259,7 @@ func (a *App) LoadRoleDependencies(req model.RoleDependenciesRequest) ([]model.C
 
 func (a *App) PreviewTargets(req model.RunRequest) ([]model.Cluster, error) {
 	if len(req.CategoryIDs) == 0 && len(req.ClusterIDs) == 0 {
-		return nil, fmt.Errorf("select at least one category or cluster")
+		return nil, fmt.Errorf("select at least one group or cluster")
 	}
 	return a.batch.ResolveClusters(req)
 }
