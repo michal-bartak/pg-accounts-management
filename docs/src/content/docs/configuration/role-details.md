@@ -26,7 +26,7 @@ The result is currently seen in [Role search](/pgcowboy/usage/find-role/) dialog
 Each row is a **label** (the column header) and a **template** (what to show). Drag the handle to reorder;
 <svg class="doc-ic" width="1.05em" height="1.05em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> removes a row; **Add column…** appends one.
 
-Out of the box there is a single *Full name* column over `${{full_name}}`.
+Out of the box there is a single *Comment* column over `${comment}` — the whole comment, whatever it holds. Replace it once you know which keys your comments carry.
 
 ## Templates
 

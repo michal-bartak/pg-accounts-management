@@ -410,7 +410,7 @@ function setSegValue(groupId, pref) {
 
 const currentThemePref = () => segValue('ui-theme', state?.ui?.theme || 'system');
 const setThemeButtons = (pref) => setSegValue('ui-theme', pref);
-const currentCommentViewPref = () => segValue('comment-view-pref', state?.ui?.commentDefaultView || 'fields');
+const currentCommentViewPref = () => segValue('comment-view-pref', state?.ui?.commentDefaultView || 'raw');
 const setCommentViewButtons = (pref) => setSegValue('comment-view-pref', pref);
 
 /** Currently-checked "stage create when adding a target that lacks the role" setting. */
@@ -506,7 +506,7 @@ async function loadConfig() {
     document.getElementById('clusters-path').textContent = (await app.GetClustersPath?.()) || '';
     setThemeButtons(state?.ui?.theme || 'system');
     applyTheme(state?.ui?.theme || 'system');
-    setCommentViewButtons(state?.ui?.commentDefaultView || 'fields');
+    setCommentViewButtons(state?.ui?.commentDefaultView || 'raw');
     { const c = document.getElementById('ui-stage-create'); if (c) c.checked = !!state?.ui?.stageCreateOnTargetAdd; }
     { const c = document.getElementById('ui-check-updates'); if (c) c.checked = autoCheckUpdates(); }
     setPasswordGenControls(state?.ui?.passwordGen);
@@ -659,6 +659,10 @@ async function onGroupAction(ev) {
 function renderClustersTable() {
   const tbody = document.querySelector('#clusters-table tbody');
   tbody.innerHTML = '';
+  // Up here, not after the loop: an EMPTY draft is a legitimate (and the first-run) state whose
+  // footer still has to be reported, and the early return below would skip it — which is how a
+  // fresh install came up with Save/Discard live before the user had touched anything.
+  refreshClustersDirty();
   if (!clustersDraft?.length) {
     tbody.innerHTML = '<tr><td colspan="7" class="hint">No clusters configured.</td></tr>';
     return;
@@ -690,7 +694,6 @@ function renderClustersTable() {
   tbody.querySelectorAll('button').forEach((btn) => {
     btn.addEventListener('click', onClusterAction);
   });
-  refreshClustersDirty();
 }
 
 function renderCategoryCheckboxes() {
@@ -914,10 +917,7 @@ const LIST_EDITORS = [
     focus: '.cf-key', // field to focus in a newly added row
     get: () => commentFieldsDraft,
     set: (v) => { commentFieldsDraft = v; },
-    // Absent comment_fields falls back to the built-in default (unlike search columns, where an
-    // empty list is a deliberate "role name only" — see searchColumns()).
-    seed: () => (state?.commentFields?.length ? state.commentFields : DEFAULT_COMMENT_FIELDS)
-      .map((f) => ({ key: f.key || '', label: f.label || '' })),
+    seed: () => (state?.commentFields || []).map((f) => ({ key: f.key || '', label: f.label || '' })),
     blank: () => ({ key: '', label: '' }),
     row: (f, i) =>
       `<input class="cf-key" data-idx="${i}" value="${escapeAttr(f.key)}" placeholder="key (e.g. full_name)" autocapitalize="none" autocomplete="off" spellcheck="false" />
@@ -2027,7 +2027,7 @@ async function runOperation() {
   }
   const clusters = resolveSelectedClusters();
   if (!clusters.length) {
-    showInlineError(errEl, 'Select at least one category or cluster');
+    showInlineError(errEl, 'Select at least one group or cluster');
     flashButton(btn, { cls: 'flash-err' });
     return;
   }
@@ -2178,7 +2178,7 @@ function savedSearchColumns() {
 function settingsDirty() {
   if (!state) return false;
   if (currentThemePref() !== (state.ui?.theme || 'system')) return true;
-  if (currentCommentViewPref() !== (state.ui?.commentDefaultView || 'fields')) return true;
+  if (currentCommentViewPref() !== (state.ui?.commentDefaultView || 'raw')) return true;
   if (currentStageCreateOnAdd() !== !!state.ui?.stageCreateOnTargetAdd) return true;
   if (currentCheckForUpdates() !== autoCheckUpdates()) return true;
   if (JSON.stringify(currentPasswordGen()) !== JSON.stringify(state.ui?.passwordGen || DEFAULT_PASSWORD_GEN)) return true;
@@ -2187,10 +2187,8 @@ function settingsDirty() {
   const pr = parentRolesDraft.map((r) => r.trim()).filter(Boolean);
   if (JSON.stringify(pr) !== JSON.stringify(state.parentRoles || [])) return true;
   const cf = commentFieldsDraft.map((f) => ({ key: f.key.trim(), label: f.label.trim() })).filter((f) => f.key);
-  const savedCf = (state.commentFields?.length ? state.commentFields : DEFAULT_COMMENT_FIELDS).map((f) => ({
-    key: f.key,
-    label: f.label,
-  }));
+  // No default baseline: removing every field is a real change, like clearing search columns.
+  const savedCf = (state.commentFields || []).map((f) => ({ key: f.key, label: f.label }));
   if (JSON.stringify(cf) !== JSON.stringify(savedCf)) return true;
   if (JSON.stringify(readSearchColumnsFromEditor()) !== JSON.stringify(savedSearchColumns())) return true;
   if (JSON.stringify(readDBFunctionsFromEditor()) !== JSON.stringify(savedDBFunctions())) return true;
@@ -2208,7 +2206,7 @@ function refreshSettingsDirty() {
 function discardSettings() {
   setThemeButtons(state?.ui?.theme || 'system');
   applyTheme(state?.ui?.theme || 'system');
-  setCommentViewButtons(state?.ui?.commentDefaultView || 'fields');
+  setCommentViewButtons(state?.ui?.commentDefaultView || 'raw');
   { const c = document.getElementById('ui-stage-create'); if (c) c.checked = !!state?.ui?.stageCreateOnTargetAdd; }
   { const c = document.getElementById('ui-check-updates'); if (c) c.checked = autoCheckUpdates(); }
   setPasswordGenControls(state?.ui?.passwordGen);
@@ -2501,7 +2499,7 @@ async function runRoleSearch() {
   const targets = { categoryIds: getSelectedCategories(), clusterIds: getSelectedClusterIDs() };
   const scopeClusters = resolveSelectedClusters();
   if (!scopeClusters.length) {
-    searchErr.textContent = 'Select at least one category or cluster in Target selection';
+    searchErr.textContent = 'Select at least one group or cluster in Target selection';
     return;
   }
   alterTargets = targets;
@@ -2808,19 +2806,15 @@ function scopeLabelsHtml(parts, extraCls = '') {
     .join('');
 }
 
-/** Canonical form of a comment for comparison: sorted-key JSON when valid, else raw. */
-/** Built-in comment-key mapping, used when config omits comment_fields. */
-const DEFAULT_COMMENT_FIELDS = [
-  { key: 'full_name', label: 'Full name' },
-  { key: 'e_mail', label: 'Email' },
-];
-
-/** Ordered configured comment fields, with the built-in default fallback. */
+/** Ordered configured comment fields (Config.CommentFields). No default fallback — like
+ *  searchColumns(): which JSON keys a comment carries is a site convention, and an empty list
+ *  is both the built-in state and a choice the user can save. */
 function commentFields() {
   const cf = state?.commentFields;
-  return Array.isArray(cf) && cf.length ? cf : DEFAULT_COMMENT_FIELDS;
+  return Array.isArray(cf) ? cf : [];
 }
 
+/** Canonical form of a comment for comparison: sorted-key JSON when valid, else raw. */
 function canonicalComment(text) {
   const t = (text || '').trim();
   if (!t || t[0] !== '{') return text || '';
@@ -2923,9 +2917,9 @@ function commentFieldArgs(commentText) {
   return out;
 }
 
-/** Preferred comment mode for an EMPTY comment (create / no-comment role): 'fields' | 'raw'. */
+/** The mode the comment editor opens in (ui.comment_default_view): 'fields' | 'raw'. */
 function preferredCommentView() {
-  return state?.ui?.commentDefaultView === 'raw' ? 'raw' : 'fields';
+  return state?.ui?.commentDefaultView === 'fields' ? 'fields' : 'raw';
 }
 
 /** Alter-role: whether adding a target where the role is missing auto-stages its creation. */
@@ -2945,7 +2939,8 @@ function commentConsensus() {
 
 /** Build the editor model from a comment string. Configured fields always render (blank if
  *  absent); extra string keys render too (labeled by raw key); non-string keys stay in
- *  baseObj only (Raw-editable). Default mode = Fields for a JSON object, else Raw. */
+ *  baseObj only (Raw-editable). Mode follows the configured preference, except that plain
+ *  text always lands in Raw. */
 function editorFromComment(comment, varies) {
   const { isObject, obj } = parseCommentObject(comment);
   const labels = {};
@@ -2971,12 +2966,11 @@ function editorFromComment(comment, varies) {
   // Configured fields always render (in order); then every other key present in the comment.
   for (const f of commentFields()) addKey(f.key, f.label || f.key);
   if (isObject) for (const k of Object.keys(obj)) addKey(k, k);
-  // Mode: JSON object -> Fields; non-JSON *content* -> Raw; empty -> the configured preference.
+  // Mode: the configured preference wins, in the role form and in the Comments dialog alike.
+  // Fields is only possible for a JSON object or an empty comment — plain text has no fields to
+  // show, so it always opens in Raw (see commentFieldsBlocked).
   const hasPlainText = !isObject && !!(comment || '').trim();
-  let mode;
-  if (isObject) mode = 'fields';
-  else if (hasPlainText) mode = 'raw';
-  else mode = preferredCommentView();
+  const mode = preferredCommentView() === 'fields' && !hasPlainText ? 'fields' : 'raw';
   return {
     mode,
     baseObj: isObject ? obj : {},
@@ -3094,6 +3088,12 @@ function switchCommentMode(mode) {
  *  Non-string keys (e.readonly) render disabled with a note — visible but edited via Raw. */
 function commentFieldInputsHtml(e, idx, disabled) {
   const idxAttr = idx == null ? '' : ` data-cv-idx="${idx}"`;
+  // With no configured comment fields and none in the comment there is nothing to lay out, and an
+  // empty box reads as a broken editor. Comment fields default to none, so this is the first thing
+  // a new user sees in Fields mode.
+  if (!e.shownKeys.length) {
+    return '<p class="rce-empty">No comment fields configured — add them in Settings, or edit the comment in Raw.</p>';
+  }
   return e.shownKeys
     .map((k) => {
       const ro = e.readonly && e.readonly.has(k);
@@ -4383,7 +4383,7 @@ function openSearchDialog() {
     const clusters = resolveSelectedClusters();
     scope.textContent = clusters.length
       ? `Comparing ${clusters.length} selected cluster(s): ${clusters.map((c) => c.alias).join(', ')}`
-      : 'No clusters selected — pick categories/clusters in Target selection first.';
+      : 'No clusters selected — pick groups/clusters in Target selection first.';
   }
   // Never reopen with stale results: a prior search's scope may not match the current Target
   // selection, so picking one of those cached matches could load the form against the wrong
@@ -4474,7 +4474,7 @@ document.getElementById('alter-detail')?.addEventListener('click', (ev) => {
   }
   if (target.closest('#btn-alter-add')) {
     if (isCreateMode() && !alterDetails.length) {
-      showInlineError(document.getElementById('ops-error'), 'Select at least one category or cluster first');
+      showInlineError(document.getElementById('ops-error'), 'Select at least one group or cluster first');
       return;
     }
     openScopeDialog(null);
@@ -4482,7 +4482,7 @@ document.getElementById('alter-detail')?.addEventListener('click', (ev) => {
   }
   if (target.closest('#btn-alter-add-config')) {
     if (isCreateMode() && !alterDetails.length) {
-      showInlineError(document.getElementById('ops-error'), 'Select at least one category or cluster first');
+      showInlineError(document.getElementById('ops-error'), 'Select at least one group or cluster first');
       return;
     }
     openScopeDialog({ kind: 'config', isNew: true });

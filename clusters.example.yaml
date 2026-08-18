@@ -10,7 +10,7 @@
 version: 1
 # Cluster groups. color = base hex (shades derived); confirm = require the
 # production-style confirm popup before running against that group's clusters.
-# Edit these in-app under Settings → Cluster groups.
+# Edit these in-app under the Clusters tab → Cluster groups.
 categories:
   - id: production
     label: Production

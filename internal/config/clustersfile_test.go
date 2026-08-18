@@ -169,8 +169,9 @@ func TestFirstRunCreatesBothFiles(t *testing.T) {
 	if got.DBFunctions.CreateRole.Call != DefaultConfig().DBFunctions.CreateRole.Call {
 		t.Errorf("create_role = %q, want the built-in default", got.DBFunctions.CreateRole.Call)
 	}
-	if len(got.CommentFields) == 0 || len(got.SearchColumns) == 0 {
-		t.Errorf("comment fields / search columns lost their defaults: %+v / %+v", got.CommentFields, got.SearchColumns)
+	// Comment fields have no default (see TestDefaultCommentFieldsAreEmpty); search columns do.
+	if len(got.SearchColumns) == 0 {
+		t.Errorf("search columns lost their default: %+v", got.SearchColumns)
 	}
 }
 

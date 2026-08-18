@@ -88,7 +88,7 @@ func TestSanitizeSearchColumns(t *testing.T) {
 
 func TestDefaultSearchColumns(t *testing.T) {
 	got := defaultSearchColumns()
-	if len(got) != 1 || got[0].Label != "Full name" || got[0].Template != "${{full_name}}" {
+	if len(got) != 1 || got[0].Label != "Comment" || got[0].Template != "${comment}" {
 		t.Fatalf("unexpected defaults: %v", got)
 	}
 }
@@ -129,7 +129,7 @@ func TestLoadInjectsDefaultSearchColumnsOnlyWhenAbsent(t *testing.T) {
 	if err := s2.Load(); err != nil {
 		t.Fatal(err)
 	}
-	if got := s2.Get().SearchColumns; len(got) != 1 || got[0].Template != "${{full_name}}" {
+	if got := s2.Get().SearchColumns; len(got) != 1 || got[0].Template != "${comment}" {
 		t.Fatalf("Load should inject the default when search_columns is omitted: %v", got)
 	}
 

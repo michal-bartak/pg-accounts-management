@@ -49,10 +49,10 @@ func TestSanitizeCommentFields(t *testing.T) {
 	}
 }
 
-func TestDefaultCommentFields(t *testing.T) {
-	got := defaultCommentFields()
-	if len(got) != 2 || got[0].Key != "full_name" || got[1].Key != "e_mail" {
-		t.Fatalf("unexpected defaults: %v", got)
+func TestDefaultCommentFieldsAreEmpty(t *testing.T) {
+	// Which JSON keys a role comment carries is a site convention, so the app ships none.
+	if got := DefaultConfig().CommentFields; len(got) != 0 {
+		t.Fatalf("expected no built-in comment fields, got %v", got)
 	}
 }
 
@@ -80,17 +80,21 @@ func TestUpdateCommentFieldsPersistsAndValidates(t *testing.T) {
 	}
 }
 
-func TestLoadInjectsDefaultCommentFields(t *testing.T) {
+func TestLoadKeepsEmptyCommentFields(t *testing.T) {
+	// Removing every field is a legitimate saved choice — nothing may refill it on load, or
+	// the user could never get rid of a field they don't want.
 	s := tmpStore(t)
-	s.cfg.CommentFields = nil
-	if err := s.Save(); err != nil {
+	if err := s.UpdateCommentFields([]model.CommentField{{Key: "full_name", Label: "Full name"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateCommentFields(nil); err != nil {
 		t.Fatal(err)
 	}
 	s2 := &Store{path: s.path}
 	if err := s2.Load(); err != nil {
 		t.Fatal(err)
 	}
-	if got := s2.Get().CommentFields; len(got) != 2 || got[0].Key != "full_name" {
-		t.Fatalf("Load should inject defaults when comment_fields omitted: %v", got)
+	if got := s2.Get().CommentFields; len(got) != 0 {
+		t.Fatalf("an emptied comment_fields list must stay empty, got %v", got)
 	}
 }

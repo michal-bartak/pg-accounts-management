@@ -21,7 +21,7 @@ In PostgreSQL a role comment lives as plain text. But we can store an JSON forma
 
 ## The field list
 
-Each entry is a **key** (the JSON key, a bare identifier) and a **label** (what the form shows). Drag the handle to reorder;
+The list starts **empty** — which keys a role comment carries is your convention, not something the app can guess — and it may be emptied again at any time. Each entry is a **key** (the JSON key, a bare identifier) and a **label** (what the form shows). Drag the handle to reorder;
 <svg class="doc-ic" width="1.05em" height="1.05em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> removes an entry; **Add field…** appends one.
 
 Rules:
@@ -37,7 +37,11 @@ Each configured key also becomes a placeholder — `${{key}}` — usable in the 
 
 ## Preferred comment view
 
-Sets which mode a **new or empty** comment opens in — **Fields** or **Raw**. Comments that already have content detect their own mode: JSON opens in Fields, anything else in Raw.
+Sets which mode the comment editor opens in — **Fields** or **Raw** — in the role form and in the [Comments dialog](/pgcowboy/usage/comments/) alike. It defaults to **Raw**.
+
+:::note
+It is a preference, not a rule. A comment that is not JSON has no fields to show, so it always opens in Raw whichever you pick.
+:::
 
 See [Altering the comment](/pgcowboy/usage/comments/) for the editor itself.
 

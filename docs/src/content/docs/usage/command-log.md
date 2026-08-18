@@ -45,7 +45,7 @@ Click the chip to open the results panel. It fills in while the run is still goi
 
 | Column | Notes |
 |--------|-------|
-| **Cluster** / **Category** | Which target the row is for. |
+| **Cluster** / **Group** | Which target the row is for. |
 | **Status** | Per cluster. One failure doesn't hide the others' success. |
 | **Duration** | How long that cluster took. |
 | **Message** | The error text, naming the operation that failed. |
