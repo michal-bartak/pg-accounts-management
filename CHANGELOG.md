@@ -10,6 +10,12 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Scrollbars on Linux** — no longer hair-thin, self-hiding, or drawn over the content they scroll.
+- **Scrollbars** — the bar now sits in the window's right margin instead of against the content, and its space is always reserved so nothing shifts when it appears.
+- **Tables** — column headers stay visible while the rows scroll, and the scrollbar sits outside the table.
+
 ## [1.1.1] - 2026-08-19
 
 ### Fixed

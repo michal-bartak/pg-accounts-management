@@ -90,21 +90,33 @@
         <button type="button" id="btn-test-clusters">Test connections</button>
         <button type="button" id="btn-manage-groups">Cluster groups</button>
       </div>
+      <!-- Split table: the header is its own table OUTSIDE the scrolling body, so it stays visible
+           and the body's scrollbar spans the data rows only. Both tables get the same generated
+           <colgroup> (tableColgroup) under table-layout:fixed, which is what keeps the columns
+           aligned. -->
       <div class="table-wrap">
-        <table id="clusters-table">
-          <thead>
-            <tr>
-              <th>Alias</th>
-              <th>Host</th>
-              <th>Port</th>
-              <th>Database</th>
-              <th>Group</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <div class="table-head-clip">
+          <table class="table-head" id="clusters-head">
+            <colgroup></colgroup>
+            <thead>
+              <tr>
+                <th>Alias</th>
+                <th>Host</th>
+                <th>Port</th>
+                <th>Database</th>
+                <th>Group</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+          </table>
+        </div>
+        <div class="table-scroll">
+          <table id="clusters-table">
+            <colgroup></colgroup>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
       <div class="clusters-footer">
         <p id="clusters-error" class="form-error hidden"></p>
@@ -341,12 +353,20 @@
     <div class="run-status-dialog-body">
       <h2>Execution status</h2>
       <div class="table-wrap">
-        <table id="run-status-table">
-          <thead>
-            <tr><th>Cluster</th><th>Group</th><th>Status</th><th>Duration</th><th>Message</th><th></th></tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <div class="table-head-clip">
+          <table class="table-head" id="run-status-head">
+            <colgroup></colgroup>
+            <thead>
+              <tr><th>Cluster</th><th>Group</th><th>Status</th><th>Duration</th><th>Message</th><th></th></tr>
+            </thead>
+          </table>
+        </div>
+        <div class="table-scroll">
+          <table id="run-status-table">
+            <colgroup></colgroup>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
       <menu>
         <button type="button" id="run-status-dialog-close" class="primary">Close</button>
@@ -440,16 +460,24 @@
         <button type="button" id="btn-add-group">Add group</button>
       </div>
       <div class="table-wrap">
-        <table id="groups-table">
-          <thead>
-            <tr>
-              <th>Group</th>
-              <th>Confirm</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <div class="table-head-clip">
+          <table class="table-head" id="groups-head">
+            <colgroup></colgroup>
+            <thead>
+              <tr>
+                <th>Group</th>
+                <th>Confirm</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+          </table>
+        </div>
+        <div class="table-scroll">
+          <table id="groups-table">
+            <colgroup></colgroup>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
       <menu>
         <button type="button" id="groups-dialog-close" class="primary">Close</button>

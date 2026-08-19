@@ -1422,3 +1422,41 @@ test('revealPickedClusters: opens the collapsed cluster list only when a restore
   assert.equal(r.livePick.caret, '▾');
   assert.deepEqual(r.livePick.scrolled, { value: 'c2', block: 'nearest' });
 });
+
+// ---------------------------------------------------------------------------------------------
+// The split header/body tables (Clusters, run status, groups) align only because both halves get
+// the SAME colgroup, so this is the one thing worth pinning: how a spec becomes a track.
+test('tableColgroup: header/min floor the width, cap ceilings it, flex and fixed tracks pass through', () => {
+  const r = evalJSON(`(() => ({
+    fromValue: tableColgroup([{ header: 'Alias', values: ['a-very-long-alias'], cap: 24 }]),
+    headerFloor: tableColgroup([{ header: 'Database', values: ['db'] }]),
+    capped: tableColgroup([{ header: 'Host', values: ['x'.repeat(80)], cap: 20 }]),
+    minFloor: tableColgroup([{ header: 'Status', min: 12 }]),
+    chip: tableColgroup([{ header: 'Group', values: ['Production'], chip: true }]),
+    flex: tableColgroup([{ flex: true }]),
+    fixed: tableColgroup([{ width: '5.5rem' }]),
+    pair: tableColgroup([{ flex: true }, { width: '4.5rem' }]),
+    nullValue: tableColgroup([{ header: 'Port', values: [null, 5432] }]),
+    // The floor keeps a too-narrow window from collapsing the flexible column to nothing: the
+    // fixed tracks plus FLEX_COL_MIN_CH for the flexible one.
+    minWidth: tableMinWidth([
+      { header: 'Alias', values: ['prod-01'] },
+      { flex: true },
+      { width: '5.5rem' },
+    ]),
+  }))()`);
+  assert.equal(r.fromValue, '<col style="width:calc(17ch + 1.5rem)">');
+  assert.equal(r.headerFloor, '<col style="width:calc(8ch + 1.5rem)">');
+  assert.equal(r.capped, '<col style="width:calc(20ch + 1.5rem)">');
+  assert.equal(r.minFloor, '<col style="width:calc(12ch + 1.5rem)">');
+  // A chip carries its own padding, so its column gets more than the plain cell padding.
+  assert.equal(r.chip, '<col style="width:calc(10ch + 3rem)">');
+  // The flexible column is emitted bare: it absorbs whatever the fixed tracks leave over.
+  assert.equal(r.flex, '<col>');
+  assert.equal(r.fixed, '<col style="width:5.5rem">');
+  assert.equal(r.pair, '<col><col style="width:4.5rem">');
+  // A null/undefined value must not widen the column past its header ('Port' = 4, '5432' = 4).
+  assert.equal(r.nullValue, '<col style="width:calc(4ch + 1.5rem)">');
+  // 7ch (prod-01) + 12ch (the flexible floor) and 1.5 + 1.5 + 5.5 rem of padding/fixed track.
+  assert.equal(r.minWidth, 'calc(19ch + 8.5rem)');
+});

@@ -19,6 +19,19 @@
   --prod: #e8a838;
   --uat: #6eb5ff;
   --radius: 8px;
+  /* Horizontal edge of the whole app: the header, the tabs bar, both panels, the Operations
+     grid and every dialog body share it, so the content edge, the right-aligned action buttons
+     and the op-tabs all line up on one vertical line. rem, because it is content-sized and has
+     to follow the density knob (1.4rem = 19.6px at the 87.5% root). */
+  --page-pad: 1.4rem;
+  /* Scrollbar geometry. --scrollbar-w REPEATS the width literal in the ::-webkit-scrollbar rule
+     below on purpose (a var() inside a scrollbar pseudo-element is not worth risking on
+     WebKitGTK: a dropped width there silently restores the native overlay bar). --scrollbar-gap
+     is the air between content and bar — measured, not guessed: content touches the bar below
+     ~2.5px. Both stay px like the bar itself. INVARIANT: --scrollbar-w + --scrollbar-gap must
+     stay <= --page-pad, or the bar lands outside the window edge. */
+  --scrollbar-w: 8px;
+  --scrollbar-gap: 7px;
   /* Hairline borders. A plain 1px is 1.75 device px at 175% display scaling, which cannot
      render exactly — the engine snaps each element's border box to whole device pixels, so
      the SAME 1px border comes out 1 or 2 device px depending on where that element's edge
@@ -107,17 +120,70 @@ input, textarea, [contenteditable="true"] {
   -webkit-user-select: text;
 }
 
-/* One scrollbar look everywhere (Firefox + WebKit); transparent track so it sits on
-   any panel colour, subtle thumb that brightens on hover. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
+/* One scrollbar look everywhere: transparent track so it sits on any panel colour, subtle thumb
+   that brightens on hover. It MUST stay a pseudo-element-only look. `scrollbar-width`/
+   `scrollbar-color` (the standard properties) take PRECEDENCE over ::-webkit-scrollbar in
+   Chromium 121+ and in WebKit/WebKitGTK, so setting them here makes every rule below dead code and
+   hands the bar back to the platform's OVERLAY scrollbar — on WebKitGTK that is the hair-thin
+   Adwaita indicator that hides itself unless you are actively scrolling and paints over the content
+   it scrolls. Giving ::-webkit-scrollbar an explicit width is also what force-renders an overlay
+   scrollbar as a classic, space-taking one, which is what the reserved gutter below relies on.
+   Do NOT re-add the standard properties outside the @supports guard. */
 *::-webkit-scrollbar { width: 8px; height: 8px; }
 *::-webkit-scrollbar-track { background: transparent; }
 *::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-*::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+*::-webkit-scrollbar-thumb:hover,
+*::-webkit-scrollbar-thumb:active { background: var(--muted); }
+*::-webkit-scrollbar-button { display: none; }
 *::-webkit-scrollbar-corner { background: transparent; }
+
+/* Firefox only (the python3 -m http.server smoke test): engines without the pseudo-elements get
+   the closest equivalent. Inside the guard it can never suppress the rules above. */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+}
+
+/* Reserve the vertical scrollbar's lane in every scroll container, so content is never
+   re-laid-out (shrunk and shifted sideways) the moment the bar appears. `overflow-y: scroll` is
+   the portable way to do it: `scrollbar-gutter: stable` needs Safari 18.2 / a very recent
+   WebKitGTK, above this app's WebKit 16 / macOS 12 floor. The track is transparent and no thumb is
+   drawn while the container is not scrollable, so an unused lane is invisible.
+   This rule OWNS the vertical axis of every scroll container — none of them declares its own
+   `overflow-y` any more, because an equal-specificity `overflow-y: auto` later in the sheet would
+   quietly win. A container keeps only its own `overflow-x` (.table-scroll and
+   `.search-dialog-body .alter-results` need the horizontal safety valve). Add a new scroll
+   container by adding it to this selector list. `.ops-sidebar` is deliberately NOT here — see its
+   own rule. */
+.ops-body, .settings-body, .cluster-list, .table-scroll,
+.run-queries-content, .deps-list, .scope-targets, #comments-list,
+.search-dialog-body .alter-results, textarea {
+  overflow-y: scroll;
+}
+
+/* …and where the container has no border of its own, the lane is taken out of the SURROUNDING
+   margin rather than out of the content: the box grows by bar+gap into the panel / dialog padding
+   (or, for .table-scroll, past the table's border), the gap sits between content and bar, so the
+   content edge lands back exactly on the panel's content edge — level with Create role / Save
+   changes, the footer divider, the dialog's own <menu>, the table's border — and the bar rides in
+   the margin. Content therefore keeps EQUAL left and right margins, with the bar occupying the
+   outer end of the right one.
+   The budget the box grows into is the parent's padding — --page-pad for the panels, the dialog
+   bodies and the .ops-sidebar panel (.cluster-list grows into that one), or the table's own border
+   box for .table-scroll; all of them are >= bar + gap, which is the invariant on the tokens.
+   Two things not to undo: (1) none of these selectors may take a `padding`/`margin` SHORTHAND
+   later in the sheet — it silently drops the longhands set here (which is why .ops-body uses
+   padding-block); (2) an ancestor must not gain an `overflow` value that CLIPS the bar — a scroll
+   container clips at its padding box, so .ops-sidebar's `auto` is fine, but .ops-main and
+   .table-wrap must stay overflow: visible. */
+.ops-body, .settings-body, .cluster-list,
+.deps-list, .scope-targets, #comments-list, .search-dialog-body .alter-results,
+.table-scroll {
+  margin-right: calc(-1 * (var(--scrollbar-w) + var(--scrollbar-gap)));
+  padding-right: var(--scrollbar-gap);
+}
 
 /* Homogeneous form controls (inputs, selects, textareas) — one baseline everywhere. */
 input, select, textarea, button { font-family: var(--font); font-size: var(--fs-base); }
@@ -235,7 +301,7 @@ body {
 }
 
 .app-header {
-  padding: 0.7rem 1.25rem;
+  padding: 0.7rem var(--page-pad);
   border-bottom: var(--hairline) solid var(--border);
 }
 /* Brand row: accent dot + (smaller) title + version chip + About button. */
@@ -304,9 +370,9 @@ body {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  /* 1.25rem horizontal matches the header + panel content edges, so the right-aligned op-tabs
-     line up with the Save/Create action buttons below. */
-  padding: 0.5rem 1.25rem;
+  /* --page-pad horizontal matches the header + panel content edges, so the right-aligned
+     op-tabs line up with the Save/Create action buttons below. */
+  padding: 0.5rem var(--page-pad);
   border-bottom: var(--hairline) solid var(--border);
 }
 
@@ -330,16 +396,16 @@ main { flex: 1 1 auto; min-height: 0; overflow: hidden; }
 
 /* Clusters / Settings: single column, header fixed, body scrolls. */
 /* Clusters + Settings share the same padded panel + inset (up-to-margins) footer divider. */
-#panel-clusters, #panel-settings { padding: 1rem 1.25rem; }
+#panel-clusters, #panel-settings { padding: 1rem var(--page-pad); }
 #panel-clusters .toolbar { flex: none; }
-#panel-clusters .table-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; }
+#panel-clusters .table-wrap { flex: 1 1 auto; min-height: 0; }
 /* Staged editor footer: Discard/Save on the right, inline error on the left; border-top inset
    to the panel content (not the full window). */
 .clusters-footer,
 .settings-footer { flex: none; display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: flex-end; border-top: var(--hairline) solid var(--border); padding: 0.75rem 0 0; margin-top: 0.75rem; }
 .clusters-footer .form-error,
 .settings-footer .form-error { margin: 0; margin-right: auto; }
-.settings-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.settings-body { flex: 1 1 auto; min-height: 0; }
 
 .toolbar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
 
@@ -381,11 +447,35 @@ select option {
   color: var(--text);
 }
 
+/* Split table: the bordered box does NOT scroll — it holds a header-only table plus a scrolling
+   body-only table (.table-scroll, which reaches past the border via the margin rule at the top of
+   this sheet). So the column headers stay visible, the bar sits OUTSIDE the border in the panel
+   margin, its track spans exactly the data rows, and the box's own border — the edge that lines up
+   with Save — never moves. `overflow: visible` is load-bearing: any other value would clip the bar
+   away, and it is also why the header's --surface band needs the corner radii below (the box no
+   longer clips it). The two tables align because they share ONE generated colgroup under
+   `table-layout: fixed` (tableColgroup in app.js) — no measuring. */
 .table-wrap {
-  overflow: auto;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
   border: var(--hairline) solid var(--border);
   border-radius: var(--radius);
 }
+/* Clips the header table so it can be scrolled sideways in step with the body (scrollLeft sync in
+   app.js) when the columns are wider than a narrow window. */
+.table-head-clip { flex: none; overflow: hidden; }
+.table-head, .table-scroll > table { table-layout: fixed; width: 100%; }
+/* Scoped to any table in a .table-wrap, not just a split header: the box is overflow: visible now,
+   so nothing clips the header's --surface band to the box's rounded corners any more. That includes
+   the single-table deps wraps built in app.js. */
+.table-wrap thead th:first-child { border-top-left-radius: var(--radius); }
+.table-wrap thead th:last-child { border-top-right-radius: var(--radius); }
+.table-scroll { flex: 1 1 auto; min-height: 0; overflow-x: auto; }
+/* Fixed layout means a value wider than its column has to be clipped; every cell carries a title.
+   The header labels need the same treatment or a squeezed column prints them over its neighbour. */
+.table-scroll td,
+.table-head th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 table {
   width: 100%;
@@ -407,14 +497,9 @@ tr:last-child td { border-bottom: none; }
    label (both sit at the cell's default left padding, like every other column). Tighten only
    that cell's vertical padding. */
 .row-actions { display: flex; gap: 0.35rem; }
-/* Hug the Actions column to its content (width:1% = "as narrow as content" in an auto table),
-   so the row's slack is absorbed by the other columns rather than left trailing after the
-   buttons — the buttons then read as the very last elements in the row. Header label + buttons
-   stay left-aligned and share the same left edge. */
-#clusters-table th:last-child,
-#clusters-table td:last-child,
-#groups-table th:last-child,
-#groups-table td:last-child { width: 1%; white-space: nowrap; }
+/* The Actions column is sized by the shared colgroup (tableColgroup in app.js) — these tables are
+   `table-layout: fixed`, so the old `width: 1%` content-hugging trick no longer applies. Header
+   label + buttons stay left-aligned and share the same left edge. */
 #clusters-table td:last-child { padding-top: 0.25rem; padding-bottom: 0.25rem; }
 
 /* The ONE small-uppercase section label — Settings groups, the Settings meta block, the role
@@ -501,11 +586,16 @@ tr:last-child td { border-bottom: none; }
   display: grid;
   grid-template-columns: 17.5rem 1fr;
   gap: 1.25rem;
-  padding: 1rem 1.25rem;
+  padding: 1rem var(--page-pad);
 }
 
-/* Left (target selection) and right (form) scroll independently. */
-.ops-sidebar { display: flex; flex-direction: column; overflow-y: auto; min-height: 0; }
+/* Left (target selection) and right (form) scroll independently. The sidebar is a bordered panel,
+   so its bar cannot leave the box, and reserving a lane INSIDE its padding is what made its rows sit
+   further from the right border than from the left. Two nested scroll containers cannot both spend
+   the same padding, so the sidebar keeps `auto` (it is the rare scroller — the cluster list flexes to
+   fill it) and hands the right margin to .cluster-list. Trade-off: when the sidebar itself overflows
+   (many groups, list collapsed) its own bar appears and shifts its content by the bar's width. */
+.ops-sidebar { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
 /* "Or pick clusters" toggle; expanded list fills the remaining sidebar height. */
 .clusters-toggle {
   display: flex; align-items: center; gap: 0.4rem;
@@ -519,7 +609,7 @@ tr:last-child td { border-bottom: none; }
 /* Small, equal inset on the scrolling body and the pinned footer: keeps body content aligned
    with the footer buttons while leaving room for focus rings (the body scroll container would
    otherwise clip the ring on flush left/right-edge inputs). */
-.ops-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0.25rem 0; }
+.ops-body { flex: 1 1 auto; min-height: 0; padding-block: 0.25rem; }
 /* No horizontal padding: the footer's right edge lines up with the Settings/Clusters Save
    buttons (all at the panel content edge, 1.25rem from the window). */
 .ops-footer { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; border-top: var(--hairline) solid var(--border); padding: 0.75rem 0 0; margin-top: 0.5rem; }
@@ -585,7 +675,7 @@ tr:last-child td { border-bottom: none; }
 .run-queries-dialog-body { min-width: 32.5rem; }
 .run-queries-content {
   max-height: 60vh;
-  overflow: auto;
+  overflow-x: auto;
   border: var(--hairline) solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
@@ -600,7 +690,7 @@ tr:last-child td { border-bottom: none; }
 
 #run-status-dialog { max-width: min(65rem, 96vw); }
 .run-status-dialog-body { min-width: 40rem; }
-.run-status-dialog-body .table-wrap { max-height: 60vh; overflow-y: auto; }
+.run-status-dialog-body .table-wrap { max-height: 60vh; }
 
 /* Pre-flight dependency popup (before a role is dropped). Narrow when nothing was found — it is
    then just a per-cluster "no dependencies" list; as wide as the viewport allows as soon as any
@@ -617,7 +707,6 @@ tr:last-child td { border-bottom: none; }
 #deps-reload:disabled { opacity: 0.6; cursor: default; }
 .deps-list {
   max-height: 60vh;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -648,11 +737,15 @@ tr:last-child td { border-bottom: none; }
    remaining space and wraps rather than stretching the dialog further. */
 .deps-table td:last-child { white-space: normal; word-break: break-word; }
 
+/* --page-pad, not a bespoke 1rem: the clearing between the target rows and the panel frame is then
+   the same as the window margin, and the padding is wide enough (>= bar + gap) for the nested
+   .cluster-list to use the same margin-right/padding-right formula as every other scroller — so its
+   bar keeps 7px from the rows and ~4.6px from the frame instead of sitting flush against it. */
 .ops-sidebar {
   background: var(--surface);
   border: var(--hairline) solid var(--border);
   border-radius: var(--radius);
-  padding: 1rem;
+  padding: var(--page-pad);
 }
 
 .ops-sidebar h2, .ops-sidebar h3 {
@@ -707,9 +800,11 @@ tr:last-child td { border-bottom: none; }
   font-size: var(--fs-sm);
 }
 
+/* The bar rides in the sidebar panel's own padding (via the shared margin rule at the top of this
+   sheet), so the cluster rows keep the same right edge as the group rows above them — both are
+   .checkbox-group rows, so a stagger would show. */
 .cluster-list {
   max-height: 13.75rem;
-  overflow-y: auto;
 }
 
 .ops-sidebar label:not(.inline) {
@@ -1034,7 +1129,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 
 /* The direct child of every <dialog> is its body (a div or a form) and carries the padding. */
 dialog > div,
-dialog > form { padding: 1.25rem; }
+dialog > form { padding: var(--page-pad); }
 
 /* All popup headers match the Clusters / Cluster groups popup. The <form> bodies lay out with
    `display: grid` + `gap`, so there the gap owns the spacing and the heading margin must be 0. */
@@ -1386,7 +1481,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 /* Scrolls as one box, so the header keeps sitting over its own columns while scrolling. The
    horizontal axis is the safety valve for a window too narrow for the configured columns' minimums
    — the alternative is chips clipped at the edge with no way to reach them. */
-.search-dialog-body .alter-results { margin-top: 0.75rem; max-height: 50vh; overflow: auto; }
+.search-dialog-body .alter-results { margin-top: 0.75rem; max-height: 50vh; overflow-x: auto; }
 /* Status chip on the left of the popup's button row, Close staying right (the same margin-right
    trick as #fn-dialog-default / #btn-test-cluster). */
 #search-status { margin-right: auto; }
@@ -1399,7 +1494,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
 /* Scope dialog */
 #scope-form { display: grid; gap: 0.6rem; }
 #scope-form > label { gap: 0.25rem; }
-.scope-targets { display: grid; gap: 0.6rem; max-height: 46vh; overflow-y: auto; }
+.scope-targets { display: grid; gap: 0.6rem; max-height: 46vh; }
 .scope-group { border: var(--hairline) solid var(--border); border-radius: var(--radius); padding: 0.5rem 0.7rem; }
 .scope-group-head { font-weight: 600; display: flex; align-items: center; gap: 0.4rem; }
 .scope-clusters { display: grid; gap: 0.2rem; margin: 0.4rem 0 0 1.2rem; }
@@ -1523,7 +1618,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
    redundant: the base `dialog` rule caps at min(40rem, 92vw) and would clamp this back. Three
    columns would need ~47.7rem, so this width holds the grid at two on purpose. */
 #comments-dialog { width: min(44rem, 94vw); max-width: min(44rem, 94vw); }
-#comments-list { display: grid; gap: 0.9rem; max-height: 55vh; overflow-y: auto; }
+#comments-list { display: grid; gap: 0.9rem; max-height: 55vh; }
 .comment-version {
   border: var(--hairline) solid var(--border);
   border-radius: var(--radius);

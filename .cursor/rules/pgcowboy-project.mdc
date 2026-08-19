@@ -161,6 +161,44 @@ overcorrected buttons by ~1px — don't reintroduce it; uppercase pills excluded
 **`--checkbox-lift`** for the Target-selection checkbox. Retune the token, never sweep the rules. **`.section-label`** is the one small-uppercase section label
 (sized by `--fs-section`), replacing five drifted near-duplicates.
 
+**Scrollbars: `::-webkit-scrollbar` only.** The standard `scrollbar-width`/`scrollbar-color` sit
+inside a `@supports not selector(::-webkit-scrollbar)` guard (Firefox smoke-test path) and must not
+be re-added outside it: set to anything but `auto`, Chromium 121+ and WebKit/WebKitGTK ignore every
+`::-webkit-scrollbar` rule on the element, which restores the platform **overlay** bar — on
+WebKitGTK a hair-thin self-hiding indicator that paints over content. An explicit
+`::-webkit-scrollbar` width is also what force-renders an overlay bar as a classic, space-taking
+one. **One grouped `overflow-y: scroll` rule** (`.ops-body, .settings-body, .cluster-list,
+.table-scroll, .run-queries-content, .deps-list, .scope-targets, #comments-list,
+.search-dialog-body .alter-results, textarea`) reserves the bar's lane so content never shifts when
+it appears; it OWNS the vertical axis (no container declares its own `overflow-y`; each keeps only
+`overflow-x`), and it is not `scrollbar-gutter: stable`, which is above the WebKit 16 / macOS 12
+floor. Nothing paints while a container cannot scroll, so an unused lane is invisible.
+
+**The bar rides in the right margin; content keeps equal left/right margins.** Tokens:
+**`--page-pad`** (1.4rem — the app's horizontal edge, read by `.app-header`, `.tabs`, `.ops-layout`,
+both panels and `dialog > div/form`, so content, action buttons and op-tabs share one vertical line),
+**`--scrollbar-w`** (8px, repeated as a literal in the `::-webkit-scrollbar` rule on purpose) and
+**`--scrollbar-gap`** (7px). Invariant: `--scrollbar-w` + `--scrollbar-gap` ≤ `--page-pad`. A second
+grouped rule gives the borderless scrollers `margin-right: calc(-1 * (var(--scrollbar-w) +
+var(--scrollbar-gap)))` + `padding-right: var(--scrollbar-gap)`, so their content edge lands back on
+the panel's content edge and the bar sits in the margin. Don't give any of them a `padding`/`margin`
+shorthand later in the sheet (it drops the longhands — hence `.ops-body`'s `padding-block`) and don't
+give an ancestor an `overflow` value (`.ops-main` / `.table-wrap` are deliberately `overflow:
+visible`). `.ops-sidebar` is the exception: bordered panel, keeps `overflow-y: auto`, and hands the
+right margin to the nested `.cluster-list`, which uses the same formula — its padding is `--page-pad`
+(not a bespoke 1rem) so the rows clear the frame by the window margin and the 15px of bar+gap fits
+with air left over instead of the bar touching the frame.
+
+**Split tables.** `.table-wrap` = bordered, NON-scrolling flex column of `.table-head-clip >
+table.table-head` (thead) + `.table-scroll > table` (tbody): headers stay visible, the bar sits
+outside the border in the panel margin, its track spans the data rows only, the box border never
+moves. `overflow: visible` is load-bearing (hence the corner radii on `.table-wrap thead th`). Both
+tables share ONE generated colgroup under `table-layout: fixed` (`tableColgroup` /
+`applyTableColumns` / `tableMinWidth` in app.js — character counts, like `depsColgroup`, never text
+measuring), plus a `scrollLeft` sync so the header follows sideways scrolling. Values can be clipped,
+so `.table-scroll td` / `.table-head th` ellipsize and the renderers set `title` on truncatable
+cells.
+
 **App-shell layout:** `body` is a flex column with `overflow:hidden` (no whole-page
 scroll); header + tabs fixed. Operations = two independently scrolling columns
 (`.ops-sidebar` / `.ops-main`); `.ops-main` has a scrolling `.ops-body` + pinned
