@@ -10,6 +10,12 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-08-19
+
+### Fixed
+
+- **pre-flight no longer needs a superuser** — the default `role_dependencies` queries `pg_roles` instead of the `pg_authid`.
+
 ## [1.1.0] - 2026-08-18
 
 ### Changed

@@ -122,4 +122,18 @@ The app resolves credentials the way `psql` does. First match wins:
 The per-cluster password is optional and stored in clear text in `clusters.yaml`, which is written with owner-only permissions. Leave it blank to keep credentials out of the file entirely. See the PostgreSQL docs on [`.pgpass`](https://www.postgresql.org/docs/current/libpq-pgpass.html).
 :::
 
+## Database privileges
+
+pgCowboy requires a **superuser** connection.
+
+The requirement comes from the operations, not from the app. The built-in templates are plain PostgreSQL DDL, so each operation needs exactly the privilege its statement needs — and the set the role form offers, taken together, adds up to a superuser. [Required privileges](/pgcowboy/configuration/call-templates/#required-privileges) breaks it down per operation.
+
+:::tip
+A lower-privileged account can still do the job — point the operations you use at `SECURITY DEFINER` wrapper functions and grant it those. See [Call Templates](/pgcowboy/configuration/call-templates/) for more.
+:::
+
+:::note
+From PostgreSQL 16 a `CREATEROLE` role may manage only the roles it created, and may grant only a role it holds `ADMIN OPTION` on. Earlier versions let `CREATEROLE` manage any non-superuser role.
+:::
+
 Building from source is covered under [Building from source](/pgcowboy/building/).

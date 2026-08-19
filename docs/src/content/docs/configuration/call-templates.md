@@ -55,6 +55,25 @@ Clicking a command opens its editor: execution mode, the template text, clickabl
 | `set_config` | `ALTER ROLE ${loginname} SET ${config_name} = ${config_value}` |
 | `reset_config` | `ALTER ROLE ${loginname} RESET ${config_name}` |
 
+## Required privileges
+
+Because the defaults are plain DDL, each operation needs whatever its statement needs. A `superuser` covers all of them.
+
+| Operation | Privilege it needs |
+|-----------|--------------------|
+| `create_role`, `remove_role` | `CREATEROLE` |
+| `grant_parents`, `revoke_parents` | `ADMIN OPTION` on each parent role (PostgreSQL 16+) |
+| `change_password`, `set_comment` | `CREATEROLE`, plus `ADMIN OPTION` on the role (PostgreSQL 16+) |
+| `set_attribute` — Login, Inherit, Create role | `CREATEROLE`, plus `ADMIN OPTION` on the role (PostgreSQL 16+) |
+| `set_attribute` — Create DB, Replication, Bypass RLS | the same attribute on the connecting role (PostgreSQL 16+); superuser earlier |
+| `set_attribute` — Superuser | superuser, always |
+| `set_config`, `reset_config` | `CREATEROLE`, plus `ADMIN OPTION` on the role (PostgreSQL 16+) |
+| `set_config` — a superuser-only parameter such as `log_statement` | superuser, or `GRANT SET ON PARAMETER` |
+
+:::tip
+To connect as a lower-privileged role, wrap the operations you cannot or will not grant in a `SECURITY DEFINER` function and point the template at it.
+:::
+
 ## Execution modes
 
 - **statement** / **block** — the template is raw SQL (DDL, `GRANT`, `ALTER ROLE`). PostgreSQL can't bind a role name as `$1`, so the app embeds names as quoted **identifiers** and literals as **escaped strings**. Use `block` when the SQL is a `DO $$ … $$` block.

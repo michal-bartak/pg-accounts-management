@@ -82,37 +82,40 @@ db_reads:
   search_roles:
     # Contract columns: rolname (text), comment (text, nullable).
     query: |
-      SELECT r.rolname AS rolname,
+      SELECT r.rolname     AS rolname,
              d.description AS comment
-      FROM pg_roles r
-      LEFT JOIN pg_shdescription d
-        ON d.objoid = r.oid AND d.classoid = 'pg_authid'::regclass
-      WHERE r.rolname ILIKE ${rolename} OR d.description ILIKE ${rolename}
+      FROM pg_roles              AS r
+      LEFT JOIN pg_shdescription AS d
+             ON d.objoid   = r.oid
+            AND d.classoid = 'pg_authid'::regclass
+      WHERE r.rolname     ILIKE ${rolename}
+         OR d.description ILIKE ${rolename}
       ORDER BY r.rolname
   role_detail:
     # Contract columns (one row): rolsuper, rolcreaterole, rolcreatedb, rolinherit, rolcanlogin,
     # rolreplication, rolbypassrls (bool), comment (text, nullable), rolconfig (text[], nullable).
     query: |
-      SELECT r.rolsuper AS rolsuper,
-             r.rolcreaterole AS rolcreaterole,
-             r.rolcreatedb AS rolcreatedb,
-             r.rolinherit AS rolinherit,
-             r.rolcanlogin AS rolcanlogin,
+      SELECT r.rolsuper       AS rolsuper,
+             r.rolcreaterole  AS rolcreaterole,
+             r.rolcreatedb    AS rolcreatedb,
+             r.rolinherit     AS rolinherit,
+             r.rolcanlogin    AS rolcanlogin,
              r.rolreplication AS rolreplication,
-             r.rolbypassrls AS rolbypassrls,
-             d.description AS comment,
-             r.rolconfig AS rolconfig
-      FROM pg_roles r
-      LEFT JOIN pg_shdescription d
-        ON d.objoid = r.oid AND d.classoid = 'pg_authid'::regclass
+             r.rolbypassrls   AS rolbypassrls,
+             d.description    AS comment,
+             r.rolconfig      AS rolconfig
+      FROM pg_roles              AS r
+      LEFT JOIN pg_shdescription AS d
+             ON d.objoid   = r.oid
+            AND d.classoid = 'pg_authid'::regclass
       WHERE r.rolname = ${rolename}
   role_parents:
     # Contract columns (one row per parent): rolname (text).
     query: |
       SELECT g.rolname AS rolname
-      FROM pg_auth_members m
-      JOIN pg_roles g ON g.oid = m.roleid
-      JOIN pg_roles u ON u.oid = m.member
+      FROM pg_auth_members AS m
+      JOIN pg_roles        AS g ON g.oid = m.roleid
+      JOIN pg_roles        AS u ON u.oid = m.member
       WHERE u.rolname = ${rolename}
       ORDER BY g.rolname
   role_dependencies:
@@ -135,12 +138,13 @@ db_reads:
              s.classid::regclass::TEXT AS class,
              CASE WHEN s.dbid = 0 OR d.datname = current_database()
                   THEN pg_describe_object(s.classid, s.objid, s.objsubid)
-                  ELSE 'Located in other database' END AS object
-      FROM pg_shdepend s
-      JOIN pg_authid r ON r.oid = s.refobjid
-      LEFT JOIN pg_database d ON s.dbid = d.oid
+                  ELSE 'Located in other database'
+             END AS object
+      FROM pg_shdepend      AS s
+      JOIN pg_roles         AS r ON r.oid  = s.refobjid
+      LEFT JOIN pg_database AS d ON s.dbid = d.oid
       WHERE s.refclassid = 'pg_authid'::regclass
-        AND r.rolname = ${rolename}
+        AND r.rolname    = ${rolename}
       ORDER BY 1, 2, 3, 4
 batch:
   max_concurrency: 5

@@ -33,6 +33,10 @@ Thanks to **templating** of SQL queries, you can extend the basic operations, an
 - **Templatable SQL** - every operation the app issues against a database is configurable, so you can extend both what it does and who can do it.
 - **Password generator** - configurable password generator.
 
+:::tip[Superuser]
+Default configuratoin of pgCowboy requires a **superuser** connection. The reasons and a way how to avoid that is described in the [Database Privileges](/pgcowboy/installation/#database-privileges) section.
+:::
+
 ## How a change is applied
 
 1. Choose the target groups and/or single clusters in **Target selection**.
