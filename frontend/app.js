@@ -280,6 +280,14 @@ const ROLE_ATTRIBUTES = [
 ];
 /** @type {MediaQueryList | null} */
 let systemThemeMedia = null;
+/** Cached `Environment().platform === 'linux'`; null until the first probe resolves. */
+let isLinuxHost = null;
+/** Linux-only gsettings poll while the preference is "system" — see applyTheme. */
+let systemThemePoll = null;
+/** Bumped by every applyTheme() call. An async resolve (or a late poll tick) captures the
+ *  generation it started in and bails if superseded, so a slow probe from a preference the
+ *  user has already moved off can't repaint over the newer pick. */
+let themeGeneration = 0;
 
 function backend() {
   return window.go?.main?.App;
@@ -458,20 +466,9 @@ function setPasswordGenControls(pg) {
   set('pwgen-exclude-similar', g.excludeSimilar);
 }
 
-function applyTheme(themePref) {
-  const pref = themePref || 'system';
-  let resolved = pref;
-  if (pref === 'system') {
-    if (!systemThemeMedia) {
-      systemThemeMedia = window.matchMedia('(prefers-color-scheme: dark)');
-      systemThemeMedia.addEventListener('change', () => {
-        if (currentThemePref() === 'system') applyTheme('system');
-      });
-    }
-    resolved = systemThemeMedia.matches ? 'dark' : 'light';
-  }
-  document.documentElement.setAttribute('data-theme', resolved);
-
+/** Tell the native window chrome which theme it is wearing. `resolved` is the concrete
+ *  dark/light outcome; for "system" the runtime is asked to follow the OS itself. */
+function setNativeTheme(pref, resolved) {
   const rt = window.runtime;
   if (!rt) return;
   try {
@@ -485,6 +482,79 @@ function applyTheme(themePref) {
   } catch {
     /* native theme optional */
   }
+}
+
+async function onLinux() {
+  if (isLinuxHost === null) {
+    try {
+      isLinuxHost = (await window.runtime?.Environment?.())?.platform === 'linux';
+    } catch {
+      isLinuxHost = false;
+    }
+  }
+  return isLinuxHost;
+}
+
+/** Does the desktop prefer dark? WebKitGTK reports `prefers-color-scheme: light` whatever the
+ *  desktop is actually set to, so on Linux the backend answers instead (gsettings, then KDE);
+ *  the media query is the fallback if that call fails, and the answer everywhere else. */
+async function resolveSystemDark() {
+  if (await onLinux()) {
+    try {
+      const dark = await backend()?.IsSystemDark?.();
+      if (typeof dark === 'boolean') return dark;
+    } catch {
+      /* fall through to the media query */
+    }
+  }
+  return !!systemThemeMedia?.matches;
+}
+
+async function applyTheme(themePref) {
+  const pref = themePref || 'system';
+  const gen = ++themeGeneration;
+  if (systemThemePoll) { // a poll left over from a previous "system" selection
+    clearInterval(systemThemePoll);
+    systemThemePoll = null;
+  }
+  if (!systemThemeMedia) {
+    systemThemeMedia = window.matchMedia('(prefers-color-scheme: dark)');
+    systemThemeMedia.addEventListener('change', () => {
+      if (currentThemePref() === 'system') applyTheme('system');
+    });
+  }
+
+  // Both halves of "wear this appearance": the page, and — on Linux — GTK. A <select>'s
+  // drop-down LIST is drawn natively by WebKitGTK, so `appearance: none` and the rules on the
+  // <option>s never reach it; only the GTK theme's variant does. A no-op off Linux, where the
+  // native list already follows the page's `color-scheme`.
+  const paint = (dark) => {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    try {
+      backend()?.SetNativeDarkTheme?.(dark)?.catch?.(() => {});
+    } catch {
+      /* backend absent — the static-server smoke test */
+    }
+  };
+
+  if (pref !== 'system') {
+    paint(pref === 'dark');
+    setNativeTheme(pref, pref);
+    return;
+  }
+
+  const dark = await resolveSystemDark();
+  if (gen !== themeGeneration) return; // superseded while the probe was in flight
+  paint(dark);
+  setNativeTheme('system', dark ? 'dark' : 'light');
+
+  // The media query never fires `change` on Linux (WebKitGTK never sees the desktop switch), so
+  // polling the backend probe is the only way "System" keeps tracking the desktop live.
+  if (!(await onLinux()) || gen !== themeGeneration) return;
+  systemThemePoll = setInterval(async () => {
+    const next = await resolveSystemDark();
+    if (gen === themeGeneration) paint(next);
+  }, 5000);
 }
 
 async function loadConfig() {

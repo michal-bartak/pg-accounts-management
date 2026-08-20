@@ -46,6 +46,10 @@ export function GetPendingUpdate() {
   return window['go']['main']['App']['GetPendingUpdate']();
 }
 
+export function IsSystemDark() {
+  return window['go']['main']['App']['IsSystemDark']();
+}
+
 export function LoadRoleDependencies(arg1) {
   return window['go']['main']['App']['LoadRoleDependencies'](arg1);
 }
@@ -112,6 +116,10 @@ export function SaveWindowSize(arg1, arg2) {
 
 export function SearchRoles(arg1) {
   return window['go']['main']['App']['SearchRoles'](arg1);
+}
+
+export function SetNativeDarkTheme(arg1) {
+  return window['go']['main']['App']['SetNativeDarkTheme'](arg1);
 }
 
 export function SetUpdateSeenVersion(arg1) {

@@ -552,6 +552,50 @@ out of step. Two rem values are hand-synced and must not drift:
 `th, td { padding: .55rem .75rem }` with the `1.5rem` in `depsColgroup`, and
 `.alter-result-head`'s `calc(0.7rem + 1px)` with the search-result row's border+padding.
 
+**Three things WebKitGTK gets wrong, fixed once each — don't undo them.**
+1. **`prefers-color-scheme` is a lie on Linux**: WebKitGTK answers "light" whatever the desktop is
+   set to, so the *System* appearance could never resolve dark there. The frontend therefore asks
+   the **backend** — `App.IsSystemDark()`
+   ([system_theme_linux.go](system_theme_linux.go), a `!linux` stub in
+   [system_theme_other.go](system_theme_other.go)) probes GNOME `gsettings`
+   (`color-scheme`, then the pre-42 `gtk-theme`) then KDE (`kreadconfig6`, then `5`), each step
+   returning a `(dark, known)` pair so "no gsettings" is *unknown* rather than *light*. Only Linux
+   calls it (`onLinux()` caches `runtime.Environment().platform`); macOS/Windows keep `matchMedia`,
+   which they answer correctly. `applyTheme` is **async** because of this — every call site is
+   fire-and-forget, and a **generation counter** (`themeGeneration`, bumped per call, re-checked
+   after every `await`) makes a slow probe from a superseded preference bail instead of repainting.
+   Linux also gets a **5 s poll** (`systemThemePoll`), since the media query never fires `change`
+   for a desktop switch the engine cannot see; it is torn down by the next `applyTheme`. Mirrors
+   the same fix in the `osc` and `audits` projects.
+2. **A `<select>` takes two separate fixes, because it is two separate things.** The CLOSED
+   control needs BOTH `appearance: none` and `-webkit-appearance: none` — WebKitGTK honours only
+   the prefixed one for form controls, so the unprefixed property alone leaves Linux drawing the
+   native GTK combo (system background, GTK's own text centring that ignores our height).
+   `input[type="checkbox"]` already carried both prefixes; a new `appearance` user must too.
+   The **drop-down LIST is a different story: no CSS reaches it at all.** WebKitGTK draws it as a
+   native GTK widget, so `appearance` never applies and neither does `select option {…}` —
+   **the option rule is kept for the platforms where it does work, but it is NOT what fixes
+   Linux**, and reaching for more CSS there is wasted effort. The only knob is GTK's own
+   **`gtk-application-prefer-dark-theme`**, set through `App.SetNativeDarkTheme(bool)`
+   ([native_theme_linux.go](native_theme_linux.go), cgo/`gtk+-3.0` — a strict subset of what Wails
+   already links on Linux; the `!linux || !cgo` stub in
+   [native_theme_other.go](native_theme_other.go) keeps `CGO_ENABLED=0` cross-builds working).
+   GTK is not thread-safe and bound methods do not run on the main loop, so the `g_object_set` is
+   deferred onto it with `g_idle_add`. `applyTheme`'s `paint()` drives page and GTK **together** —
+   including from the poll tick, or a live desktop switch would darken the page and leave the
+   drop-downs white. It also fixes the other natively drawn surfaces (context menus, file dialogs);
+   a GTK theme with no dark variant simply ignores it.
+3. **Wails sets no GTK window icon**, so the window/task bar/switcher fall back to the desktop's
+   generic icon. `main.go` embeds `build/appicon.png` (the same drawing the packaged hicolor icon is
+   resized from — one source) and passes it as `linux.Options.Icon`, with
+   **`ProgramName: "pgcowboy"`** — `g_set_prgname()`, which is the Wayland `app_id` and the X11
+   `res_name`, and must equal the installed **`pgcowboy.desktop`** basename or the compositor can't
+   match window to entry; it otherwise defaults to the executable name `pgCowboy`, which doesn't.
+   [pgcowboy.desktop](build/linux/pgcowboy.desktop)'s `StartupWMClass` is kept in step with it.
+   Passing a non-nil `linux.Options` at all means **`WebviewGpuPolicy` must be set explicitly**:
+   Wails applies its `Never` default (the wailsapp/wails#2977 rendering workaround) *only* when the
+   struct is nil, so leaving the field at its zero value would silently flip it to `Always`.
+
 **Scrollbars are styled ONLY through `::-webkit-scrollbar`** (one universal block in
 [styles.css](frontend/styles.css), just below the user-select rule) — the standard
 `scrollbar-width`/`scrollbar-color` properties live inside a
@@ -900,6 +944,8 @@ The header is a `.brand` row (accent dot + smaller title + version chip + round 
 
 ```
 main.go, app.go           Wails entry + bound methods
+system_theme_*.go         Linux-only desktop dark/light probe behind App.IsSystemDark()
+native_theme_*.go         Linux-only GTK dark-variant toggle behind App.SetNativeDarkTheme()
 internal/model/           Shared JSON-tagged types + RunRequest (stdlib only)
 internal/calltemplate/    Template parse/validate/SQL build (stdlib only)
 internal/config/          YAML persistence (config.yaml + clusters.yaml), migrate/validate

@@ -7,5 +7,5 @@ Exec=/usr/bin/pgCowboy
 Icon=pgcowboy
 Categories=Development;Database;
 Keywords=postgres;postgresql;database;roles;
-StartupWMClass=pgCowboy
+StartupWMClass=pgcowboy
 Terminal=false

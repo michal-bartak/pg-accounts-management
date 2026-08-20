@@ -8,6 +8,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/linux"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
 
 	"github.com/michal-bartak/pgcowboy/internal/version"
@@ -22,6 +23,14 @@ var assets embed.FS
 //
 //go:embed VERSION
 var versionFile string
+
+// appIcon is the window icon for Linux. macOS and Windows take theirs from the bundle / exe
+// resource, but Wails sets no GTK window icon, so without this the window, task bar and
+// alt-tab fall back to the desktop's generic application icon. Same PNG the packaged
+// hicolor icon is resized from, so there is one source drawing.
+//
+//go:embed build/appicon.png
+var appIcon []byte
 
 // Window sizing: defaults and floor. The persisted size is the OS window size (via Wails
 // WindowGetSize), so save/restore round-trips without shrinking each launch.
@@ -66,6 +75,19 @@ func main() {
 		OnStartup:        app.startup,
 		Mac: &mac.Options{
 			TitleBar: mac.TitleBarDefault(),
+		},
+		Linux: &linux.Options{
+			// GTK window icon — see appIcon above.
+			Icon: appIcon,
+			// g_set_prgname(), which is also the Wayland app_id. It must equal the installed
+			// desktop file's basename (pgcowboy.desktop) or the compositor cannot match the
+			// window to the entry, and shows the generic icon and name. Without this it
+			// defaults to the executable name ("pgCowboy"), which does not match.
+			ProgramName: "pgcowboy",
+			// Wails applies this default itself only when Options.Linux is nil; passing a
+			// non-nil struct would otherwise silently flip it to "always" (the zero value)
+			// and reintroduce the WebKitGTK rendering glitches of wailsapp/wails#2977.
+			WebviewGpuPolicy: linux.WebviewGpuPolicyNever,
 		},
 		Bind: []interface{}{
 			app,
