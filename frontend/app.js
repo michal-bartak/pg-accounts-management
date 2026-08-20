@@ -4206,8 +4206,11 @@ document.querySelectorAll('.tab').forEach((tab) => {
     document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById(`panel-${tab.dataset.tab}`).classList.add('active');
-    // Create role / Alter role live in the tabs bar but belong to Operations only.
-    document.getElementById('op-tabs')?.classList.toggle('hidden', tab.dataset.tab !== 'operations');
+    // The per-page action groups (Create/Alter role, the Clusters actions) live in the tabs bar;
+    // each declares the page it belongs to, so a new group needs no code here.
+    document
+      .querySelectorAll('.tab-actions')
+      .forEach((group) => group.classList.toggle('hidden', group.dataset.for !== tab.dataset.tab));
     // Leaving/entering a page discards stale run status so it never bleeds across pages.
     clearRunStatus();
   });

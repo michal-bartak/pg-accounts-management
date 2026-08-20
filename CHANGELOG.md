@@ -16,6 +16,10 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - **Scrollbars** — the bar now sits in the window's right margin instead of against the content, and its space is always reserved so nothing shifts when it appears.
 - **Tables** — column headers stay visible while the rows scroll, and the scrollbar sits outside the table.
 
+### Changed
+
+- **Clusters actions moved to the tab bar** — Add cluster, Test connections and Cluster groups now sit beside the page tabs, like Create/Alter role.
+
 ## [1.1.1] - 2026-08-19
 
 ### Fixed

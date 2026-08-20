@@ -26,12 +26,17 @@
   --page-pad: 1.4rem;
   /* Scrollbar geometry. --scrollbar-w REPEATS the width literal in the ::-webkit-scrollbar rule
      below on purpose (a var() inside a scrollbar pseudo-element is not worth risking on
-     WebKitGTK: a dropped width there silently restores the native overlay bar). --scrollbar-gap
-     is the air between content and bar — measured, not guessed: content touches the bar below
-     ~2.5px. Both stay px like the bar itself. INVARIANT: --scrollbar-w + --scrollbar-gap must
-     stay <= --page-pad, or the bar lands outside the window edge. */
+     WebKitGTK: a dropped width there silently restores the native overlay bar).
+     --scrollbar-gap is DERIVED, not picked: it is half of what the bar leaves over in the margin,
+     so the bar sits centred in that margin — equal air between the content (or the box's frame
+     line) and the bar, and between the bar and the window/dialog edge. Writing it as a relation
+     means changing --page-pad or the bar's width keeps it centred instead of silently shifting it.
+     Both stay px like the bar itself. It also satisfies the invariant
+     --scrollbar-w + --scrollbar-gap <= --page-pad by construction (equality only if the bar took
+     the whole margin), and stays well clear of the ~2.5px where content starts touching the bar —
+     at --page-pad 1.4rem it is 5.8px. */
   --scrollbar-w: 8px;
-  --scrollbar-gap: 7px;
+  --scrollbar-gap: calc((var(--page-pad) - var(--scrollbar-w)) / 2);
   /* Hairline borders. A plain 1px is 1.75 device px at 175% display scaling, which cannot
      render exactly — the engine snaps each element's border box to whole device pixels, so
      the SAME 1px border comes out 1 or 2 device px depending on where that element's edge
@@ -171,16 +176,16 @@ input, textarea, [contenteditable="true"] {
    the margin. Content therefore keeps EQUAL left and right margins, with the bar occupying the
    outer end of the right one.
    The budget the box grows into is the parent's padding — --page-pad for the panels, the dialog
-   bodies and the .ops-sidebar panel (.cluster-list grows into that one), or the table's own border
-   box for .table-scroll; all of them are >= bar + gap, which is the invariant on the tokens.
+   bodies and the .ops-sidebar panel (.cluster-list grows into that one); all of them are
+   >= bar + gap, which is the invariant on the tokens. (.table-scroll grows past a border instead,
+   so it carries its own pair — see its rule.)
    Two things not to undo: (1) none of these selectors may take a `padding`/`margin` SHORTHAND
    later in the sheet — it silently drops the longhands set here (which is why .ops-body uses
    padding-block); (2) an ancestor must not gain an `overflow` value that CLIPS the bar — a scroll
    container clips at its padding box, so .ops-sidebar's `auto` is fine, but .ops-main and
    .table-wrap must stay overflow: visible. */
 .ops-body, .settings-body, .cluster-list,
-.deps-list, .scope-targets, #comments-list, .search-dialog-body .alter-results,
-.table-scroll {
+.deps-list, .scope-targets, #comments-list, .search-dialog-body .alter-results {
   margin-right: calc(-1 * (var(--scrollbar-w) + var(--scrollbar-gap)));
   padding-right: var(--scrollbar-gap);
 }
@@ -397,7 +402,6 @@ main { flex: 1 1 auto; min-height: 0; overflow: hidden; }
 /* Clusters / Settings: single column, header fixed, body scrolls. */
 /* Clusters + Settings share the same padded panel + inset (up-to-margins) footer divider. */
 #panel-clusters, #panel-settings { padding: 1rem var(--page-pad); }
-#panel-clusters .toolbar { flex: none; }
 #panel-clusters .table-wrap { flex: 1 1 auto; min-height: 0; }
 /* Staged editor footer: Discard/Save on the right, inline error on the left; border-top inset
    to the panel content (not the full window). */
@@ -406,8 +410,6 @@ main { flex: 1 1 auto; min-height: 0; overflow: hidden; }
 .clusters-footer .form-error,
 .settings-footer .form-error { margin: 0; margin-right: auto; }
 .settings-body { flex: 1 1 auto; min-height: 0; }
-
-.toolbar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
 
 button {
   min-height: var(--control-h);
@@ -471,7 +473,19 @@ select option {
    the single-table deps wraps built in app.js. */
 .table-wrap thead th:first-child { border-top-left-radius: var(--radius); }
 .table-wrap thead th:last-child { border-top-right-radius: var(--radius); }
-.table-scroll { flex: 1 1 auto; min-height: 0; overflow-x: auto; }
+/* The one scroller that reaches out past a BORDER instead of out of a padding box: the table's cells
+   end exactly on the box's inner border edge, so the nearest painted edge to the left of the bar is
+   the frame LINE, and the gap has to clear it too. Without the extra hairline the bar keeps only
+   5.85px of visible air on its left and 5.74px on its right — i.e. it reads as centred in the window
+   margin instead of centred in it like every other scroller — the frame line would eat 1.15px of the
+   gap on one side only. */
+.table-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: auto;
+  margin-right: calc(-1 * (var(--scrollbar-w) + var(--scrollbar-gap) + var(--hairline)));
+  padding-right: calc(var(--scrollbar-gap) + var(--hairline));
+}
 /* Fixed layout means a value wider than its column has to be clipped; every cell carries a title.
    The header labels need the same treatment or a squeezed column prints them over its neighbour. */
 .table-scroll td,
@@ -589,13 +603,29 @@ tr:last-child td { border-bottom: none; }
   padding: 1rem var(--page-pad);
 }
 
-/* Left (target selection) and right (form) scroll independently. The sidebar is a bordered panel,
-   so its bar cannot leave the box, and reserving a lane INSIDE its padding is what made its rows sit
+/* Left (target selection) and right (form) scroll independently. The sidebar is a bordered panel, so
+   its bar cannot leave the box, and reserving a lane INSIDE its padding is what made its rows sit
    further from the right border than from the left. Two nested scroll containers cannot both spend
    the same padding, so the sidebar keeps `auto` (it is the rare scroller — the cluster list flexes to
    fill it) and hands the right margin to .cluster-list. Trade-off: when the sidebar itself overflows
-   (many groups, list collapsed) its own bar appears and shifts its content by the bar's width. */
-.ops-sidebar { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+   (many groups, list collapsed) its own bar appears and shifts its content by the bar's width.
+   Its padding and its overflow belong in ONE rule: the padding-RIGHT is the budget .cluster-list's
+   bar rides in (bar + gap, centred), so it must stay --page-pad — splitting the two across the sheet
+   is how someone retunes the padding without seeing that constraint. The LEFT is deliberately
+   smaller: the rows carry their own 0.75rem, so a full --page-pad there reads as double indentation.
+   Consequence to accept: with the bar's lane reserved on the right only, an unscrollable list looks
+   slightly lopsided (11.9px of content clearance on the left, 19.6px on the right). */
+.ops-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--surface);
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--page-pad);
+  padding-left: 0.85rem;
+}
 /* "Or pick clusters" toggle; expanded list fills the remaining sidebar height. */
 .clusters-toggle {
   display: flex; align-items: center; gap: 0.4rem;
@@ -737,17 +767,6 @@ tr:last-child td { border-bottom: none; }
    remaining space and wraps rather than stretching the dialog further. */
 .deps-table td:last-child { white-space: normal; word-break: break-word; }
 
-/* --page-pad, not a bespoke 1rem: the clearing between the target rows and the panel frame is then
-   the same as the window margin, and the padding is wide enough (>= bar + gap) for the nested
-   .cluster-list to use the same margin-right/padding-right formula as every other scroller — so its
-   bar keeps 7px from the rows and ~4.6px from the frame instead of sitting flush against it. */
-.ops-sidebar {
-  background: var(--surface);
-  border: var(--hairline) solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--page-pad);
-}
-
 .ops-sidebar h2, .ops-sidebar h3 {
   margin: 0 0 0.5rem;
   font-size: var(--fs-h2);
@@ -831,7 +850,10 @@ tr:last-child td { border-bottom: none; }
 .hint { font-size: var(--fs-sm); color: var(--muted); margin: 0.5rem 0 0; }
 
 /* Create role / Alter role live at the right of the top tabs bar. */
-.op-tabs { display: flex; gap: 0.35rem; margin-left: auto; }
+/* The tabs bar carries one right-aligned action group per page — Operations' mode switches and the
+   Clusters actions — so every page's actions sit in the same place. Only the active page's group is
+   in the layout (.hidden), so the `margin-left: auto` of the visible one always wins. */
+.tab-actions { display: flex; gap: 0.35rem; margin-left: auto; }
 .op-tab.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 
 .op-form { display: none; }
@@ -1486,8 +1508,7 @@ button.flash-fade { transition: background .8s ease, border-color .8s ease, colo
    trick as #fn-dialog-default / #btn-test-cluster). */
 #search-status { margin-right: auto; }
 
-/* Cluster groups: right-aligned toolbar button + list popup */
-#btn-manage-groups { margin-left: auto; }
+/* Cluster groups: the list popup opened from the tabs bar's Clusters actions */
 .groups-dialog-body { min-width: 26.25rem; }
 .groups-dialog-body .settings-section-head { margin-top: 0; }
 

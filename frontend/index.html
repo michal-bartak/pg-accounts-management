@@ -20,9 +20,16 @@
     <button class="tab active" data-tab="operations" role="tab">Operations</button>
     <button class="tab" data-tab="clusters" role="tab">Clusters</button>
     <button class="tab" data-tab="settings" role="tab">Settings</button>
-    <div class="op-tabs" id="op-tabs">
+    <!-- One right-aligned action group per page, shown only while that page is active (the .tab
+         click handler keys off data-for). Add a page's actions by adding a group here. -->
+    <div class="tab-actions" id="op-tabs" data-for="operations">
       <button type="button" class="op-tab active" data-op="create_role">Create role</button>
       <button type="button" class="op-tab" data-op="alter_user">Alter role</button>
+    </div>
+    <div class="tab-actions hidden" id="cluster-actions" data-for="clusters">
+      <button type="button" id="btn-add-cluster" class="primary">Add cluster</button>
+      <button type="button" id="btn-test-clusters">Test connections</button>
+      <button type="button" id="btn-manage-groups">Cluster groups</button>
     </div>
   </nav>
 
@@ -85,11 +92,7 @@
     </section>
 
     <section id="panel-clusters" class="panel">
-      <div class="toolbar">
-        <button type="button" id="btn-add-cluster" class="primary">Add cluster</button>
-        <button type="button" id="btn-test-clusters">Test connections</button>
-        <button type="button" id="btn-manage-groups">Cluster groups</button>
-      </div>
+      <!-- Add cluster / Test connections / Cluster groups live in the tabs bar (#cluster-actions). -->
       <!-- Split table: the header is its own table OUTSIDE the scrolling body, so it stays visible
            and the body's scrollbar spans the data rows only. Both tables get the same generated
            <colgroup> (tableColgroup) under table-layout:fixed, which is what keeps the columns

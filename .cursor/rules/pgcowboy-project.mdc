@@ -134,8 +134,11 @@ button reverts one template to the vanilla built-in.
 
 ## UI (`frontend/`)
 
-Tabs: **Operations**, **Clusters**, **Settings**, with **Create role** + **Alter role**
-op-tabs right-aligned in the same bar (visible only while Operations is active). Prod/UAT
+Tabs: **Operations**, **Clusters**, **Settings**, with ONE right-aligned `.tab-actions` group per
+page in the same bar — **Create role** + **Alter role** (`#op-tabs`) and **Add cluster** + **Test
+connections** + **Cluster groups** (`#cluster-actions`); each declares its page via `data-for` and
+the `.tab` handler shows only the active one, so a new group is markup only. The Clusters panel has
+no in-panel toolbar. Prod/UAT
 badges in CSS. Per-cluster outcomes render in the **Status** panel (hidden until
 non-empty). Do not add a heavy frontend framework unless requested.
 
@@ -178,7 +181,9 @@ floor. Nothing paints while a container cannot scroll, so an unused lane is invi
 **`--page-pad`** (1.4rem — the app's horizontal edge, read by `.app-header`, `.tabs`, `.ops-layout`,
 both panels and `dialog > div/form`, so content, action buttons and op-tabs share one vertical line),
 **`--scrollbar-w`** (8px, repeated as a literal in the `::-webkit-scrollbar` rule on purpose) and
-**`--scrollbar-gap`** (7px). Invariant: `--scrollbar-w` + `--scrollbar-gap` ≤ `--page-pad`. A second
+**`--scrollbar-gap`** = `calc((var(--page-pad) - var(--scrollbar-w)) / 2)` — derived, not picked, so the
+bar sits centred in the margin (equal air to the content/frame line and to the window/dialog edge) and
+the `bar + gap ≤ --page-pad` invariant holds by construction. A second
 grouped rule gives the borderless scrollers `margin-right: calc(-1 * (var(--scrollbar-w) +
 var(--scrollbar-gap)))` + `padding-right: var(--scrollbar-gap)`, so their content edge lands back on
 the panel's content edge and the bar sits in the margin. Don't give any of them a `padding`/`margin`
@@ -192,7 +197,9 @@ with air left over instead of the bar touching the frame.
 **Split tables.** `.table-wrap` = bordered, NON-scrolling flex column of `.table-head-clip >
 table.table-head` (thead) + `.table-scroll > table` (tbody): headers stay visible, the bar sits
 outside the border in the panel margin, its track spans the data rows only, the box border never
-moves. `overflow: visible` is load-bearing (hence the corner radii on `.table-wrap thead th`). Both
+moves. `.table-scroll` grows past a BORDER (not out of a padding box), so its margin/padding pair adds
+`--hairline` — otherwise the frame line eats part of the gap and the bar reads as centred in the margin
+instead of centred like the other scrollers. `overflow: visible` is load-bearing (hence the corner radii on `.table-wrap thead th`). Both
 tables share ONE generated colgroup under `table-layout: fixed` (`tableColgroup` /
 `applyTableColumns` / `tableMinWidth` in app.js — character counts, like `depsColgroup`, never text
 measuring), plus a `scrollLeft` sync so the header follows sideways scrolling. Values can be clipped,
@@ -217,7 +224,7 @@ reads the drafts — Operations keeps reading saved `state`. **Test connections*
 (module-level `selectedCategoryIds`=null→all / `selectedClusterIds`, seeded once from
 persisted `Config.Targets`, re-render keeps it, persisted via `SaveTargetSelection`) so it
 survives Settings-save and restarts. **Cluster groups** are edited from
-the Clusters toolbar (right-aligned `btn-manage-groups` → `#groups-dialog` list →
+the tabs bar's Clusters actions (`btn-manage-groups` → `#groups-dialog` list →
 `#group-dialog` form; no Save button, so not in Settings). Feature descriptions live
 behind a **`?` help badge** (`.q-hint`, via `hintBadge(text)`); mouse hover shows a shared
 `position:fixed`, viewport-clamped popover (`.q-hint-pop`) driven by delegated
