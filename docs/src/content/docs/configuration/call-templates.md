@@ -99,24 +99,46 @@ The app knows the kind of each field, so you don't quote them yourself:
 - **`config_name`** → a bare, validated GUC name (never quoted).
 - **`attributes`** → a space-separated keyword list, each keyword checked against a whitelist (`SUPERUSER`/`NOSUPERUSER`, `CREATEROLE`, `LOGIN`, `REPLICATION`, `BYPASSRLS`, …). All of a cluster's attribute changes are combined into one `ALTER ROLE … WITH …`.
 
-:::caution
-A comment field cannot be used inside the `ARRAY[...] || ${...}` form.
+## Examples
+### SQL statement
+
+```sql
+CREATE ROLE ${loginname}
+```
+### Function call
+
+Suppose role creation must go through a helper that also assigns fixed groups.
+
+```sql
+admin_access.create_role
+(
+    _role_name     => ${loginname},
+    _role_fullname => ${{fullname}},
+    _role_email    => ${{email}},
+    _role_parents  => ARRAY['gr_personal_users', 'gr_personal_users_ldap']
+)
+
+```
+:::note
+No SELECT/PERFORM in this code, nor semicolon.
 :::
 
-## A function-mode example
+### Code block
 
-Suppose role creation must go through a helper that also assigns fixed groups. Set `create_role` to **function** mode with:
+It provides another way of performing multiple operations.
 
-```text
-admin_access.create_role(
-  ${loginname}, NULL, ${{full_name}}, ${{e_mail}},
-  ARRAY['gr_personal_users', 'gr_personal_users_ldap'] || ${parent_roles}
-)
+:::caution[Sub-commits]
+Don't use sub-commits. This statements is issued together with others within single transaction. Sub-commits will fail.
+:::
+
+```sql
+DO LANGUAGE plpgsql $$
+BEGIN
+  CREATE ROLE ${loginname};
+  GRANT gr_personal_users_ldap TO ${loginname};
+  ALTER ROLE ${loginname} SET log_statement='all';
+END;$$
 ```
-
-- `${loginname}` is a bind; `${{full_name}}` / `${{e_mail}}` are comment-field placeholders (their values come from the role's comment, typed, `NULL` when empty/absent).
-- `NULL` is a plain SQL literal for an unused argument.
-- `ARRAY[...] || ${parent_roles}` appends the selected parent roles to a fixed set (it becomes `|| NULL` when the selection is empty).
 
 ## Read (introspection) queries
 
