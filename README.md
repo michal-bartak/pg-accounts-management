@@ -20,7 +20,7 @@ What changed in each version: [CHANGELOG.md](CHANGELOG.md).
 git clone https://github.com/michal-bartak/pgcowboy.git
 cd pgcowboy
 go mod tidy
-wails dev
+make dev
 ```
 
 See [Building from source](https://michal-bartak.github.io/pgcowboy/building/) for requirements and `make` targets.

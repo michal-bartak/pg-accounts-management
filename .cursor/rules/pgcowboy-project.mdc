@@ -23,7 +23,12 @@ Cross-platform **PostgreSQL role maintenance** desktop app: manage clusters, bat
 - Go module: `github.com/michal-bartak/pgcowboy`
 - Wails **v2.12.0** (CLI may auto-bump `go.mod` on `wails dev`)
 - pgx v5, yaml.v3, google/uuid
-- Bindings: `frontend/wailsjs/` — **auto-generated** by Wails; do not hand-edit; regenerate via `wails dev` / `wails build`
+- Bindings: `frontend/wailsjs/` — **auto-generated** by Wails; do not hand-edit; regenerate via `make dev` / `make build`
+- **Always build through `make`, never a bare `wails dev`/`wails build`:** Wails' cgo asks pkg-config
+  for `webkit2gtk-4.0`, so a 4.1-only host (Ubuntu 24.04+, Fedora) fails to compile. The Makefile
+  detects it and adds `-tags webkit2_41` (`WAILS_BUILD_FLAGS`); every target that compiles Go must
+  pass it, which is why `dev` is a target. Detected per host, not pinned in `wails.json`'s
+  `build:tags` (committed, and 4.1 is wrong on a 4.0-only host / meaningless off Linux).
 
 ## Config files
 

@@ -112,7 +112,7 @@ Packaging notes:
 - **MSI** — per-machine install into `C:\Program Files\pgCowboy`, Start-menu shortcut, in-place upgrades (`MajorUpgrade`), install path remembered under `HKLM\Software\MichalBartak\pgCowboy`. The `UpgradeCode` GUID in `product.wxs` must never change. Banner and dialog bitmaps are generated from `build/appicon.png` at build time.
 - **deb/rpm** — `/usr/bin/pgCowboy`, a `.desktop` entry from [`build/linux/pgcowboy.desktop`](build/linux/pgcowboy.desktop) and an icon; package name `pgcowboy`. Runtime dependencies name the WebKit the binary is linked against (`libwebkit2gtk-4.1-0` / `webkit2gtk4.1`) — update them together with the build tag if that ever changes. Set `MAINTAINER="Name <email>"` to override the maintainer field.
 
-On Ubuntu 24.04+ (WebKit 4.1 only), `make build` auto-detects `webkit2gtk-4.1` and passes `-tags webkit2_41` to Wails. Install dev packages: `libgtk-3-dev libwebkit2gtk-4.1-dev`.
+On Ubuntu 24.04+ and Fedora (WebKit 4.1 only), `make build` and `make dev` auto-detect `webkit2gtk-4.1` and pass `-tags webkit2_41` to Wails — a bare `wails dev`/`wails build` does not, and fails against the 4.0 default. Install dev packages: `libgtk-3-dev libwebkit2gtk-4.1-dev`.
 
 ### Unsigned builds (macOS and Windows)
 

@@ -1,4 +1,4 @@
-.PHONY: version sync-wails-version ensure-wails test test-frontend test-vet build build-ci package package-ci clean dist docs-install docs-dev docs-build docs-preview docs-clean docs-lint docs-shots docs-shots-status
+.PHONY: version sync-wails-version ensure-wails test test-frontend test-vet dev build build-ci package package-ci clean dist docs-install docs-dev docs-build docs-preview docs-clean docs-lint docs-shots docs-shots-status
 
 APP := pgCowboy
 VERSION := $(shell tr -d ' \n\r' < VERSION)
@@ -27,7 +27,11 @@ else
 WAILS := $(GOPATH_DIR)/bin/wails
 endif
 
-# Ubuntu 24.04+ ships webkit2gtk 4.1 only; Wails defaults to 4.0 without this tag.
+# Ubuntu 24.04+ (and Fedora) ship webkit2gtk 4.1 only; Wails' cgo asks for 4.0 without this
+# tag. Detected per host rather than pinned in wails.json's `build:tags`, which is committed:
+# 4.1 is wrong on a 22.04-era host that has only 4.0, and meaningless off Linux. Every target
+# that compiles Go must pass it — `dev` as well as `build`, or `wails dev` fails where
+# `make build` succeeds.
 ifeq ($(GOOS),linux)
 ifneq ($(shell pkg-config --exists webkit2gtk-4.1 2>/dev/null && echo yes),)
 WAILS_BUILD_FLAGS := -tags webkit2_41
@@ -104,6 +108,11 @@ test-frontend:
 
 test-vet: test test-frontend
 	go vet ./...
+
+# Dev window with live reload; regenerates frontend/wailsjs/. Use this rather than a bare
+# `wails dev` — see WAILS_BUILD_FLAGS above for what the bare command misses on Linux.
+dev: ensure-wails
+	"$(WAILS)" dev $(WAILS_BUILD_FLAGS)
 
 # Production app bundle (macOS: build/bin/pgCowboy.app). Requires Wails CLI.
 build: sync-wails-version test-vet ensure-wails

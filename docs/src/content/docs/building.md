@@ -17,8 +17,14 @@ cd pgcowboy
 go mod tidy
 
 # Development window with live reload:
-wails dev
+make dev
 ```
+
+:::caution[Use `make dev`, not `wails dev`]
+Wails' cgo asks for `webkit2gtk-4.0`. On a distribution that ships only 4.1 (Ubuntu 24.04+,
+Fedora) a bare `wails dev` therefore fails to compile even where `make build` succeeds — the
+`make` targets detect the installed version and pass `-tags webkit2_41` for you.
+:::
 
 ## Build a release installer
 
