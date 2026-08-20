@@ -584,10 +584,11 @@ out of step. Two rem values are hand-synced and must not drift:
    plain `linux && cgo` tag broke both workflows (`release.yml`'s build job `needs: test`). The
    stub in [native_theme_other.go](native_theme_other.go) carries the exact complement,
    `!linux || !cgo || (!dev && !production)`, so exactly one definition always exists. `wails build`
-   passes `production`, `wails dev` passes `dev`. The corollary: **the bare CI commands compile
-   none of this**, which is why [test.yml](.github/workflows/test.yml) has a `linux-desktop-build`
-   job that installs the GTK/WebKit headers and runs `go build -tags production,webkit2_41 ./...` —
-   the only thing that type-checks the cgo before a release does.
+   passes `production`, `wails dev` passes `dev`. The corollary to keep in mind: **the CI test
+   workflow compiles none of this** — the first thing that type-checks the cgo is
+   [release.yml](.github/workflows/release.yml)'s Linux build job (it installs the GTK/WebKit
+   headers and runs a real `wails build`), or a local `make build` on Linux. So a change here
+   wants a Linux build before it is tagged.
    GTK is not thread-safe and bound methods do not run on the main loop, so the `g_object_set` is
    deferred onto it with `g_idle_add`. `applyTheme`'s `paint()` drives page and GTK **together** —
    including from the poll tick, or a live desktop switch would darken the page and leave the
