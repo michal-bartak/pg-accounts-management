@@ -24,6 +24,8 @@ export function GetDefaultTemplates():Promise<model.DefaultTemplates>;
 
 export function GetPendingUpdate():Promise<model.UpdateInfo>;
 
+export function IsSystemDark():Promise<boolean>;
+
 export function LoadRoleDependencies(arg1:model.RoleDependenciesRequest):Promise<Array<model.ClusterRoleDependencies>>;
 
 export function LoadRoleDetails(arg1:model.RoleDetailsRequest):Promise<Array<model.ClusterRoleDetail>>;

@@ -15,6 +15,9 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - **Scrollbars on Linux** — no longer hair-thin, self-hiding, or drawn over the content they scroll.
 - **Scrollbars** — the bar now sits in the window's right margin instead of against the content, and its space is always reserved so nothing shifts when it appears.
 - **Tables** — column headers stay visible while the rows scroll, and the scrollbar sits outside the table.
+- **Appearance "System" on Linux** — now follows the desktop's light/dark setting, and keeps following it when you change it.
+- **Dropdowns in dark mode on Linux** — no longer drawn white by the system theme.
+- **Application icon on Linux** — the window, task bar and app switcher now show the pgCowboy icon.
 
 ### Changed
 

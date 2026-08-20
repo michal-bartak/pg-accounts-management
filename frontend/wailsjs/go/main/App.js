@@ -46,6 +46,10 @@ export function GetPendingUpdate() {
   return window['go']['main']['App']['GetPendingUpdate']();
 }
 
+export function IsSystemDark() {
+  return window['go']['main']['App']['IsSystemDark']();
+}
+
 export function LoadRoleDependencies(arg1) {
   return window['go']['main']['App']['LoadRoleDependencies'](arg1);
 }

@@ -435,8 +435,14 @@ button.small { min-height: 0; padding: calc(0.25rem - var(--ink-lift)) 0.5rem ca
 /* A disabled button is fully inert — no hover/pointer reaction. */
 button:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
 
+/* Take over the native rendering. The `-webkit-` prefix is NOT redundant: WebKitGTK honours only
+   the prefixed property for form controls, so without it Linux draws the native GTK combo — system
+   background (white under a light GTK theme, whatever our theme is), native popup, and GTK's own
+   text centring that ignores our height. macOS/Windows respect the unprefixed one. Same reason
+   input[type="checkbox"] above carries both. */
 select {
   appearance: none;
+  -webkit-appearance: none;
   padding-right: 1.75rem;
   background-image: var(--select-chevron);
   background-repeat: no-repeat;
@@ -444,8 +450,11 @@ select {
   cursor: pointer;
 }
 
+/* The popup list and its options stay OS-drawn — appearance:none does not reach them, and
+   WebKitGTK ignores `color-scheme` there and uses the GTK theme. Colour them explicitly so the
+   open dropdown matches the app. (Its shape and position remain native, and differ per platform.) */
 select option {
-  background: var(--surface);
+  background-color: var(--surface);
   color: var(--text);
 }
 

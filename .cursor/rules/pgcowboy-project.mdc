@@ -164,6 +164,25 @@ overcorrected buttons by ~1px — don't reintroduce it; uppercase pills excluded
 **`--checkbox-lift`** for the Target-selection checkbox. Retune the token, never sweep the rules. **`.section-label`** is the one small-uppercase section label
 (sized by `--fs-section`), replacing five drifted near-duplicates.
 
+**Three WebKitGTK/Linux quirks, each fixed once.** (1) **`prefers-color-scheme` always reports
+"light"** there, so *System* appearance is resolved by the backend: `App.IsSystemDark()`
+(`system_theme_linux.go`; `!linux` stub in `system_theme_other.go`) probes GNOME `gsettings`
+(`color-scheme`, then pre-42 `gtk-theme`) then KDE (`kreadconfig6`/`5`), each returning
+`(dark, known)` so "no gsettings" is unknown, not light. Only Linux calls it (`onLinux()` caches
+`runtime.Environment().platform`); elsewhere `matchMedia` still answers. `applyTheme` is therefore
+**async**, guarded by a **generation counter** (`themeGeneration`, re-checked after each `await`) so
+a superseded probe can't repaint, and Linux gets a **5 s poll** (`systemThemePoll`) because the
+media query never fires `change` for a switch the engine can't see. (2) **`<select>` needs both
+`appearance: none` and `-webkit-appearance: none`** — WebKitGTK honours only the prefixed one, so
+without it Linux draws the native GTK combo (white under a light GTK theme); `<option>`s are drawn
+natively regardless and ignore `color-scheme`, hence their explicit `background-color`/`color`.
+(3) **Wails sets no GTK window icon** — `main.go` embeds `build/appicon.png` as `linux.Options.Icon`
+with `ProgramName: "pgcowboy"` (`g_set_prgname()` = Wayland `app_id` / X11 `res_name`; must equal
+the `pgcowboy.desktop` basename, and defaults to the executable name `pgCowboy` otherwise), and
+`StartupWMClass` is kept in step. Passing a non-nil `linux.Options` means **`WebviewGpuPolicy` must
+be set explicitly to `Never`** — Wails applies that default (wailsapp/wails#2977) only when the
+struct is nil.
+
 **Scrollbars: `::-webkit-scrollbar` only.** The standard `scrollbar-width`/`scrollbar-color` sit
 inside a `@supports not selector(::-webkit-scrollbar)` guard (Firefox smoke-test path) and must not
 be re-added outside it: set to anything but `auto`, Chromium 121+ and WebKit/WebKitGTK ignore every
@@ -387,6 +406,7 @@ Go was installed via `brew install go` on this machine. Self-signed dev build wa
 
 ```
 main.go, app.go           Wails entry + bindings
+system_theme_*.go         Linux-only desktop dark/light probe (App.IsSystemDark)
 internal/config/          YAML persistence
 internal/model/           Shared types + RunRequest
 internal/calltemplate/    Call template parse/validate/SQL build (stdlib only)
