@@ -567,13 +567,24 @@ out of step. Two rem values are hand-synced and must not drift:
    Linux also gets a **5 s poll** (`systemThemePoll`), since the media query never fires `change`
    for a desktop switch the engine cannot see; it is torn down by the next `applyTheme`. Mirrors
    the same fix in the `osc` and `audits` projects.
-2. **`<select>` needs BOTH `appearance: none` and `-webkit-appearance: none`.** WebKitGTK honours
-   only the prefixed one for form controls, so the unprefixed property alone leaves Linux drawing
-   the native GTK combo — system background (white under a light GTK theme, whatever the app's
-   theme), native popup, GTK's own text centring that ignores our height. The `<option>`s are drawn
-   natively regardless and WebKitGTK ignores `color-scheme` there, so they carry an explicit
-   `background-color`/`color`. `input[type="checkbox"]` already carried both prefixes — a new
-   `appearance` user must too.
+2. **A `<select>` takes two separate fixes, because it is two separate things.** The CLOSED
+   control needs BOTH `appearance: none` and `-webkit-appearance: none` — WebKitGTK honours only
+   the prefixed one for form controls, so the unprefixed property alone leaves Linux drawing the
+   native GTK combo (system background, GTK's own text centring that ignores our height).
+   `input[type="checkbox"]` already carried both prefixes; a new `appearance` user must too.
+   The **drop-down LIST is a different story: no CSS reaches it at all.** WebKitGTK draws it as a
+   native GTK widget, so `appearance` never applies and neither does `select option {…}` —
+   **the option rule is kept for the platforms where it does work, but it is NOT what fixes
+   Linux**, and reaching for more CSS there is wasted effort. The only knob is GTK's own
+   **`gtk-application-prefer-dark-theme`**, set through `App.SetNativeDarkTheme(bool)`
+   ([native_theme_linux.go](native_theme_linux.go), cgo/`gtk+-3.0` — a strict subset of what Wails
+   already links on Linux; the `!linux || !cgo` stub in
+   [native_theme_other.go](native_theme_other.go) keeps `CGO_ENABLED=0` cross-builds working).
+   GTK is not thread-safe and bound methods do not run on the main loop, so the `g_object_set` is
+   deferred onto it with `g_idle_add`. `applyTheme`'s `paint()` drives page and GTK **together** —
+   including from the poll tick, or a live desktop switch would darken the page and leave the
+   drop-downs white. It also fixes the other natively drawn surfaces (context menus, file dialogs);
+   a GTK theme with no dark variant simply ignores it.
 3. **Wails sets no GTK window icon**, so the window/task bar/switcher fall back to the desktop's
    generic icon. `main.go` embeds `build/appicon.png` (the same drawing the packaged hicolor icon is
    resized from — one source) and passes it as `linux.Options.Icon`, with
@@ -934,6 +945,7 @@ The header is a `.brand` row (accent dot + smaller title + version chip + round 
 ```
 main.go, app.go           Wails entry + bound methods
 system_theme_*.go         Linux-only desktop dark/light probe behind App.IsSystemDark()
+native_theme_*.go         Linux-only GTK dark-variant toggle behind App.SetNativeDarkTheme()
 internal/model/           Shared JSON-tagged types + RunRequest (stdlib only)
 internal/calltemplate/    Template parse/validate/SQL build (stdlib only)
 internal/config/          YAML persistence (config.yaml + clusters.yaml), migrate/validate

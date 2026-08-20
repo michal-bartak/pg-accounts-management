@@ -60,6 +60,8 @@ export function SaveWindowSize(arg1:number,arg2:number):Promise<void>;
 
 export function SearchRoles(arg1:model.RoleSearchRequest):Promise<Array<model.ClusterRoleMatches>>;
 
+export function SetNativeDarkTheme(arg1:boolean):Promise<void>;
+
 export function SetUpdateSeenVersion(arg1:string):Promise<void>;
 
 export function TestConnection(arg1:model.TestConnectionRequest):Promise<void>;

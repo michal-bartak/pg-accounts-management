@@ -118,6 +118,10 @@ export function SearchRoles(arg1) {
   return window['go']['main']['App']['SearchRoles'](arg1);
 }
 
+export function SetNativeDarkTheme(arg1) {
+  return window['go']['main']['App']['SetNativeDarkTheme'](arg1);
+}
+
 export function SetUpdateSeenVersion(arg1) {
   return window['go']['main']['App']['SetUpdateSeenVersion'](arg1);
 }

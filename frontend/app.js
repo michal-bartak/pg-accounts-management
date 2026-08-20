@@ -524,13 +524,25 @@ async function applyTheme(themePref) {
     });
   }
 
+  // Both halves of "wear this appearance": the page, and — on Linux — GTK. A <select>'s
+  // drop-down LIST is drawn natively by WebKitGTK, so `appearance: none` and the rules on the
+  // <option>s never reach it; only the GTK theme's variant does. A no-op off Linux, where the
+  // native list already follows the page's `color-scheme`.
+  const paint = (dark) => {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    try {
+      backend()?.SetNativeDarkTheme?.(dark)?.catch?.(() => {});
+    } catch {
+      /* backend absent — the static-server smoke test */
+    }
+  };
+
   if (pref !== 'system') {
-    document.documentElement.setAttribute('data-theme', pref);
+    paint(pref === 'dark');
     setNativeTheme(pref, pref);
     return;
   }
 
-  const paint = (dark) => document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   const dark = await resolveSystemDark();
   if (gen !== themeGeneration) return; // superseded while the probe was in flight
   paint(dark);

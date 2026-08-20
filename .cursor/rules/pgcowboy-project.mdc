@@ -172,10 +172,14 @@ overcorrected buttons by ~1px — don't reintroduce it; uppercase pills excluded
 `runtime.Environment().platform`); elsewhere `matchMedia` still answers. `applyTheme` is therefore
 **async**, guarded by a **generation counter** (`themeGeneration`, re-checked after each `await`) so
 a superseded probe can't repaint, and Linux gets a **5 s poll** (`systemThemePoll`) because the
-media query never fires `change` for a switch the engine can't see. (2) **`<select>` needs both
-`appearance: none` and `-webkit-appearance: none`** — WebKitGTK honours only the prefixed one, so
-without it Linux draws the native GTK combo (white under a light GTK theme); `<option>`s are drawn
-natively regardless and ignore `color-scheme`, hence their explicit `background-color`/`color`.
+media query never fires `change` for a switch the engine can't see. (2) **A `<select>` is two problems.** The closed control needs both
+`appearance: none` and `-webkit-appearance: none` (WebKitGTK honours only the prefixed one, so
+without it Linux draws the native GTK combo). The **drop-down list is native and NO CSS reaches
+it** — `select option {…}` is kept for the platforms where it works but does NOT fix Linux; the
+only knob is GTK's `gtk-application-prefer-dark-theme` via `App.SetNativeDarkTheme(bool)`
+(`native_theme_linux.go`, cgo/`gtk+-3.0`; `!linux || !cgo` stub keeps `CGO_ENABLED=0` cross-builds
+working; `g_idle_add` defers the call onto the GTK main loop). `applyTheme`'s `paint()` drives page
+and GTK together, poll tick included.
 (3) **Wails sets no GTK window icon** — `main.go` embeds `build/appicon.png` as `linux.Options.Icon`
 with `ProgramName: "pgcowboy"` (`g_set_prgname()` = Wayland `app_id` / X11 `res_name`; must equal
 the `pgcowboy.desktop` basename, and defaults to the executable name `pgCowboy` otherwise), and
@@ -407,6 +411,7 @@ Go was installed via `brew install go` on this machine. Self-signed dev build wa
 ```
 main.go, app.go           Wails entry + bindings
 system_theme_*.go         Linux-only desktop dark/light probe (App.IsSystemDark)
+native_theme_*.go         Linux-only GTK dark-variant toggle (App.SetNativeDarkTheme)
 internal/config/          YAML persistence
 internal/model/           Shared types + RunRequest
 internal/calltemplate/    Call template parse/validate/SQL build (stdlib only)

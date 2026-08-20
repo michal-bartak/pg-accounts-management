@@ -115,7 +115,11 @@ const themeSetup = ({ platform, systemDark = false, mediaDark = false }) => `
   window.__probes = 0;
   window.runtime = { Environment: async () => ({ platform: '${platform}' }),
                      WindowSetSystemDefaultTheme() {}, WindowSetLightTheme() {}, WindowSetDarkTheme() {} };
-  window.go = { main: { App: { IsSystemDark: async () => { window.__probes++; return ${systemDark}; } } } };
+  window.__gtk = [];
+  window.go = { main: { App: {
+    IsSystemDark: async () => { window.__probes++; return ${systemDark}; },
+    SetNativeDarkTheme: async (d) => { window.__gtk.push(d); },
+  } } };
 `;
 
 // Shared config: two configured comment fields, Fields as the default empty view.
@@ -1493,13 +1497,28 @@ test('applyTheme(system): Linux takes the backend probe over the media query', a
     ${themeSetup({ platform: 'linux', systemDark: true, mediaDark: false })}
     await applyTheme('system');
     return { theme: document.documentElement.attrs['data-theme'], probes: window.__probes,
-             pollMs: __intervals.map((i) => i.ms) };
+             gtk: window.__gtk, pollMs: __intervals.map((i) => i.ms) };
   })()`);
   // The media query said light; the desktop is dark, and that is what wins.
   assert.equal(r.theme, 'dark');
   assert.equal(r.probes, 1);
+  // GTK is told too — the <select> drop-down list is native and no CSS reaches it.
+  assert.deepEqual(r.gtk, [true]);
   // Linux gets a live poll — the media query never fires `change` for a desktop theme switch.
   assert.deepEqual(r.pollMs, [5000]);
+});
+
+test('applyTheme: a live desktop switch retells GTK, not just the page', async () => {
+  const r = await evalJSONAsync(`(async () => {
+    ${themeSetup({ platform: 'linux', systemDark: false, mediaDark: false })}
+    await applyTheme('system');                       // desktop starts light
+    window.go.main.App.IsSystemDark = async () => true; // user flips it to dark
+    await __intervals[0].fn();                         // one poll tick
+    return { theme: document.documentElement.attrs['data-theme'], gtk: window.__gtk };
+  })()`);
+  assert.equal(r.theme, 'dark');
+  // The poll must drive BOTH surfaces, or the page goes dark and the drop-downs stay white.
+  assert.deepEqual(r.gtk, [false, true]);
 });
 
 test('applyTheme(system): off Linux the media query answers and the backend is never probed', async () => {
@@ -1519,10 +1538,11 @@ test('applyTheme: an explicit pick ignores both the probe and the media query', 
     ${themeSetup({ platform: 'linux', systemDark: true, mediaDark: true })}
     await applyTheme('light');
     return { theme: document.documentElement.attrs['data-theme'], probes: window.__probes,
-             polls: __intervals.length };
+             gtk: window.__gtk, polls: __intervals.length };
   })()`);
   assert.equal(r.theme, 'light');
   assert.equal(r.probes, 0);
+  assert.deepEqual(r.gtk, [false]);
   assert.equal(r.polls, 0); // and it tears down any poll a previous "system" left running
 });
 
