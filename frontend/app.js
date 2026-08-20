@@ -596,10 +596,96 @@ function renderCategoryColors() {
     .join('\n');
 }
 
+/** How narrow the flexible column may get before the table scrolls sideways instead of letting
+ *  `table-layout: fixed` collapse it to nothing (which is what a too-small window does). */
+const FLEX_COL_MIN_CH = 12;
+
+/**
+ * One column track from a spec, as both CSS and its `ch`/`rem` parts (so the same numbers can be
+ * summed into the table's min-width). A spec is one of:
+ *   {header, values, min, cap, chip} — `ch` from the widest value, floored by the header label and
+ *                                     `min`, capped by `cap`, plus the th/td padding
+ *   {width}                         — a fixed rem track (icon buttons have no text to count)
+ *   {flex: true}                    — the ONE column that absorbs the remaining width
+ * Character counts only — no text measuring, same approach as depsColgroup.
+ */
+function tableTrack(sp) {
+  // + 1.5rem for the th/td horizontal padding (.75rem each side); a chip adds its own.
+  const pad = sp.chip ? 3 : 1.5;
+  if (sp.width) return { css: sp.width, ch: 0, rem: parseFloat(sp.width) || 0 };
+  if (sp.flex) return { css: null, ch: FLEX_COL_MIN_CH, rem: pad };
+  const widest = (sp.values || []).reduce(
+    (m, v) => Math.max(m, String(v ?? '').length),
+    Math.max((sp.header || '').length, sp.min || 0)
+  );
+  const n = Math.min(sp.cap ?? widest, widest);
+  return { css: `calc(${n}ch + ${pad}rem)`, ch: n, rem: pad };
+}
+
+/** The colgroup shared by both tables of a split pair. */
+function tableColgroup(specs) {
+  return specs
+    .map((sp) => {
+      const t = tableTrack(sp);
+      return t.css ? `<col style="width:${t.css}">` : '<col>';
+    })
+    .join('');
+}
+
+/**
+ * The floor for both tables of a pair. Without it a window too narrow for the fixed tracks makes
+ * `table-layout: fixed` give the flexible column zero width — the values vanish and the header
+ * labels print on top of each other. With it the table overflows instead, so the body scrolls
+ * sideways and the header follows (the scrollLeft sync in applyTableColumns).
+ */
+function tableMinWidth(specs) {
+  const total = specs.reduce(
+    (acc, sp) => {
+      const t = tableTrack(sp);
+      return { ch: acc.ch + t.ch, rem: acc.rem + t.rem };
+    },
+    { ch: 0, rem: 0 }
+  );
+  return `calc(${total.ch}ch + ${total.rem}rem)`;
+}
+
+/**
+ * Write one colgroup into both tables of a split pair and keep the header in horizontal step with
+ * the body: the header sits OUTSIDE the scroll container (that is what keeps it visible and the
+ * bar beside the data rows only), so it has no scrollLeft of its own.
+ */
+function applyTableColumns(headId, bodyId, specs) {
+  const head = document.getElementById(headId);
+  const body = document.getElementById(bodyId);
+  if (!head || !body) return;
+  const headCols = head.querySelector('colgroup');
+  const bodyCols = body.querySelector('colgroup');
+  if (!headCols || !bodyCols) return;
+  const html = tableColgroup(specs);
+  headCols.innerHTML = html;
+  bodyCols.innerHTML = html;
+  const min = tableMinWidth(specs);
+  head.style.minWidth = min;
+  body.style.minWidth = min;
+  const clip = head.closest('.table-head-clip');
+  const scroll = body.closest('.table-scroll');
+  if (clip && scroll && !scroll.dataset.headSync) {
+    scroll.dataset.headSync = '1';
+    scroll.addEventListener('scroll', () => {
+      clip.scrollLeft = scroll.scrollLeft;
+    });
+  }
+}
+
 function renderGroupsTable() {
   const tbody = document.querySelector('#groups-table tbody');
   if (!tbody) return;
   tbody.innerHTML = '';
+  applyTableColumns('groups-head', 'groups-table', [
+    { header: 'Group', values: (categoriesDraft || []).map((c) => c.label), chip: true, flex: true },
+    { header: 'Confirm', min: 8 },
+    { width: '5.5rem' },
+  ]);
   if (!categoriesDraft?.length) {
     tbody.innerHTML = '<tr><td colspan="3" class="hint">No groups defined.</td></tr>';
     return;
@@ -663,6 +749,7 @@ function renderClustersTable() {
   // footer still has to be reported, and the early return below would skip it — which is how a
   // fresh install came up with Save/Discard live before the user had touched anything.
   refreshClustersDirty();
+  applyClusterColumns(clustersDraft || []);
   if (!clustersDraft?.length) {
     tbody.innerHTML = '<tr><td colspan="7" class="hint">No clusters configured.</td></tr>';
     return;
@@ -677,10 +764,10 @@ function renderClustersTable() {
   for (const c of rows) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${escapeHtml(c.alias)}</td>
-      <td>${escapeHtml(c.host)}</td>
+      <td title="${escapeAttr(c.alias)}">${escapeHtml(c.alias)}</td>
+      <td title="${escapeAttr(c.host)}">${escapeHtml(c.host)}</td>
       <td>${c.port}</td>
-      <td>${escapeHtml(c.database)}</td>
+      <td title="${escapeAttr(c.database)}">${escapeHtml(c.database)}</td>
       <td><span class="badge" data-cat="${escapeAttr(c.category)}">${escapeHtml(draftCategoryLabel(c.category))}</span></td>
       <td class="cluster-status" data-status-for="${escapeAttr(c.id)}"></td>
       <td>
@@ -694,6 +781,23 @@ function renderClustersTable() {
   tbody.querySelectorAll('button').forEach((btn) => {
     btn.addEventListener('click', onClusterAction);
   });
+}
+
+/**
+ * Clusters table columns. Host takes the slack (it is the long one); Status is a fixed track
+ * because setClusterStatus fills it after this runs, so deriving its width from content would make
+ * the columns jump when a test finishes; Actions is two icon buttons, i.e. no text to count.
+ */
+function applyClusterColumns(rows) {
+  applyTableColumns('clusters-head', 'clusters-table', [
+    { header: 'Alias', values: rows.map((c) => c.alias), cap: 24 },
+    { flex: true }, // Host
+    { header: 'Port', values: rows.map((c) => c.port), cap: 6 },
+    { header: 'Database', values: rows.map((c) => c.database), cap: 20 },
+    { header: 'Group', values: rows.map((c) => draftCategoryLabel(c.category)), cap: 16, chip: true },
+    { header: 'Status', min: 12 },
+    { width: '5.5rem' },
+  ]);
 }
 
 function renderCategoryCheckboxes() {
@@ -1397,8 +1501,19 @@ function renderRunStatusDialog(rs = statusDialogState) {
   const tbody = document.querySelector('#run-status-table tbody');
   if (!tbody) return;
   tbody.innerHTML = '';
+  const ids = rs ? statusRowOrder(rs) : [];
+  // Message takes the slack; Status/Duration are fixed tracks so the columns don't jump as
+  // progress events arrive.
+  applyTableColumns('run-status-head', 'run-status-table', [
+    { header: 'Cluster', values: ids.map((id) => rs.byId.get(id)?.alias), cap: 24 },
+    { header: 'Group', values: ids.map((id) => categoryLabel(rs.byId.get(id)?.category)), cap: 16, chip: true },
+    { header: 'Status', min: 10 },
+    { header: 'Duration', min: 9 },
+    { flex: true }, // Message
+    { width: '4.5rem' },
+  ]);
   if (!rs) return;
-  for (const id of statusRowOrder(rs)) {
+  for (const id of ids) {
     const r = rs.byId.get(id);
     const statusCell =
       r.phase !== 'done'
@@ -1416,12 +1531,13 @@ function renderRunStatusDialog(rs = statusDialogState) {
         ? `<button type="button" class="config-path-copy rst-copy" data-cluster-id="${escapeAttr(id)}" title="Copy message + queries" aria-label="Copy message and queries">${ICONS.copy}</button>`
         : '';
     const tr = document.createElement('tr');
+    const shownMessage = stripClusterPrefix(message, r.alias);
     tr.innerHTML = `
-      <td>${escapeHtml(r.alias)}</td>
+      <td title="${escapeAttr(r.alias)}">${escapeHtml(r.alias)}</td>
       <td><span class="badge" data-cat="${escapeAttr(r.category)}">${escapeHtml(categoryLabel(r.category))}</span></td>
       <td>${statusCell}</td>
       <td>${r.phase === 'done' ? rowDurationMs(r) + ' ms' : ''}</td>
-      <td>${escapeHtml(stripClusterPrefix(message, r.alias))}</td>
+      <td title="${escapeAttr(shownMessage)}">${escapeHtml(shownMessage)}</td>
       <td><div class="rst-actions">${viewCell}${copyCell}</div></td>`;
     tbody.appendChild(tr);
   }
@@ -4090,8 +4206,11 @@ document.querySelectorAll('.tab').forEach((tab) => {
     document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById(`panel-${tab.dataset.tab}`).classList.add('active');
-    // Create role / Alter role live in the tabs bar but belong to Operations only.
-    document.getElementById('op-tabs')?.classList.toggle('hidden', tab.dataset.tab !== 'operations');
+    // The per-page action groups (Create/Alter role, the Clusters actions) live in the tabs bar;
+    // each declares the page it belongs to, so a new group needs no code here.
+    document
+      .querySelectorAll('.tab-actions')
+      .forEach((group) => group.classList.toggle('hidden', group.dataset.for !== tab.dataset.tab));
     // Leaving/entering a page discards stale run status so it never bleeds across pages.
     clearRunStatus();
   });

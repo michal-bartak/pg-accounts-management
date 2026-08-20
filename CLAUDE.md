@@ -75,8 +75,8 @@ into prose, it goes stale.
   wrapper functions override per-op in config or the Settings editor. Loading an existing config never
   force-overwrites a user's templates (`migrateOne` keeps a non-empty `call`); the editor's **Default**
   button is how a user reverts one template to the vanilla built-in.
-- **Categories = cluster groups**, edited from the **Clusters** tab (a right-aligned
-  *Cluster groups* toolbar button opens the `#groups-dialog` list popup; *Add group*
+- **Categories = cluster groups**, edited from the **Clusters** tab (a *Cluster groups* button in
+  the tabs bar's Clusters action group opens the `#groups-dialog` list popup; *Add group*
   opens the `#group-dialog` form — label + base `color` + `confirm`). Group id is a slug of the
   label, immutable on edit; delete blocked while a cluster uses it. Group colours are applied
   by a generated `<style id="cat-colors">` keyed on `data-cat`; there are no hardcoded
@@ -102,7 +102,7 @@ into prose, it goes stale.
   so they don't react to hover) — Settings (`btn-save-settings`, `settingsDirty`), the role form
   (`btn-alter-save`, dirty = `buildAlterClusterOps().length>0`, in `updateOpsFooter`), and the
   Clusters Save. All right-aligned action buttons + the op-tabs share one right margin (the
-  `.tabs`, `.ops-footer`, and Settings/Clusters footers all align to the 1.25rem panel edge). Errors/validation render **inline** in a `.form-error` next to the control
+  `.tabs`, `.ops-footer`, and Settings/Clusters footers all align to the `--page-pad` panel edge). Errors/validation render **inline** in a `.form-error` next to the control
   (`showInlineError`/`clearInlineError`) — `#ops-error` (Operations footer), `#settings-error`,
   `#clusters-error`, `#scope-error`, `#group-error`, `#cluster-test-error`, `#alter-search-errors`
   (a **one-liner** only — see the search-status decision below)
@@ -552,6 +552,82 @@ out of step. Two rem values are hand-synced and must not drift:
 `th, td { padding: .55rem .75rem }` with the `1.5rem` in `depsColgroup`, and
 `.alter-result-head`'s `calc(0.7rem + 1px)` with the search-result row's border+padding.
 
+**Scrollbars are styled ONLY through `::-webkit-scrollbar`** (one universal block in
+[styles.css](frontend/styles.css), just below the user-select rule) — the standard
+`scrollbar-width`/`scrollbar-color` properties live inside a
+`@supports not selector(::-webkit-scrollbar)` guard and **must not be re-added outside it**. When
+they are set to anything but `auto`, Chromium 121+ and WebKit/WebKitGTK *ignore every
+`::-webkit-scrollbar` rule on the element* (spec'd precedence), which hands the bar back to the
+platform's **overlay** scrollbar: on Fedora/WebKitGTK that was a hair-thin Adwaita indicator that
+hid itself unless you were actively scrolling, went native grey when pressed, and — being
+zero-width in layout — painted over the content it scrolled. Giving `::-webkit-scrollbar` an
+explicit `width` is also what force-renders an overlay scrollbar as a classic, space-taking one, so
+the pseudo-element block is what makes the three engines agree. The guarded standard properties are
+there only for the Firefox smoke-test path.
+**Every scroll container reserves the bar's lane** via ONE grouped `overflow-y: scroll` rule
+(`.ops-body, .settings-body, .cluster-list, .table-scroll, .run-queries-content, .deps-list,
+.scope-targets, #comments-list, .search-dialog-body .alter-results, textarea`), so content is never
+shrunk and shifted sideways the moment the bar appears. That rule **owns the vertical axis**: no
+container declares its own `overflow-y` any more (an equal-specificity `overflow-y: auto` later in
+the sheet would quietly win), each keeps only its `overflow-x` where the horizontal safety valve
+matters, and a new scroll container is added by extending that selector list. It is
+`overflow-y: scroll` rather than `scrollbar-gutter: stable` because the latter needs Safari 18.2 / a
+very recent WebKitGTK, above the app's WebKit 16 / macOS 12 floor. Nothing is painted while a
+container cannot scroll (transparent track, no thumb), so a reserved-but-unused lane is invisible.
+
+**The bar rides in the right margin, and content keeps EQUAL left/right margins.** Three tokens:
+**`--page-pad`** (1.4rem) is the horizontal edge of the whole app — `.app-header`, `.tabs`,
+`.ops-layout`, `#panel-clusters, #panel-settings` and `dialog > div, dialog > form` all read it, so
+the content edge, the right-aligned action buttons and the op-tabs sit on one vertical line (that
+`1.25rem` used to be hand-repeated in five rules, which is how the tabs bar got left behind when the
+margin changed) — plus **`--scrollbar-w`** (8px, deliberately repeated as a literal in the
+`::-webkit-scrollbar` rule: a `var()` in a scrollbar pseudo-element is not worth risking on
+WebKitGTK) and **`--scrollbar-gap`**, which is **derived, not picked**: `calc((var(--page-pad) - var(--scrollbar-w)) / 2)`, i.e. half of what the bar leaves over, so the bar sits **centred in the margin** — equal air between the content (or the box's frame line) and the bar, and between the bar and the window/dialog edge. Written as a relation so changing `--page-pad` or the bar width re-centres it instead of silently shifting it; it is 5.8px at 1.4rem, and a centred 6.5px each side would mean `--page-pad: 1.5rem`.
+**Invariant: `--scrollbar-w` + `--scrollbar-gap` ≤ `--page-pad`.** A second grouped rule gives the
+borderless scroll containers `margin-right: calc(-1 * (var(--scrollbar-w) + var(--scrollbar-gap)))`
++ `padding-right: var(--scrollbar-gap)`: the box grows into the surrounding padding, the gap lands
+between content and bar, so the content edge falls back exactly on the panel's content edge — level
+with *Create role* / *Save changes*, the footer divider, a dialog's own `<menu>` — while the bar sits
+in the margin. Two things not to undo: none of those selectors may take a `padding`/`margin`
+**shorthand** later in the sheet (it silently drops these longhands — hence `.ops-body`'s
+`padding-block`), and no ancestor may gain an `overflow` value (it would clip the bar; `.ops-main`
+and `.table-wrap` are deliberately `overflow: visible`).
+**`.ops-sidebar` is the one exception**: it is a bordered panel, so its bar cannot leave the box, and
+reserving a lane inside its padding is what made its rows sit further from the right border than from
+the left. It keeps `overflow-y: auto` and hands the right margin to the nested **`.cluster-list`**,
+which uses the same shared formula as every other scroller — that works because the panel's padding is
+**`--page-pad`, not a bespoke `1rem`**: the clearing between the target rows and the panel frame is
+then the same as the window margin, and the budget (19.6px) is wide enough for bar + gap (15px), so
+the bar sits centred in that padding instead of flush against the frame (which is what the old 14px
+budget forced — 8 + gap did not fit in it). A scroll container clips at its padding box, so the sidebar's
+`auto` does not clip that bar. Trade-off: if the sidebar itself overflows (many groups, list
+collapsed) its own bar appears and shifts its content.
+
+**Tables are split: header table + scrolling body table.** `.table-wrap` is a bordered,
+**non-scrolling** flex column holding `.table-head-clip > table.table-head` (thead only) and
+`.table-scroll > table` (tbody only) — so headers stay visible, the bar sits **outside** the border in
+the panel margin, its track spans exactly the data rows, and the box's border (the edge aligned with
+*Save*) never moves. It is the one scroller that grows past a **border** rather than out of a padding
+box, so its own `margin-right`/`padding-right` pair adds `--hairline` to the gap: the table's cells end
+on the inner border edge, so the nearest painted edge left of the bar is the frame LINE, and without
+that extra the bar keeps 5.85px on one side and 5.74px on the other — reading as centred in the margin
+instead of centred in it like every other scroller — the frame line would eat into the gap on one side
+only. This replaced both alternatives the user rejected: a lane reserved *inside* the
+box leaves the header band and row rules stopping 8px short of the border, and an on-demand lane moves
+the columns instead. `overflow: visible` on the wrap is load-bearing (any other value clips the bar
+away) and is why `.table-wrap thead th:first-child/:last-child` re-apply the corner radii the box no
+longer clips. The two tables align because both get the **same generated colgroup** under
+`table-layout: fixed` — `tableColgroup`/`applyTableColumns` in [app.js](frontend/app.js), character
+counts only (`calc(<n>ch + 1.5rem)`, a chip adds its own padding), the same approach as
+`depsColgroup`; **not** the `measureText` machinery this codebase deleted. `applyTableColumns` also
+sets each pair's `min-width` from those same tracks (`tableMinWidth`, with `FLEX_COL_MIN_CH` for the
+flexible column) — without it a window narrower than the fixed tracks makes fixed layout collapse the
+flexible column to zero width; with it the body scrolls sideways and the header follows via the
+`scrollLeft` sync. Fixed layout means values can be clipped, so `.table-scroll td` / `.table-head th`
+ellipsize and the renderers put a `title` on every cell that can be truncated. The three pairs are
+`clusters-head`/`clusters-table`, `run-status-head`/`run-status-table` and `groups-head`/`groups-table`;
+the old `#clusters-table th:last-child { width: 1% }` content-hugging trick is gone with auto layout.
+
 **Vertical rhythm inside a Settings group is `--settings-row-gap`**, applied two ways: as
 `.settings-row-gap`'s `margin-top` between sibling rows, and as `.pwgen-col`'s flex `gap` — the
 password-generator classes stack two lines inside ONE `.settings-row`, so no margin falls between
@@ -614,16 +690,20 @@ Settings & Clusters `[Discard] [Save]` right-aligned; Remove role renders left o
 `.ops-footer .alter-actions{justify-content:flex-end}` + `#btn-alter-remove{order:-1}` — `order`
 is the whole mechanism, and both rules now sit together). A button opts out to the LEFT of a
 right-aligned row with `margin-right:auto` (Test connection, `#fn-dialog-default`,
-`#search-status`). The **Test connections** button lives in the Clusters
-toolbar (`btn-test-clusters` → `testAllClusters`): it tests every configured cluster and
+`#search-status`). The **Test connections** button lives in the tabs bar's Clusters action group
+(`btn-test-clusters` → `testAllClusters`): it tests every configured cluster and
 writes the outcome into a per-row **Status** column (`setClusterStatus`). Cluster rows have
 no per-row Test button (testing on-screen values is done from the cluster editor via
 `TestConnectionInput`); each row's **Actions** cell holds right-aligned **✎ edit** / **× delete**
 icon buttons (`.scope-act`, same as the role form) in a `.row-actions` flex.
 
-Top tabs **Operations / Clusters / Settings**, with **Create role** / **Alter role**
-op-tabs right-aligned in the same bar (shown only while Operations is active; toggled in
-the `.tab` click handler). The two op-tabs drive **one shared `#role-form`** (there is no
+Top tabs **Operations / Clusters / Settings**, with **one right-aligned action group per page** in
+the same bar: `.tab-actions` boxes carrying **Create role** / **Alter role** (`#op-tabs`) and
+**Add cluster** / **Test connections** / **Cluster groups** (`#cluster-actions`). Each declares its
+page with `data-for`, and the `.tab` click handler shows only the active page's group — so adding a
+page's actions is markup, not code (Settings has none). The Clusters page therefore has **no
+in-panel toolbar** (`.toolbar` is gone): its table starts at the panel's top padding, like the
+Settings body and the Operations grid. The two op-tabs drive **one shared `#role-form`** (there is no
 `#form-create_role` / `#form-alter_user` split): Create resets it to an empty form; Alter
 opens the search popup and fills it on pick — see the shared-role-form product decision
 above. The left sidebar is **Target selection** only (no connection or
