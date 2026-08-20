@@ -577,9 +577,17 @@ out of step. Two rem values are hand-synced and must not drift:
    **the option rule is kept for the platforms where it does work, but it is NOT what fixes
    Linux**, and reaching for more CSS there is wasted effort. The only knob is GTK's own
    **`gtk-application-prefer-dark-theme`**, set through `App.SetNativeDarkTheme(bool)`
-   ([native_theme_linux.go](native_theme_linux.go), cgo/`gtk+-3.0` — a strict subset of what Wails
-   already links on Linux; the `!linux || !cgo` stub in
-   [native_theme_other.go](native_theme_other.go) keeps `CGO_ENABLED=0` cross-builds working).
+   ([native_theme_linux.go](native_theme_linux.go), cgo/`gtk+-3.0`). **Its build constraint is
+   `linux && cgo && (dev || production)`, and that is load-bearing**: Wails gates its own cgo the
+   same way — untagged, `internal/app` resolves to a stub that refuses to run — so a bare
+   `go build ./...` / `go test ./...` has never needed the GTK headers, and CI installs none. A
+   plain `linux && cgo` tag broke both workflows (`release.yml`'s build job `needs: test`). The
+   stub in [native_theme_other.go](native_theme_other.go) carries the exact complement,
+   `!linux || !cgo || (!dev && !production)`, so exactly one definition always exists. `wails build`
+   passes `production`, `wails dev` passes `dev`. The corollary: **the bare CI commands compile
+   none of this**, which is why [test.yml](.github/workflows/test.yml) has a `linux-desktop-build`
+   job that installs the GTK/WebKit headers and runs `go build -tags production,webkit2_41 ./...` —
+   the only thing that type-checks the cgo before a release does.
    GTK is not thread-safe and bound methods do not run on the main loop, so the `g_object_set` is
    deferred onto it with `g_idle_add`. `applyTheme`'s `paint()` drives page and GTK **together** —
    including from the poll tick, or a live desktop switch would darken the page and leave the

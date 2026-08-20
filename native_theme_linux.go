@@ -1,4 +1,10 @@
-//go:build linux && cgo
+// Only a REAL desktop build needs (or can link) GTK. Wails gates its own cgo the same way —
+// without `dev` or `production` its internal/app falls back to a stub that refuses to run — so a
+// plain `go build ./...` / `go test ./...` has never required the GTK headers, and this file must
+// not be what changes that: CI runs the bare commands with no libgtk-3-dev installed.
+// `wails build` passes `production`, `wails dev` passes `dev`; native_theme_other.go covers the
+// exact complement of this constraint, so exactly one definition always exists.
+//go:build linux && cgo && (dev || production)
 
 package main
 

@@ -182,8 +182,11 @@ media query never fires `change` for a switch the engine can't see. (2) **A `<se
 without it Linux draws the native GTK combo). The **drop-down list is native and NO CSS reaches
 it** — `select option {…}` is kept for the platforms where it works but does NOT fix Linux; the
 only knob is GTK's `gtk-application-prefer-dark-theme` via `App.SetNativeDarkTheme(bool)`
-(`native_theme_linux.go`, cgo/`gtk+-3.0`; `!linux || !cgo` stub keeps `CGO_ENABLED=0` cross-builds
-working; `g_idle_add` defers the call onto the GTK main loop). `applyTheme`'s `paint()` drives page
+(`native_theme_linux.go`, cgo/`gtk+-3.0`; `g_idle_add` defers the call onto the GTK main loop).
+Its constraint **`linux && cgo && (dev || production)`** is load-bearing — Wails gates its own cgo
+the same way, so the bare `go build`/`go test` CI commands need no GTK headers; `native_theme_other.go`
+holds the exact complement. Because those bare commands then compile none of the cgo, `test.yml` has a
+`linux-desktop-build` job (`go build -tags production,webkit2_41 ./...`) that does. `applyTheme`'s `paint()` drives page
 and GTK together, poll tick included.
 (3) **Wails sets no GTK window icon** — `main.go` embeds `build/appicon.png` as `linux.Options.Icon`
 with `ProgramName: "pgcowboy"` (`g_set_prgname()` = Wayland `app_id` / X11 `res_name`; must equal
