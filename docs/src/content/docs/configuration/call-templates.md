@@ -3,7 +3,7 @@ title: Call templates
 description: How pgCowboy turns form input into the SQL it runs
 ---
 
-Every change the app makes runs through a **call template** — a short piece of SQL with `${placeholder}` or `${{placeholder}}` fields. Templates live in **Settings → DB command templates**. 
+Every change the app makes runs through a **call template** — a short piece of SQL with `${placeholder}` or `${{placeholder}}` fields. Templates live in **Settings → DB command templates**.
 
 Command templates offers three **execution modes*: `statement`, `block` or `function` while introspection templates accepts sql `statements` only.
 
@@ -157,7 +157,130 @@ Because matching is by name, you can point a read query at a privileged wrapper 
 
 Column order doesn't matter and a missing column is tolerated, but an unexpected extra column is rejected.
 
+### Custom role_dependencies
+
 `role_dependencies` is the pre-flight check: it runs on every cluster a removal targets, and its rows are shown per cluster before anything is dropped.
+
+The query is executed against connected database, identifing dependencies on all databases of the cluster. Unfortunatelly it can resolv fully qualified identifiers of these objects only for connected database. If you have `dblink` installed, you can write a function that looks up to each database in the cluster collecting needed data. Here is an example
+
+<details>
+<summary>Code of role_depenendencies() function</summary>
+
+:::note
+The proposed implementation uses pg service files. It's possible you will need to adjust that to own needs.
+:::
+
+```sql
+CREATE OR REPLACE FUNCTION admin.role_depenendencies(_rolename TEXT)
+RETURNS TABLE (database TEXT, dependency TEXT, class TEXT, object TEXT)
+LANGUAGE plpgsql
+AS $x$
+DECLARE
+    _dbs RECORD;
+    _nconn   oid[];  -- collect unreachable dbs
+    _conn    TEXT;   -- dblink conn name
+    _connstr TEXT;   -- connection string
+    _sql     TEXT = format($sql$
+                SELECT COALESCE(d.datname, current_database()) AS database,
+                       CASE s.deptype
+                           WHEN 'o' THEN 'owner'
+                           WHEN 'a' THEN 'privileges (ACL)'
+                           WHEN 'i' THEN 'initial privileges'
+                           WHEN 'r' THEN 'RLS policy'
+                           WHEN 't' THEN 'tablespace'
+                           WHEN 'p' THEN 'pinned (system)'
+                       END AS dependency,
+                       s.classid::regclass::TEXT AS class,
+                       CASE WHEN s.dbid = 0 OR d.datname = current_database()
+                            THEN pg_describe_object(s.classid, s.objid, s.objsubid)
+                            ELSE 'oid: ' || s.objid || CASE WHEN s.objsubid = 0 THEN '' ELSE '; sub oid: ' || s.objsubid END
+                       END AS object
+                FROM pg_shdepend      AS s
+                JOIN pg_roles         AS r ON r.oid  = s.refobjid
+                LEFT JOIN pg_database AS d ON s.dbid = d.oid
+                WHERE s.refclassid = 'pg_authid'::regclass
+                  AND r.rolname    = %L
+                $sql$, _rolename);
+BEGIN
+
+    CREATE TEMPORARY TABLE res (database TEXT, dependency TEXT, class TEXT, object TEXT) ON COMMIT DROP;
+
+    -- try to fetch remote dependencies
+    FOR _dbs IN
+
+        SELECT oid, datname
+        FROM pg_database
+        WHERE datname <> current_database()
+
+    LOOP
+
+        _conn = NULL;
+
+        BEGIN
+            -- use you own implementation of dblink connection
+            _conn = 'conn_' || _dbs.datname;
+
+            IF NOT _conn = ANY(COALESCE(dblink_get_connections(), Array[]::TEXT[]))
+            THEN
+
+                _connstr = format('service=%s', 's_' || _dbs.datname);
+                PERFORM dblink_connect(_conn, _connstr);
+
+            END IF;
+
+        EXCEPTION WHEN OTHERS THEN
+            _nconn = _nconn || _dbs.oid;
+            _conn = NULL;
+
+        END;
+
+        IF _conn IS NOT NULL
+        THEN
+
+            PERFORM dblink_exec(_conn, 'SET search_path = ''''', TRUE); -- to ensure fully qualified identifiers resolved properly
+
+            INSERT INTO res (database, dependency, class, object)
+            SELECT x.database, x.dependency, x.class, x.object
+            FROM dblink(_conn, _sql || ' AND (s.dbid = 0 OR d.datname = current_database())', TRUE)
+                    AS x(database TEXT, dependency TEXT, class TEXT, object TEXT);
+
+            PERFORM dblink_disconnect(_conn);
+
+        END IF;
+
+    END LOOP;
+
+    -- local + unresolved remote dependencies
+    SET search_path = ''; -- to ensure fully qualified identifiers resolved properly
+    EXECUTE  'INSERT INTO res (database, dependency, class, object) ' || _sql || ' AND ((s.dbid = 0 OR d.datname = current_database()) OR s.dbid = ANY (' || quote_literal(_nconn) || '))';
+    RESET search_path;
+
+    RETURN QUERY
+    SELECT *
+    FROM res;
+
+END;
+$x$;
+
+COMMENT ON FUNCTION admin.role_depenendencies(_rolename TEXT) IS $$
+Returns information about objects that depend on the login role whose name is passed as the argument.
+
+Useful for identifying dependencies that would prevent the role from being dropped.
+
+The function uses dblink to connect to other databases in the cluster, which is required to resolve object identifiers. If a connection cannot be established, the object's OID is returned instead.
+$$;
+
+```
+
+</details>
+
+Once deployed, replace `role_dependencies` template with
+
+```sql
+SELECT database, dependency, class, object
+FROM admin.role_depenendencies(${rolename})
+ORDER BY 1, 2, 3, 4
+```
 
 :::tip
 Full syntax, the field whitelist, examples and common mistakes are in the repository's [`sql/README.md`](https://github.com/michal-bartak/pgcowboy/blob/main/sql/README.md).
