@@ -20,6 +20,16 @@ export default defineConfig({
       title: 'pgCowboy',
       description: 'Maintain PostgreSQL roles across many clusters from one desktop app',
       plugins: [starlightThemeRapide()],
+      // Restore Starlight's own theme picker: a labelled Dark/Light/Auto <select>.
+      // starlight-theme-rapide replaces ThemeSelect with a sun/moon icon button whose click
+      // handler only flips between dark and light, so "auto" (follow the OS) is unreachable once
+      // you click it. Its overrideComponents() yields to an override declared here, logging one
+      // build warning as it does so. NOTE that warning is expected, not a misconfiguration.
+      // Header spacing then needs two rapide rules undone; see the theme-picker block in
+      // src/styles/custom.css.
+      components: {
+        ThemeSelect: '@astrojs/starlight/components/ThemeSelect.astro',
+      },
       // Renames the table-of-contents' top entry from "Overview" to the page title.
       routeMiddleware: './src/starlightRouteData.ts',
       favicon: '/appicon.png',
